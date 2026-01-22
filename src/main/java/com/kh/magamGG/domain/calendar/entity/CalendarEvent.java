@@ -3,6 +3,9 @@ package com.kh.magamGG.domain.calendar.entity;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -10,9 +13,12 @@ import java.util.List;
 
 @Entity
 @Table(name = "CALENDAR_EVENT")
+@Getter
+@NoArgsConstructor
 public class CalendarEvent {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "CALENDAR_EVENT_NO")
 	private Long calendarEventNo;
 	

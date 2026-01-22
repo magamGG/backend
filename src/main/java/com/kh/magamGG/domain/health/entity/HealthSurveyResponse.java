@@ -2,15 +2,21 @@ package com.kh.magamGG.domain.health.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "HEALTH_SURVEY_RESPONSE")
+@Getter
+@NoArgsConstructor
 public class HealthSurveyResponse {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "HEALTH_SURVEY_RESPONSE_NO")
 	private Long healthSurveyResponseNo;
 	
@@ -23,7 +29,7 @@ public class HealthSurveyResponse {
 	private Member member;
 	
 	@Column(name = "HEALTH_SURVEY_RESPONSE_TOTAL_SCORE")
-	private Long healthSurveyResponseTotalScore;
+	private Integer healthSurveyResponseTotalScore;
 	
 	@Column(name = "HEALTH_SURVEY_RESPONSE_STATUS", nullable = false, length = 1)
 	private String healthSurveyResponseStatus;

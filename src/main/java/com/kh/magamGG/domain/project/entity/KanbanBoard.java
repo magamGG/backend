@@ -1,14 +1,20 @@
 package com.kh.magamGG.domain.project.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "KANBAN_BOARD")
+@Getter
+@NoArgsConstructor
 public class KanbanBoard {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "KANBAN_BOARD_NO")
 	private Long kanbanBoardNo;
 	
@@ -20,7 +26,7 @@ public class KanbanBoard {
 	private String kanbanBoardName;
 	
 	@Column(name = "KANBAN_BOARD_ORDER", nullable = false)
-	private Long kanbanBoardOrder;
+	private Integer kanbanBoardOrder;
 	
 	@Column(name = "KANBAN_BOARD_STATUS", nullable = false, length = 1)
 	private String kanbanBoardStatus;

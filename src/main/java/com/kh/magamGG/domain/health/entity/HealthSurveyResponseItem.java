@@ -1,13 +1,19 @@
 package com.kh.magamGG.domain.health.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "HEALTH_SURVEY_RESPONSE_ITEM")
+@Getter
+@NoArgsConstructor
 public class HealthSurveyResponseItem {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "HEALTH_SURVEY_RESPONSE_ITEM_NO")
 	private Long healthSurveyResponseItemNo;
 	
@@ -20,7 +26,7 @@ public class HealthSurveyResponseItem {
 	private HealthSurveyQuestion healthSurveyQuestion;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE", nullable = false)
-	private Long healthSurveyQuestionItemAnswerScore;
+	private Integer healthSurveyQuestionItemAnswerScore;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT", nullable = false)
 	private LocalDateTime healthSurveyQuestionItemCreatedAt;

@@ -5,7 +5,7 @@ spring:
   datasource:
     url: jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
     username: magam_user
-    password: 0000
+    password: asdf1234!
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   servlet:
@@ -21,11 +21,15 @@ spring:
       hibernate:
         format_sql: true
 
-  server:
-    port: 8888
+jwt:
+  secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
+  expiration: 86400000
 
-    servlet:
-      encoding:
-        charset: UTF-8
-        enabled: true
-        force: true
+server:
+  port: 8888
+
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true

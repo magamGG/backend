@@ -2,14 +2,20 @@ package com.kh.magamGG.domain.project.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "PROJECT_MEMBER")
+@Getter
+@NoArgsConstructor
 public class ProjectMember {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "PROJECT_MEMBER_NO")
 	private Long projectMemberNo;
 	

@@ -3,13 +3,19 @@ package com.kh.magamGG.domain.memo.entity;
 import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "MEMO")
+@Getter
+@NoArgsConstructor
 public class Memo {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "MEMO_NO")
 	private Long memoNo;
 	

@@ -3,13 +3,19 @@ package com.kh.magamGG.domain.attendance.entity;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ATTENDANCE")
+@Getter
+@NoArgsConstructor
 public class Attendance {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "ATTENDANCE_NO")
 	private Long attendanceNo;
 	

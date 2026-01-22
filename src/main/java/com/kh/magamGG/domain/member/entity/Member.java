@@ -11,15 +11,21 @@ import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.entity.TaskHistory;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "MEMBER")
+@Getter
+@NoArgsConstructor
 public class Member {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "MEMBER_NO")
 	private Long memberNo;
 	

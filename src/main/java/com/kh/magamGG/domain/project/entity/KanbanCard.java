@@ -1,15 +1,22 @@
 package com.kh.magamGG.domain.project.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "KANBAN_CARD")
+@Getter
+@NoArgsConstructor
 public class KanbanCard {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "TASK_NO")
 	private Long taskNo;
 	
@@ -33,11 +40,11 @@ public class KanbanCard {
 	@JoinColumn(name = "PROJECT_MEMBER_NO", nullable = false)
 	private ProjectMember projectMember;
 	
-	@Column(name = "Field", length = 255)
-	private String field;
+	@Column(name = "TASK_STARTED_AT")
+	private LocalDate taskStartedAt;
 	
-	@Column(name = "Field2", length = 255)
-	private String field2;
+	@Column(name = "TASK_ENDED_AT")
+	private LocalDate taskEndedAt;
 	
 	@OneToMany(mappedBy = "kanbanCard", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Comment> comments = new ArrayList<>();

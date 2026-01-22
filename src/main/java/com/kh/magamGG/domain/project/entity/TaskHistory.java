@@ -2,13 +2,19 @@ package com.kh.magamGG.domain.project.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "TASK_HISTORY")
+@Getter
+@NoArgsConstructor
 public class TaskHistory {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "TASK_HISTORY_NO")
 	private Long taskHistoryNo;
 	

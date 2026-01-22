@@ -2,14 +2,20 @@ package com.kh.magamGG.domain.attendance.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ATTENDANCE_REQUEST")
+@Getter
+@NoArgsConstructor
 public class AttendanceRequest {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "ATTENDANCE_REQUEST_NO")
 	private Long attendanceRequestNo;
 	
@@ -27,7 +33,7 @@ public class AttendanceRequest {
 	private LocalDate attendanceRequestEndDate;
 	
 	@Column(name = "ATTENDANCE_REQUEST_USING_DAYS", nullable = false)
-	private Long attendanceRequestUsingDays;
+	private Integer attendanceRequestUsingDays;
 	
 	@Column(name = "ATTENDANCE_REQUEST_REASON", length = 255)
 	private String attendanceRequestReason;

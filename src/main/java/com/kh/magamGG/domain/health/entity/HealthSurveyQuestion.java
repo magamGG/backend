@@ -1,15 +1,21 @@
 package com.kh.magamGG.domain.health.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "HEALTH_SURVEY_QUESTION")
+@Getter
+@NoArgsConstructor
 public class HealthSurveyQuestion {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "HEALTH_SURVEY_QUESTION_NO")
 	private Long healthSurveyQuestionNo;
 	
@@ -18,16 +24,16 @@ public class HealthSurveyQuestion {
 	private HealthSurvey healthSurvey;
 	
 	@Column(name = "HEALTH_SURVEY_ORDER")
-	private Long healthSurveyOrder;
+	private Integer healthSurveyOrder;
 	
-	@Column(name = "HEALTH_SRUVEY_QUESTION_CONTENT", length = 1000)
-	private String healthSruveyQuestionContent;
+	@Column(name = "HEALTH_SURVEY_QUESTION_CONTENT", length = 1000)
+	private String healthSurveyQuestionContent;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_MIN_SCORE")
-	private Long healthSurveyQuestionMinScore;
+	private Integer healthSurveyQuestionMinScore;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_MAX_SCORE")
-	private Long healthSurveyQuestionMaxScore;
+	private Integer healthSurveyQuestionMaxScore;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_CREATED_AT", nullable = false)
 	private LocalDateTime healthSurveyQuestionCreatedAt;

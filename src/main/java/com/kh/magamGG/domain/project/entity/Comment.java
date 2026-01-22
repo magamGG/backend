@@ -1,12 +1,17 @@
 package com.kh.magamGG.domain.project.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "COMMENT")
+@Getter
+@NoArgsConstructor
 public class Comment {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "COMMENT_NO")
 	private Long commentNo;
 	

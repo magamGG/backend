@@ -2,13 +2,19 @@ package com.kh.magamGG.domain.attendance.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "LEAVE_BALANCE")
+@Getter
+@NoArgsConstructor
 public class LeaveBalance {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "LEAVE_BALANCE_NO")
 	private Long leaveBalanceNo;
 	
@@ -20,13 +26,13 @@ public class LeaveBalance {
 	private String leaveType;
 	
 	@Column(name = "LEAVE_BALANCE_TOTAL_DAYS", nullable = false)
-	private Long leaveBalanceTotalDays;
+	private Integer leaveBalanceTotalDays;
 	
 	@Column(name = "LEAVE_BALANCE_USED_DAYS")
-	private Long leaveBalanceUsedDays;
+	private Integer leaveBalanceUsedDays;
 	
 	@Column(name = "LEAVE_BALANCE_REMAIN_DAYS")
-	private Long leaveBalanceRemainDays;
+	private Integer leaveBalanceRemainDays;
 	
 	@Column(name = "LEAVE_BALANCE_YEAR", nullable = false, length = 4)
 	private String leaveBalanceYear;

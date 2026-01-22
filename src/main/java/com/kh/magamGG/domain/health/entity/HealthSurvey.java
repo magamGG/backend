@@ -1,15 +1,21 @@
 package com.kh.magamGG.domain.health.entity;
 
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "HEALTH_SURVEY")
+@Getter
+@NoArgsConstructor
 public class HealthSurvey {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "HEALTH_SURVEY_NO")
 	private Long healthSurveyNo;
 	

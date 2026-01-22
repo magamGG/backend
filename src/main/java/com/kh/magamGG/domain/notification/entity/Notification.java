@@ -2,13 +2,19 @@ package com.kh.magamGG.domain.notification.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "NOTIFICATION")
+@Getter
+@NoArgsConstructor
 public class Notification {
 	
 	@Id
+	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "NOTIFICATION_NO")
 	private Long notificationNo;
 	
