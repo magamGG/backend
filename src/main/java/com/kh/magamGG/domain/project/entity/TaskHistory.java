@@ -19,7 +19,7 @@ public class TaskHistory {
 	private Long taskHistoryNo;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "TASK_NO", nullable = false)
+	@JoinColumn(name = "KANBAN_CARD_NO", nullable = false)
 	private KanbanCard kanbanCard;
 	
 	@Column(name = "BEFORE_TASK_HISTORY", length = 1000)

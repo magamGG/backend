@@ -16,7 +16,7 @@ public class Comment {
 	private Long commentNo;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "TASK_NO", nullable = false)
+	@JoinColumn(name = "KANBAN_CARD_NO", nullable = false)
 	private KanbanCard kanbanCard;
 	
 	@Column(name = "COMMENT_CONTENT", length = 1000)
