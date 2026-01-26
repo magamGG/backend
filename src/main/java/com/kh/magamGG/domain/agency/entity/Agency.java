@@ -24,6 +24,9 @@ public class Agency {
 	
 	@Column(name = "AGENCY_CODE", length = 6)
 	private String agencyCode;
+
+	@Column(name = "AGENCY_LEAVE")
+    private Integer agencyLeave;
 	
 	@OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Member> members = new ArrayList<>();

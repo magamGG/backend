@@ -5,6 +5,7 @@ import com.kh.magamGG.domain.attendance.entity.Attendance;
 import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
 import com.kh.magamGG.domain.attendance.entity.LeaveBalance;
 import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
+import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponse;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
@@ -92,4 +93,7 @@ public class Member {
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<TaskHistory> taskHistories = new ArrayList<>();
+
+	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DailyHealthCheck> dailyHealthCheck = new ArrayList<>();
 }

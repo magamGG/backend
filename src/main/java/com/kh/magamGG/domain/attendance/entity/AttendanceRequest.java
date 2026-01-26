@@ -27,10 +27,10 @@ public class AttendanceRequest {
 	private String attendanceRequestType;
 	
 	@Column(name = "ATTENDANCE_REQUEST_START_DATE", nullable = false)
-	private LocalDate attendanceRequestStartDate;
+	private LocalDateTime attendanceRequestStartDate;
 	
 	@Column(name = "ATTENDANCE_REQUEST_END_DATE", nullable = false)
-	private LocalDate attendanceRequestEndDate;
+	private LocalDateTime attendanceRequestEndDate;
 	
 	@Column(name = "ATTENDANCE_REQUEST_USING_DAYS", nullable = false)
 	private Integer attendanceRequestUsingDays;
