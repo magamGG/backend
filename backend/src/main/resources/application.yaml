@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: magamgg
+
+  datasource:
+    url: jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: magam_user
+    password: asdf1234!
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 100MB
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+jwt:
+  secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
+  expiration: 86400000
+
+server:
+  port: 8888
+
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
