@@ -20,10 +20,10 @@ public class Agency {
 	@Column(name = "AGENCY_NO")
 	private Long agencyNo;
 	
-	@Column(name = "AGENCY_NAME", length = 30)
+	@Column(name = "AGENCY_NAME", length = 30, unique = true)
 	private String agencyName;
 	
-	@Column(name = "AGENCY_CODE", length = 11)
+	@Column(name = "AGENCY_CODE", length = 11, unique = true)
 	private String agencyCode;
 
     @Column(name = "AGENCY_LEAVE", columnDefinition = "INT DEFAULT 15")
