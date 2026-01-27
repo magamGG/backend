@@ -33,10 +33,10 @@ public class Memo {
 	@Column(name = "MEMO_TEXT", length = 255)
 	private String memoText;
 	
-	@Column(name = "MEMO_CREATED_AT", nullable = false)
+	@Column(name = "MEMO_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime memoCreatedAt;
 	
-	@Column(name = "MEMO_UPDATED_AT")
+	@Column(name = "MEMO_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime memoUpdatedAt;
 	
 	@Column(name = "MEMO_TYPE", length = 12)

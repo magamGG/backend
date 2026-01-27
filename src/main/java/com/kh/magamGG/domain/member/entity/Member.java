@@ -4,6 +4,7 @@ import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.attendance.entity.Attendance;
 import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
 import com.kh.magamGG.domain.attendance.entity.LeaveBalance;
+import com.kh.magamGG.domain.attendance.entity.LeaveHistory;
 import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
 import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponse;
@@ -31,14 +32,11 @@ public class Member {
 	private Long memberNo;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "AGENCY_NO", nullable = false)
+	@JoinColumn(name = "AGENCY_NO")
 	private Agency agency;
 	
 	@Column(name = "MEMBER_NAME", nullable = false, length = 20)
 	private String memberName;
-	
-	@Column(name = "MEMBER_ID", nullable = false, unique = true, length = 20)
-	private String memberId;
 	
 	@Column(name = "MEMBER_PASSWORD", nullable = false, length = 100)
 	private String memberPassword;
@@ -61,10 +59,10 @@ public class Member {
 	@Column(name = "MEMBER_ROLE", nullable = false, length = 20)
 	private String memberRole;
 	
-	@Column(name = "MEMBER_CREATED_AT", nullable = false)
+	@Column(name = "MEMBER_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime memberCreatedAt;
 	
-	@Column(name = "MEMBER_UPDATED_AT")
+	@Column(name = "MEMBER_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime memberUpdatedAt;
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -95,5 +93,11 @@ public class Member {
 	private List<TaskHistory> taskHistories = new ArrayList<>();
 
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<DailyHealthCheck> dailyHealthCheck = new ArrayList<>();
+    private List<DailyHealthCheck> dailyHealthChecks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<NewRequest> newRequests = new ArrayList<>();
+
+    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<LeaveHistory> leaveHistories = new ArrayList<>();
 }

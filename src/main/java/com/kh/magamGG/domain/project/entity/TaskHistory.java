@@ -28,7 +28,7 @@ public class TaskHistory {
 	@Column(name = "AFTER_TASK_HISTORY", length = 1000)
 	private String afterTaskHistory;
 	
-	@Column(name = "TASK_HISTORY_UPDATED_AT")
+	@Column(name = "TASK_HISTORY_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime taskHistoryUpdatedAt;
 	
 	@ManyToOne(fetch = FetchType.LAZY)

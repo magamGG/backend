@@ -1,6 +1,7 @@
 package com.kh.magamGG.domain.agency.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
+import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -25,9 +26,12 @@ public class Agency {
 	@Column(name = "AGENCY_CODE", length = 6)
 	private String agencyCode;
 
-	@Column(name = "AGENCY_LEAVE")
+    @Column(name = "AGENCY_LEAVE", columnDefinition = "INT DEFAULT 15")
     private Integer agencyLeave;
 	
 	@OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Member> members = new ArrayList<>();
+
+    @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<NewRequest> newRequests = new ArrayList<>();
 }

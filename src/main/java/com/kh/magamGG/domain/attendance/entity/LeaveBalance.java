@@ -28,7 +28,7 @@ public class LeaveBalance {
 	@Column(name = "LEAVE_BALANCE_TOTAL_DAYS", nullable = false)
 	private Integer leaveBalanceTotalDays;
 	
-	@Column(name = "LEAVE_BALANCE_USED_DAYS")
+	@Column(name = "LEAVE_BALANCE_USED_DAYS", columnDefinition = "INT DEFAULT 0")
 	private Integer leaveBalanceUsedDays;
 	
 	@Column(name = "LEAVE_BALANCE_REMAIN_DAYS")

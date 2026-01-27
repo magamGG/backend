@@ -31,10 +31,10 @@ public class HealthSurveyResponse {
 	@Column(name = "HEALTH_SURVEY_RESPONSE_TOTAL_SCORE")
 	private Integer healthSurveyResponseTotalScore;
 	
-	@Column(name = "HEALTH_SURVEY_RESPONSE_STATUS", nullable = false, length = 1)
+	@Column(name = "HEALTH_SURVEY_RESPONSE_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
 	private String healthSurveyResponseStatus;
 	
-	@Column(name = "HEALTH_SURVEY_RESPONSE_CREATED_AT")
+	@Column(name = "HEALTH_SURVEY_RESPONSE_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyResponseCreatedAt;
 	
 	@OneToMany(mappedBy = "healthSurveyResponse", cascade = CascadeType.ALL, orphanRemoval = true)

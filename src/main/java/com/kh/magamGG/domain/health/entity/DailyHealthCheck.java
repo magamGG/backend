@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "HEALTH_SURVEY")
+@Table(name = "Daily_Health_Check")
 @Getter
 @NoArgsConstructor
 public class DailyHealthCheck {
@@ -36,6 +36,6 @@ public class DailyHealthCheck {
     @Column(name = "HEALTH_CHECK_NOTES", length = 1000)
     private Long healthCheckNotes;
 
-    @Column(name = "HEALTH_CHECK_CREATED_AT")
+    @Column(name = "HEALTH_CHECK_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime healthCheckCreatedAt;
 }

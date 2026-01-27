@@ -44,15 +44,15 @@ public class AttendanceRequest {
 	@Column(name = "MEDICAL_FILE_URL", nullable = false, length = 500)
 	private String medicalFileUrl;
 	
-	@Column(name = "ATTENDANCE_REQUEST_STATUS", nullable = false, length = 20)
+	@Column(name = "ATTENDANCE_REQUEST_STATUS", nullable = false, columnDefinition = "VARCHAR(20) DEFAULT 'PENDING'")
 	private String attendanceRequestStatus;
 	
 	@Column(name = "ATTENDANCE_REQUEST_REJECT_REASON", length = 200)
 	private String attendanceRequestRejectReason;
 	
-	@Column(name = "ATTENDANCE_REQUEST_CREATED_AT", nullable = false)
+	@Column(name = "ATTENDANCE_REQUEST_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime attendanceRequestCreatedAt;
 	
-	@Column(name = "ATTENDANCE_REQUEST_UPADATED_AT")
-	private LocalDateTime attendanceRequestUpadatedAt;
+	@Column(name = "ATTENDANCE_REQUEST_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
+	private LocalDateTime attendanceRequestUpdatedAt;
 }

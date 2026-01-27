@@ -27,7 +27,7 @@ public class ProjectMember {
 	@JoinColumn(name = "PROJECT_NO", nullable = false)
 	private Project project;
 	
-	@Column(name = "PROJECT_MEMBER_ROLE", nullable = false, length = 50)
+	@Column(name = "PROJECT_MEMBER_ROLE", nullable = false, columnDefinition = "VARCHAR(50) DEFAULT 'MEMBER'")
 	private String projectMemberRole;
 	
 	@OneToMany(mappedBy = "projectMember", cascade = CascadeType.ALL, orphanRemoval = true)

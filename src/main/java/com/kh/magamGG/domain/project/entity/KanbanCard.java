@@ -27,13 +27,13 @@ public class KanbanCard {
 	@Column(name = "KANBAN_CARD_NAME", nullable = false, length = 50)
 	private String kanbanCardName;
 	
-	@Column(name = "KANBAN_CARD_STATUS", nullable = false, length = 20)
+	@Column(name = "KANBAN_CARD_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'N'")
 	private String kanbanCardStatus;
 	
-	@Column(name = "KANBAN_CARD_CREATED_AT", nullable = false)
+	@Column(name = "KANBAN_CARD_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime kanbanCardCreatedAt;
 	
-	@Column(name = "KANBAN_CARD_UPDATED_AT")
+	@Column(name = "KANBAN_CARD_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime kanbanCardUpdatedAt;
 	
 	@ManyToOne(fetch = FetchType.LAZY)

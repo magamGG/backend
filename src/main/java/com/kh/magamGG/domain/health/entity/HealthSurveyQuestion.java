@@ -35,10 +35,10 @@ public class HealthSurveyQuestion {
 	@Column(name = "HEALTH_SURVEY_QUESTION_MAX_SCORE")
 	private Integer healthSurveyQuestionMaxScore;
 	
-	@Column(name = "HEALTH_SURVEY_QUESTION_CREATED_AT", nullable = false)
+	@Column(name = "HEALTH_SURVEY_QUESTION_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyQuestionCreatedAt;
 	
-	@Column(name = "HEALTH_SURVEY_QUESTION_UPDATED_AT")
+	@Column(name = "HEALTH_SURVEY_QUESTION_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyQuestionUpdatedAt;
 	
 	@OneToMany(mappedBy = "healthSurveyQuestion", cascade = CascadeType.ALL, orphanRemoval = true)

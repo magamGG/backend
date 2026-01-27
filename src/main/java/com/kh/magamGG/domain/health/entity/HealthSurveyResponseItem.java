@@ -28,6 +28,6 @@ public class HealthSurveyResponseItem {
 	@Column(name = "HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE", nullable = false)
 	private Integer healthSurveyQuestionItemAnswerScore;
 	
-	@Column(name = "HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT", nullable = false)
+	@Column(name = "HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyQuestionItemCreatedAt;
 }

@@ -28,7 +28,7 @@ public class Notification {
 	@Column(name = "NOTIFICATION_TEXT", length = 260)
 	private String notificationText;
 	
-	@Column(name = "NOTIFICATION_CREATED_AT")
+	@Column(name = "NOTIFICATION_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime notificationCreatedAt;
 	
 	@Column(name = "NOTIFICATION_STATUS", nullable = false, length = 1)

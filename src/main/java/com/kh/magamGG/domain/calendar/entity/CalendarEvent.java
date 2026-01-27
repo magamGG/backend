@@ -41,10 +41,10 @@ public class CalendarEvent {
 	@Column(name = "CALENDAR_EVENT_ENDED_AT", nullable = false)
 	private LocalDate calendarEventEndedAt;
 	
-	@Column(name = "CALENDAR_EVENT_CREATED_AT", nullable = false)
+	@Column(name = "CALENDAR_EVENT_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime calendarEventCreatedAt;
 	
-	@Column(name = "CALENDAR_EVENT_UPDATED_AT")
+	@Column(name = "CALENDAR_EVENT_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime calendarEventUpdatedAt;
 	
 	@Column(name = "CALENDAR_EVENT_COLOR", length = 10)

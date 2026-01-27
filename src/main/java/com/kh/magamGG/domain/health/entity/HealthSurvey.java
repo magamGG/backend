@@ -28,13 +28,13 @@ public class HealthSurvey {
 	@Column(name = "HEALTH_SURVEY_CONTENT", length = 30)
 	private String healthSurveyContent;
 	
-	@Column(name = "HEALTH_SURVEY_STATUS", nullable = false, length = 1)
+	@Column(name = "HEALTH_SURVEY_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
 	private String healthSurveyStatus;
 	
-	@Column(name = "HEALTH_SURVEY_CREATED_AT")
+	@Column(name = "HEALTH_SURVEY_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyCreatedAt;
 	
-	@Column(name = "HEALTH_SURVEY_UPDATED_AT")
+	@Column(name = "HEALTH_SURVEY_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyUpdatedAt;
 	
 	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)

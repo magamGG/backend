@@ -22,7 +22,7 @@ public class Project {
 	@Column(name = "PROJECT_NAME", nullable = false, length = 100)
 	private String projectName;
 	
-	@Column(name = "PROJECT_STATUS", nullable = false, length = 100)
+	@Column(name = "PROJECT_STATUS", nullable = false, columnDefinition = "VARCHAR(100) DEFAULT '연재'")
 	private String projectStatus;
 	
 	@Column(name = "PROJECT_COLOR", nullable = false, length = 50)

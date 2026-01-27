@@ -28,7 +28,7 @@ public class KanbanBoard {
 	@Column(name = "KANBAN_BOARD_ORDER", nullable = false)
 	private Integer kanbanBoardOrder;
 	
-	@Column(name = "KANBAN_BOARD_STATUS", nullable = false, length = 1)
+	@Column(name = "KANBAN_BOARD_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
 	private String kanbanBoardStatus;
 	
 	@OneToMany(mappedBy = "kanbanBoard", cascade = CascadeType.ALL, orphanRemoval = true)
