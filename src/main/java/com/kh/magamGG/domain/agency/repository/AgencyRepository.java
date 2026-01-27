@@ -1,6 +1,10 @@
 package com.kh.magamGG.domain.agency.repository;
 
-public interface AgencyRepository {
+import com.kh.magamGG.domain.agency.entity.Agency;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+
+public interface AgencyRepository extends JpaRepository<Agency, Long> {
+    Optional<Agency> findByAgencyCode(String agencyCode);
 }
-
-
