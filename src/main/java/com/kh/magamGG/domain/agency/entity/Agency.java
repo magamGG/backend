@@ -23,7 +23,7 @@ public class Agency {
 	@Column(name = "AGENCY_NAME", length = 30)
 	private String agencyName;
 	
-	@Column(name = "AGENCY_CODE", length = 6)
+	@Column(name = "AGENCY_CODE", length = 11)
 	private String agencyCode;
 
     @Column(name = "AGENCY_LEAVE", columnDefinition = "INT DEFAULT 15")
