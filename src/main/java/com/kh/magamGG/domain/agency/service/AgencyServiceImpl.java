@@ -9,6 +9,7 @@ import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.member.repository.NewRequestRepository;
+import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import com.kh.magamGG.global.exception.NewRequestNotFoundException;
@@ -31,6 +32,7 @@ public class AgencyServiceImpl implements AgencyService {
     private final MemberRepository memberRepository;
     private final NewRequestRepository newRequestRepository;
     private final AgencyMapper agencyMapper; // MyBatis Mapper
+    private final NotificationService notificationService;
     
     @Override
     @Transactional
@@ -64,6 +66,19 @@ public class AgencyServiceImpl implements AgencyService {
         newRequest = newRequestRepository.save(newRequest);
         log.info("에이전시 가입 요청 생성: 회원 {} -> 에이전시 {} (요청번호: {})", 
                 member.getMemberName(), agency.getAgencyName(), newRequest.getNewRequestNo());
+        
+        // 에이전시 담당자에게 알림 발송
+        String notificationName = "가입 요청";
+        String notificationText = String.format("%s님(%s)이 에이전시 가입을 요청했습니다.", 
+                member.getMemberName(),
+                member.getMemberRole());
+        
+        notificationService.notifyAgencyManagers(
+                agency.getAgencyNo(),
+                notificationName,
+                notificationText,
+                "JOIN_REQ"
+        );
         
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
