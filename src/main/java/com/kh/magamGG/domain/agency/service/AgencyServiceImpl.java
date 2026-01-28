@@ -189,7 +189,7 @@ public class AgencyServiceImpl implements AgencyService {
         if (updated == 0) {
             throw new IllegalStateException("가입 요청 상태 업데이트에 실패했습니다.");
         }
-        
+
         log.info("에이전시 가입 요청 거절: 요청번호 {}, 회원 {}, 사유: {}", 
                 newRequestNo, memberName, rejectionReason);
         
