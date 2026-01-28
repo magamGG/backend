@@ -3,6 +3,8 @@ package com.kh.magamGG.domain.agency.entity;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -13,6 +15,8 @@ import java.util.List;
 @Table(name = "AGENCY")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Agency {
 	
 	@Id
@@ -34,7 +38,7 @@ public class Agency {
 
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
-    
+
     // 에이전시 소속명(스튜디오) 수정
     public void updateAgencyName(String agencyName) {
     	this.agencyName = agencyName;

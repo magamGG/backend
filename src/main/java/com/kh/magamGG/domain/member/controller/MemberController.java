@@ -3,6 +3,8 @@ package com.kh.magamGG.domain.member.controller;
 import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
+import com.kh.magamGG.domain.member.dto.request.MemberRequest;
+import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 import com.kh.magamGG.domain.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -14,9 +16,17 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/members")
 @RequiredArgsConstructor
 public class MemberController {
-	
+
+    private final MemberService memberService;
+
+    @PostMapping
+    public ResponseEntity<MemberResponse> register(@RequestBody MemberRequest request) {
+        MemberResponse response = memberService.register(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
 	private final MemberService memberService;
-	
+
 	/**
 	 * 마이페이지 정보 조회
 	 */
@@ -25,7 +35,7 @@ public class MemberController {
 		MemberMyPageResponseDto response = memberService.getMyPageInfo(memberNo);
 		return ResponseEntity.ok(response);
 	}
-	
+
 	/**
 	 * 프로필 정보 수정
 	 */
@@ -37,7 +47,7 @@ public class MemberController {
 		memberService.updateProfile(memberNo, requestDto);
 		return ResponseEntity.ok().build();
 	}
-	
+
 	/**
 	 * 프로필 이미지 업로드
 	 */
@@ -49,7 +59,7 @@ public class MemberController {
 		String fileName = memberService.uploadProfileImage(memberNo, file);
 		return ResponseEntity.ok(fileName);
 	}
-	
+
 	/**
 	 * 배경 이미지 업로드
 	 */
@@ -61,7 +71,7 @@ public class MemberController {
 		String fileName = memberService.uploadBackgroundImage(memberNo, file);
 		return ResponseEntity.ok(fileName);
 	}
-	
+
 	/**
 	 * 에이전시별 직원 통계 조회
 	 */
@@ -72,7 +82,7 @@ public class MemberController {
 		EmployeeStatisticsResponseDto response = memberService.getEmployeeStatistics(agencyNo);
 		return ResponseEntity.ok(response);
 	}
-	
+
 	/**
 	 * 회원 탈퇴
 	 */

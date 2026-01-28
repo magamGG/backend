@@ -4,38 +4,39 @@ import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
 import org.springframework.web.multipart.MultipartFile;
+import com.kh.magamGG.domain.member.dto.request.MemberRequest;
+import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 
 public interface MemberService {
-	
+    MemberResponse register(MemberRequest request);
+
 	/**
 	 * 마이페이지 정보 조회
 	 */
 	MemberMyPageResponseDto getMyPageInfo(Long memberNo);
-	
+
 	/**
 	 * 프로필 정보 수정
 	 */
 	void updateProfile(Long memberNo, MemberUpdateRequestDto requestDto);
-	
+
 	/**
 	 * 프로필 이미지 업로드
 	 */
 	String uploadProfileImage(Long memberNo, MultipartFile file);
-	
+
 	/**
 	 * 배경 이미지 업로드
 	 */
 	String uploadBackgroundImage(Long memberNo, MultipartFile file);
-	
+
 	/**
 	 * 에이전시별 직원 통계 조회
 	 */
 	EmployeeStatisticsResponseDto getEmployeeStatistics(Long agencyNo);
-	
+
 	/**
 	 * 회원 탈퇴
 	 */
 	void deleteMember(Long memberNo);
 }
-
-

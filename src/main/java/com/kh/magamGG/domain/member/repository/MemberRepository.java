@@ -11,7 +11,8 @@ import java.util.Optional;
 public interface MemberRepository extends JpaRepository<Member, Long> {
 	
 	Optional<Member> findByMemberEmail(String memberEmail);
-	
+    boolean existsByMemberEmail(String memberEmail);
+
 	@Query("SELECT m.memberRole, COUNT(m) FROM Member m WHERE m.agency.agencyNo = :agencyNo GROUP BY m.memberRole")
 	List<Object[]> countByAgencyNoAndMemberRole(@Param("agencyNo") Long agencyNo);
 }
