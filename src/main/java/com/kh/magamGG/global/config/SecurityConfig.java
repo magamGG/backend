@@ -26,6 +26,7 @@ public class SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/api/members").permitAll() // 로그인, 회원가입은 인증 없이 접근 가능
+                .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
                 .requestMatchers("/api/**").permitAll() // TODO: JWT 필터 구현 후 제거 - 현재 개발 중이므로 모든 API 허용
                 .anyRequest().authenticated() // 나머지는 인증 필요
             );

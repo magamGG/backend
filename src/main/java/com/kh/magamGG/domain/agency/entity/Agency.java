@@ -32,10 +32,12 @@ public class Agency {
 
     @Column(name = "AGENCY_LEAVE", columnDefinition = "INT DEFAULT 15")
     private Integer agencyLeave;
-	
+
+    @Builder.Default
 	@OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Member> members = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
 

@@ -195,8 +195,6 @@ public class AgencyServiceImpl implements AgencyService {
                 .build();
     }
 
-	private final AgencyRepository agencyRepository;
-
 	@Override
 	public Agency getAgency(Long agencyNo) {
 		return agencyRepository.findById(agencyNo)
