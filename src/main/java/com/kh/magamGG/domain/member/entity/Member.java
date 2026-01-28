@@ -113,6 +113,7 @@ public class Member {
     // 에이전시 소속 설정 메서드
     public void setAgency(Agency agency) {
         this.agency = agency;
+    }
 
     // 프로필 정보 수정
     public void updateProfile(String memberName, String memberEmail, String memberPhone, String memberAddress) {
