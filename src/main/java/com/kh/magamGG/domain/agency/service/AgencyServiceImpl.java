@@ -3,6 +3,7 @@ package com.kh.magamGG.domain.agency.service;
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
+import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
@@ -10,6 +11,7 @@ import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.member.repository.NewRequestRepository;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
+import com.kh.magamGG.global.exception.NewRequestNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class AgencyServiceImpl implements AgencyService {
     private final AgencyRepository agencyRepository;
     private final MemberRepository memberRepository;
     private final NewRequestRepository newRequestRepository;
+    private final AgencyMapper agencyMapper; // MyBatis Mapper
     
     @Override
     @Transactional
@@ -97,5 +100,98 @@ public class AgencyServiceImpl implements AgencyService {
                         .newRequestStatus(nr.getNewRequestStatus())
                         .build())
                 .collect(Collectors.toList());
+    }
+    
+    @Override
+    @Transactional
+    public JoinRequestResponse approveJoinRequest(Long newRequestNo) {
+        // 가입 요청 조회
+        NewRequest newRequest = newRequestRepository.findById(newRequestNo)
+                .orElseThrow(() -> new NewRequestNotFoundException("존재하지 않는 가입 요청입니다."));
+        
+        // 상태 확인 (대기 상태만 승인 가능)
+        if (!"대기".equals(newRequest.getNewRequestStatus())) {
+            throw new IllegalArgumentException("이미 처리된 요청입니다. (현재 상태: " + newRequest.getNewRequestStatus() + ")");
+        }
+        
+        Long memberNo = newRequest.getMember().getMemberNo();
+        Long agencyNo = newRequest.getAgency().getAgencyNo();
+        String memberName = newRequest.getMember().getMemberName();
+        String agencyName = newRequest.getAgency().getAgencyName();
+        
+        // 1. NEW_REQUEST 상태를 "승인"으로 변경 (MyBatis 직접 SQL)
+        int requestUpdated = agencyMapper.updateNewRequestStatus(newRequestNo, "승인");
+        if (requestUpdated == 0) {
+            throw new IllegalStateException("가입 요청 상태 업데이트에 실패했습니다.");
+        }
+        log.info("NEW_REQUEST 상태 업데이트 완료: {} -> 승인", newRequestNo);
+        
+        // 2. MEMBER의 AGENCY_NO를 업데이트 (MyBatis 직접 SQL)
+        int memberUpdated = agencyMapper.updateMemberAgencyNo(memberNo, agencyNo);
+        if (memberUpdated == 0) {
+            throw new IllegalStateException("회원의 에이전시 정보 업데이트에 실패했습니다.");
+        }
+        log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
+        
+        log.info("에이전시 가입 요청 승인 완료: 요청번호 {}, 회원 {} -> 에이전시 {} 소속으로 변경", 
+                newRequestNo, memberName, agencyName);
+        
+        // 업데이트된 엔티티 다시 조회해서 반환
+        newRequest = newRequestRepository.findById(newRequestNo)
+                .orElseThrow(() -> new NewRequestNotFoundException("업데이트 후 요청을 찾을 수 없습니다."));
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("업데이트 후 회원을 찾을 수 없습니다."));
+        
+        return JoinRequestResponse.builder()
+                .newRequestNo(newRequest.getNewRequestNo())
+                .agencyNo(agencyNo)
+                .memberNo(member.getMemberNo())
+                .memberName(member.getMemberName())
+                .memberEmail(member.getMemberEmail())
+                .memberPhone(member.getMemberPhone())
+                .memberRole(member.getMemberRole())
+                .newRequestDate(newRequest.getNewRequestDate())
+                .newRequestStatus(newRequest.getNewRequestStatus())
+                .build();
+    }
+    
+    @Override
+    @Transactional
+    public JoinRequestResponse rejectJoinRequest(Long newRequestNo, String rejectionReason) {
+        // 가입 요청 조회
+        NewRequest newRequest = newRequestRepository.findById(newRequestNo)
+                .orElseThrow(() -> new NewRequestNotFoundException("존재하지 않는 가입 요청입니다."));
+        
+        // 상태 확인 (대기 상태만 거절 가능)
+        if (!"대기".equals(newRequest.getNewRequestStatus())) {
+            throw new IllegalArgumentException("이미 처리된 요청입니다. (현재 상태: " + newRequest.getNewRequestStatus() + ")");
+        }
+        
+        String memberName = newRequest.getMember().getMemberName();
+        
+        // 가입 요청 상태를 "거절"로 변경 (MyBatis 직접 SQL)
+        int updated = agencyMapper.updateNewRequestStatus(newRequestNo, "거절");
+        if (updated == 0) {
+            throw new IllegalStateException("가입 요청 상태 업데이트에 실패했습니다.");
+        }
+        
+        log.info("에이전시 가입 요청 거절: 요청번호 {}, 회원 {}, 사유: {}", 
+                newRequestNo, memberName, rejectionReason);
+        
+        // 업데이트된 엔티티 다시 조회
+        newRequest = newRequestRepository.findById(newRequestNo)
+                .orElseThrow(() -> new NewRequestNotFoundException("업데이트 후 요청을 찾을 수 없습니다."));
+        
+        return JoinRequestResponse.builder()
+                .newRequestNo(newRequest.getNewRequestNo())
+                .agencyNo(newRequest.getAgency().getAgencyNo())
+                .memberNo(newRequest.getMember().getMemberNo())
+                .memberName(newRequest.getMember().getMemberName())
+                .memberEmail(newRequest.getMember().getMemberEmail())
+                .memberPhone(newRequest.getMember().getMemberPhone())
+                .memberRole(newRequest.getMember().getMemberRole())
+                .newRequestDate(newRequest.getNewRequestDate())
+                .newRequestStatus(newRequest.getNewRequestStatus())
+                .build();
     }
 }

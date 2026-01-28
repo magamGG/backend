@@ -104,4 +104,9 @@ public class Member {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
+
+    // 에이전시 소속 설정 메서드
+    public void setAgency(Agency agency) {
+        this.agency = agency;
+    }
 }

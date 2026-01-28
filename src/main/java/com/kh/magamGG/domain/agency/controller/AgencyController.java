@@ -1,6 +1,7 @@
 package com.kh.magamGG.domain.agency.controller;
 
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
+import com.kh.magamGG.domain.agency.dto.request.RejectJoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.service.AgencyService;
 import lombok.RequiredArgsConstructor;
@@ -28,5 +29,20 @@ public class AgencyController {
     public ResponseEntity<List<JoinRequestResponse>> getJoinRequests(@PathVariable Long agencyNo) {
         List<JoinRequestResponse> responses = agencyService.getJoinRequests(agencyNo);
         return ResponseEntity.ok(responses);
+    }
+    
+    @PostMapping("/join-requests/{newRequestNo}/approve")
+    public ResponseEntity<JoinRequestResponse> approveJoinRequest(@PathVariable Long newRequestNo) {
+        JoinRequestResponse response = agencyService.approveJoinRequest(newRequestNo);
+        return ResponseEntity.ok(response);
+    }
+    
+    @PostMapping("/join-requests/{newRequestNo}/reject")
+    public ResponseEntity<JoinRequestResponse> rejectJoinRequest(
+            @PathVariable Long newRequestNo,
+            @RequestBody(required = false) RejectJoinRequestRequest request) {
+        String rejectionReason = request != null ? request.getRejectionReason() : null;
+        JoinRequestResponse response = agencyService.rejectJoinRequest(newRequestNo, rejectionReason);
+        return ResponseEntity.ok(response);
     }
 }

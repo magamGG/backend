@@ -21,6 +21,10 @@ spring:
       hibernate:
         format_sql: true
 
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.kh.magamGG.domain
+
 jwt:
   secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
   expiration: 86400000

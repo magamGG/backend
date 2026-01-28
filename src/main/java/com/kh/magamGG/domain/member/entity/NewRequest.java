@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@org.hibernate.annotations.DynamicUpdate
 public class NewRequest {
 
     @Id
@@ -36,4 +37,8 @@ public class NewRequest {
     @Column(name = "NEW_REQUEST_STATUS", nullable = false, length = 10)
     private String newRequestStatus;
 
+    // 상태 업데이트 메서드
+    public void setNewRequestStatus(String newRequestStatus) {
+        this.newRequestStatus = newRequestStatus;
+    }
 }

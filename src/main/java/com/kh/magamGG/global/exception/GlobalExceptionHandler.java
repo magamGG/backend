@@ -63,6 +63,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
     
+    @ExceptionHandler(NewRequestNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNewRequestNotFoundException(
+            NewRequestNotFoundException ex, WebRequest request) {
+        log.error("가입 요청을 찾을 수 없음: {}", ex.getMessage());
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.NOT_FOUND.value(),
+                "NOT_FOUND",
+                ex.getMessage(),
+                request.getDescription(false).replace("uri=", "")
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+    
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentialsException(
             InvalidCredentialsException ex, WebRequest request) {

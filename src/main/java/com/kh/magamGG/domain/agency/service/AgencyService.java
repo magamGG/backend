@@ -8,4 +8,6 @@ import java.util.List;
 public interface AgencyService {
     JoinRequestResponse createJoinRequest(JoinRequestRequest request, Long memberNo);
     List<JoinRequestResponse> getJoinRequests(Long agencyNo);
+    JoinRequestResponse approveJoinRequest(Long newRequestNo);
+    JoinRequestResponse rejectJoinRequest(Long newRequestNo, String rejectionReason);
 }
