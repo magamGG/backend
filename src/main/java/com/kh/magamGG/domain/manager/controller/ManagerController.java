@@ -1,8 +1,11 @@
 package com.kh.magamGG.domain.manager.controller;
 
+import com.kh.magamGG.domain.manager.dto.response.AssignedArtistResponse;
 import com.kh.magamGG.domain.manager.service.ArtistAssignmentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/managers")
