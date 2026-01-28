@@ -91,7 +91,7 @@ public class MemberServiceImpl implements MemberService {
 		member.setMemberPassword(encodedPassword);
 		member.setMemberPhone(request.getMemberPhone());
 		member.setMemberRole(request.getMemberRole());
-		member.setMemberStatus("활성");
+		member.setMemberStatus("ACTIVE");
 		member.setAgency(agency);
 		member.setMemberCreatedAt(LocalDateTime.now());
 		member.setMemberUpdatedAt(LocalDateTime.now());
@@ -218,9 +218,18 @@ public class MemberServiceImpl implements MemberService {
 	
 	@Override
 	@Transactional
-	public void deleteMember(Long memberNo) {
+	public void deleteMember(Long memberNo, String password) {
 		Member member = memberRepository.findById(memberNo)
 			.orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+		
+		// 비밀번호 확인
+		if (password == null || password.trim().isEmpty()) {
+			throw new IllegalArgumentException("비밀번호를 입력해주세요.");
+		}
+		
+		if (!passwordEncoder.matches(password, member.getMemberPassword())) {
+			throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
+		}
 		
 		// 프로필 이미지 삭제
 		if (member.getMemberProfileImage() != null) {
