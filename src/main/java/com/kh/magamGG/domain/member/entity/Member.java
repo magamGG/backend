@@ -12,11 +12,11 @@ import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.entity.TaskHistory;
+import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -25,9 +25,8 @@ import java.util.List;
 @Entity
 @Table(name = "MEMBER")
 @Getter
+@Setter
 @NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class Member {
 	
 	@Id
@@ -45,11 +44,14 @@ public class Member {
 	@Column(name = "MEMBER_PASSWORD", nullable = false, length = 100)
 	private String memberPassword;
 	
-	@Column(name = "MEMBER_EMAIL", nullable = false, length = 50)
+	@Column(name = "MEMBER_EMAIL", nullable = false, length = 50, unique = true)
 	private String memberEmail;
 	
 	@Column(name = "MEMBER_PHONE", nullable = false, length = 15)
 	private String memberPhone;
+
+    @Column(name = "MEMBER_ADDRESS", length = 100)
+    private String memberAddress;
 	
 	@Column(name = "MEMBER_STATUS", nullable = false, length = 20)
 	private String memberStatus;
@@ -60,7 +62,7 @@ public class Member {
 	@Column(name = "MEMBER_PROFILE_BANNER_IMAGE", length = 100)
 	private String memberProfileBannerImage;
 	
-	@Column(name = "MEMBER_ROLE", nullable = false, length = 100)
+	@Column(name = "MEMBER_ROLE", nullable = false, length = 20)
 	private String memberRole;
 	
 	@Column(name = "MEMBER_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
@@ -104,9 +106,31 @@ public class Member {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
-
-    // 에이전시 소속 설정 메서드
-    public void setAgency(Agency agency) {
-        this.agency = agency;
+    
+    // 프로필 정보 수정
+    public void updateProfile(String memberName, String memberEmail, String memberPhone, String memberAddress) {
+    	this.memberName = memberName;
+    	this.memberEmail = memberEmail;
+    	this.memberPhone = memberPhone;
+    	this.memberAddress = memberAddress;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
+    
+    // 프로필 이미지 업데이트
+    public void updateProfileImage(String memberProfileImage) {
+    	this.memberProfileImage = memberProfileImage;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
+    
+    // 배경 이미지 업데이트
+    public void updateBackgroundImage(String memberProfileBannerImage) {
+    	this.memberProfileBannerImage = memberProfileBannerImage;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
+    
+    // 비밀번호 업데이트
+    public void updatePassword(String memberPassword) {
+    	this.memberPassword = memberPassword;
+    	this.memberUpdatedAt = LocalDateTime.now();
     }
 }

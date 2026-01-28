@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.attendance.service;
 
+import com.kh.magamGG.domain.attendance.dto.AttendanceStatisticsResponseDto;
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
 
@@ -44,6 +45,15 @@ public interface AttendanceService {
      * @return 대기 중인 근태 신청 목록
      */
     List<AttendanceRequestResponse> getPendingAttendanceRequestsByAgency(Long agencyNo);
+    
+    /**
+     * 회원별 월별 근태 통계 조회
+     * @param memberNo 회원 번호
+     * @param year 연도
+     * @param month 월
+     * @return 근태 통계
+     */
+    AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month);
 }
 
 

@@ -10,7 +10,7 @@ import org.springframework.web.context.request.WebRequest;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
-    
+
     @ExceptionHandler(DuplicateEmailException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateEmailException(
             DuplicateEmailException ex, WebRequest request) {
@@ -23,7 +23,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
-    
+
     @ExceptionHandler(DuplicateAgencyCodeException.class)
     public ResponseEntity<ErrorResponse> handleDuplicateAgencyCodeException(
             DuplicateAgencyCodeException ex, WebRequest request) {
@@ -36,7 +36,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
     }
-    
+
     @ExceptionHandler(AgencyNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleAgencyNotFoundException(
             AgencyNotFoundException ex, WebRequest request) {
@@ -49,7 +49,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
-    
+
     @ExceptionHandler(MemberNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleMemberNotFoundException(
             MemberNotFoundException ex, WebRequest request) {
@@ -62,7 +62,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
-    
+
     @ExceptionHandler(NewRequestNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNewRequestNotFoundException(
             NewRequestNotFoundException ex, WebRequest request) {
@@ -75,7 +75,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
-    
+
     @ExceptionHandler(InvalidCredentialsException.class)
     public ResponseEntity<ErrorResponse> handleInvalidCredentialsException(
             InvalidCredentialsException ex, WebRequest request) {
@@ -88,7 +88,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
-    
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
             IllegalArgumentException ex, WebRequest request) {
@@ -101,7 +101,7 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
-    
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception ex, WebRequest request) {
