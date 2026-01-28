@@ -12,6 +12,7 @@ import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.entity.TaskHistory;
+import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -46,6 +47,9 @@ public class Member {
 	
 	@Column(name = "MEMBER_PHONE", nullable = false, length = 15)
 	private String memberPhone;
+
+    @Column(name = "MEMBER_ADDRESS", length = 100)
+    private String memberAddress;
 	
 	@Column(name = "MEMBER_STATUS", nullable = false, length = 20)
 	private String memberStatus;
@@ -100,4 +104,25 @@ public class Member {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
+    
+    // 프로필 정보 수정
+    public void updateProfile(String memberName, String memberEmail, String memberPhone, String memberAddress) {
+    	this.memberName = memberName;
+    	this.memberEmail = memberEmail;
+    	this.memberPhone = memberPhone;
+    	this.memberAddress = memberAddress;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
+    
+    // 프로필 이미지 업데이트
+    public void updateProfileImage(String memberProfileImage) {
+    	this.memberProfileImage = memberProfileImage;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
+    
+    // 배경 이미지 업데이트
+    public void updateBackgroundImage(String memberProfileBannerImage) {
+    	this.memberProfileBannerImage = memberProfileBannerImage;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
 }

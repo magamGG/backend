@@ -34,4 +34,9 @@ public class Agency {
 
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
+    
+    // 에이전시 소속명(스튜디오) 수정
+    public void updateAgencyName(String agencyName) {
+    	this.agencyName = agencyName;
+    }
 }
