@@ -61,13 +61,13 @@ public class MemberServiceImpl implements MemberService {
         }
         // 담당자 회원가입
         else if ("담당자".equals(request.getMemberRole())) {
-            if (request.getAgencyCode() == null || request.getAgencyCode().isEmpty()) {
-                throw new IllegalArgumentException("담당자 회원가입 시 에이전시 코드가 필요합니다.");
+            // 담당자는 선택적으로 에이전시에 속할 수 있음 (비소속 허용)
+            if (request.getAgencyCode() != null && !request.getAgencyCode().isEmpty()) {
+                // 에이전시 코드가 제공된 경우에만 에이전시 조회
+                agency = agencyRepository.findByAgencyCode(request.getAgencyCode())
+                        .orElseThrow(() -> new AgencyNotFoundException("존재하지 않는 에이전시 코드입니다."));
             }
-            
-            // 에이전시 코드로 기존 에이전시 조회
-            agency = agencyRepository.findByAgencyCode(request.getAgencyCode())
-                    .orElseThrow(() -> new AgencyNotFoundException("존재하지 않는 에이전시 코드입니다."));
+            // agencyCode가 null이거나 비어있으면 담당자가 독립적으로 가입하는 경우 (비소속)
         }
         // 아티스트 회원가입
         else {

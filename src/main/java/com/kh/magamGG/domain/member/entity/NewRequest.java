@@ -2,6 +2,8 @@ package com.kh.magamGG.domain.member.entity;
 
 import com.kh.magamGG.domain.agency.entity.Agency;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "NEW_REQUEST")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class NewRequest {
 
     @Id
@@ -29,7 +33,7 @@ public class NewRequest {
     @Column(name = "NEW_REQUEST_DATE")
     private LocalDateTime newRequestDate;
 
-    @Column(name = "NEW_REQUEST_STATUS", nullable = false, length = 1)
+    @Column(name = "NEW_REQUEST_STATUS", nullable = false, length = 10)
     private String newRequestStatus;
 
 }
