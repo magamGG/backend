@@ -4,6 +4,7 @@ import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
+import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 import com.kh.magamGG.domain.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
@@ -11,8 +12,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/members")
@@ -92,9 +91,9 @@ public class MemberController {
 	@DeleteMapping("/{memberNo}")
 	public ResponseEntity<Void> deleteMember(
 		@PathVariable Long memberNo,
-		@RequestBody(required = false) Map<String, String> request
+		@RequestBody(required = false) MemberDeleteRequest request
 	) {
-		String password = request != null ? request.get("password") : null;
+		String password = request != null ? request.getPassword() : null;
 		memberService.deleteMember(memberNo, password);
 		return ResponseEntity.ok().build();
 	}

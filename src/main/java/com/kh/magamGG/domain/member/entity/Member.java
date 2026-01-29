@@ -137,4 +137,10 @@ public class Member {
     	this.memberPassword = memberPassword;
     	this.memberUpdatedAt = LocalDateTime.now();
     }
+    
+    // 회원 상태 업데이트
+    public void updateStatus(String memberStatus) {
+    	this.memberStatus = memberStatus;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
 }

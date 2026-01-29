@@ -222,6 +222,11 @@ public class MemberServiceImpl implements MemberService {
 		Member member = memberRepository.findById(memberNo)
 			.orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 		
+		// 이미 탈퇴한 회원인지 확인
+		if ("BLOCKED".equals(member.getMemberStatus())) {
+			throw new IllegalArgumentException("이미 탈퇴 처리된 회원입니다.");
+		}
+		
 		// 비밀번호 확인
 		if (password == null || password.trim().isEmpty()) {
 			throw new IllegalArgumentException("비밀번호를 입력해주세요.");
@@ -231,17 +236,9 @@ public class MemberServiceImpl implements MemberService {
 			throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
 		}
 		
-		// 프로필 이미지 삭제
-		if (member.getMemberProfileImage() != null) {
-			deleteFile(member.getMemberProfileImage());
-		}
-		
-		// 배경 이미지 삭제
-		if (member.getMemberProfileBannerImage() != null) {
-			deleteFile(member.getMemberProfileBannerImage());
-		}
-		
-		memberRepository.delete(member);
+		// 실제 삭제 대신 상태를 BLOCKED로 변경
+		member.updateStatus("BLOCKED");
+		memberRepository.save(member);
 	}
 	
 	private String saveFile(MultipartFile file) {
