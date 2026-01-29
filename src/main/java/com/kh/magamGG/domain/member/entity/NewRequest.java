@@ -42,8 +42,4 @@ public class NewRequest {
         this.newRequestStatus = newRequestStatus;
     }
 
-    // 상태 업데이트 메서드
-    public void setNewRequestStatus(String newRequestStatus) {
-        this.newRequestStatus = newRequestStatus;
-    }
 }
