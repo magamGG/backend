@@ -8,6 +8,7 @@ import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRequestRepository;
 import com.kh.magamGG.domain.member.entity.Member;
+import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
@@ -36,6 +37,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final MemberRepository memberRepository;
     private final AgencyRepository agencyRepository;
     private final NotificationService notificationService;
+    private final ArtistAssignmentRepository artistAssignmentRepository;
     
     @Override
     @Transactional
@@ -73,22 +75,29 @@ public class AttendanceServiceImpl implements AttendanceService {
                 request.getAttendanceRequestStartDate(),
                 request.getAttendanceRequestEndDate());
         
-        // 에이전시 담당자에게 알림 발송
-        if (member.getAgency() != null) {
-            String notificationName = "근태 신청";
-            String notificationText = String.format("%s님이 %s을(를) 신청했습니다. (%s ~ %s)", 
-                    member.getMemberName(),
-                    request.getAttendanceRequestType(),
-                    request.getAttendanceRequestStartDate(),
-                    request.getAttendanceRequestEndDate());
-            
-            notificationService.notifyAgencyManagers(
-                    member.getAgency().getAgencyNo(),
-                    notificationName,
-                    notificationText,
-                    "LEAVE_REQ"
-            );
-        }
+        // 작가의 담당자에게만 알림 발송 (ARTIST_ASSIGNMENT 테이블에서 조회)
+        artistAssignmentRepository.findByArtistMemberNo(memberNo)
+                .ifPresent(assignment -> {
+                    // 담당자의 MEMBER_NO 조회
+                    Long managerMemberNo = assignment.getManager().getMember().getMemberNo();
+                    
+                    String notificationName = "근태 신청";
+                    String notificationText = String.format("%s님이 %s을(를) 신청했습니다. (%s ~ %s)", 
+                            member.getMemberName(),
+                            request.getAttendanceRequestType(),
+                            request.getAttendanceRequestStartDate(),
+                            request.getAttendanceRequestEndDate());
+                    
+                    // 담당자에게만 알림 발송
+                    notificationService.createNotification(
+                            managerMemberNo,
+                            notificationName,
+                            notificationText,
+                            "LEAVE_REQ"
+                    );
+                    
+                    log.info("근태 신청 알림 발송: 작가={}, 담당자={}", memberNo, managerMemberNo);
+                });
         
         return AttendanceRequestResponse.fromEntity(savedRequest);
     }

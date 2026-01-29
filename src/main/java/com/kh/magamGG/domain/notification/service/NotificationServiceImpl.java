@@ -61,15 +61,25 @@ public class NotificationServiceImpl implements NotificationService {
     @Override
     @Transactional
     public void notifyAgencyManagers(Long agencyNo, String name, String text, String type) {
-        // 해당 에이전시 소속 담당자(매니저/관리자) 목록 조회
-        // 알림을 받아야 하는 역할들
-        List<Member> managers = memberRepository.findByAgency_AgencyNoAndMemberRoleIn(
-                agencyNo, 
-                List.of("담당자", "MANAGER", "매니저", "PD", "에이전시 관리자", "관리자", "대표")
-        );
+        List<Member> managers;
+        
+        // JOIN_REQ 타입일 때는 에이전시 관리자만 알림 발송
+        if ("JOIN_REQ".equals(type)) {
+            managers = memberRepository.findByAgency_AgencyNoAndMemberRoleIn(
+                    agencyNo, 
+                    List.of("에이전시 관리자")
+            );
+            log.info("가입 요청 알림: 에이전시 {}의 에이전시 관리자에게만 알림 발송", agencyNo);
+        } else {
+            // 다른 타입은 기존대로 담당자(매니저/관리자) 목록 조회
+            managers = memberRepository.findByAgency_AgencyNoAndMemberRoleIn(
+                    agencyNo, 
+                    List.of("담당자", "MANAGER", "매니저", "PD", "에이전시 관리자", "관리자", "대표")
+            );
+        }
         
         if (managers.isEmpty()) {
-            log.warn("에이전시 {}에 담당자가 없습니다. 알림을 보낼 수 없습니다.", agencyNo);
+            log.warn("에이전시 {}에 알림을 받을 담당자가 없습니다. 알림을 보낼 수 없습니다.", agencyNo);
             return;
         }
         
@@ -78,7 +88,7 @@ public class NotificationServiceImpl implements NotificationService {
             createNotification(manager.getMemberNo(), name, text, type);
         }
         
-        log.info("에이전시 {} 담당자 {}명에게 알림 전송 완료", agencyNo, managers.size());
+        log.info("에이전시 {} 담당자 {}명에게 알림 전송 완료 (타입: {})", agencyNo, managers.size(), type);
     }
     
     @Override

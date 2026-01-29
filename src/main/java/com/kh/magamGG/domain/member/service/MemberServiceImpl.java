@@ -551,6 +551,49 @@ public class MemberServiceImpl implements MemberService {
         log.info("작가 배정 해제 완료: artistNo={}", artistNo);
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<MemberResponse> getArtistsByManagerNo(Long managerNo) {
+        try {
+            log.debug("담당자별 작가 목록 조회 시작: managerNo={}", managerNo);
+            
+            // ARTIST_ASSIGNMENT 테이블에서 해당 managerNo로 배정된 작가 목록 조회
+            List<ArtistAssignment> assignments = artistAssignmentRepository.findByManagerNo(managerNo);
+            log.debug("조회된 배정 수: {}", assignments.size());
+            
+            return assignments.stream()
+                .map(assignment -> {
+                    Member artist = assignment.getArtist();
+                    // managerNo는 이미 알고 있으므로 그대로 전달
+                    return convertToResponseWithManagerNo(artist, managerNo);
+                })
+                .collect(Collectors.toList());
+        } catch (Exception e) {
+            log.error("담당자별 작가 목록 조회 실패: managerNo={}, error={}", managerNo, e.getMessage(), e);
+            throw new RuntimeException("담당자별 작가 목록 조회 중 오류가 발생했습니다: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void removeFromAgency(Long memberNo) {
+        log.info("에이전시에서 회원 제거 시작: memberNo={}", memberNo);
+        
+        Member member = memberRepository.findById(memberNo)
+            .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+        
+        if (member.getAgency() == null) {
+            log.warn("이미 에이전시에 소속되지 않은 회원: memberNo={}", memberNo);
+            throw new IllegalArgumentException("이미 에이전시에 소속되지 않은 회원입니다.");
+        }
+        
+        // agencyNo를 null로 설정
+        member.setAgency(null);
+        memberRepository.save(member);
+        
+        log.info("에이전시에서 회원 제거 완료: memberNo={}", memberNo);
+    }
+
     private MemberResponse convertToResponse(Member member) {
         return convertToResponseWithManagerNo(member, null);
     }

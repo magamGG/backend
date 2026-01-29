@@ -31,6 +31,18 @@ public class MemberController {
     }
 
     /**
+     * 담당자별 작가 목록 조회 (ARTIST_ASSIGNMENT 테이블에서 managerNo로 조회)
+     * 더 구체적인 경로를 먼저 배치하여 경로 매칭 충돌 방지
+     */
+    @GetMapping("/manager/{managerNo}/artists")
+    public ResponseEntity<List<MemberResponse>> getArtistsByManagerNo(
+        @PathVariable Long managerNo
+    ) {
+        List<MemberResponse> response = memberService.getArtistsByManagerNo(managerNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 마이페이지 정보 조회
      */
     @GetMapping("/{memberNo}")
@@ -159,6 +171,18 @@ public class MemberController {
         @PathVariable Long artistNo
     ) {
         memberService.unassignArtistFromManager(artistNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 회원을 에이전시에서 제거 (agencyNo를 null로 설정)
+     * 더 구체적인 경로를 나중에 배치하여 경로 매칭 충돌 방지
+     */
+    @PutMapping("/{memberNo}/remove-from-agency")
+    public ResponseEntity<Void> removeFromAgency(
+        @PathVariable Long memberNo
+    ) {
+        memberService.removeFromAgency(memberNo);
         return ResponseEntity.ok().build();
     }
 }

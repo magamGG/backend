@@ -75,4 +75,14 @@ public interface MemberService {
      * 작가의 담당자 배정 해제
      */
     void unassignArtistFromManager(Long artistNo);
+
+    /**
+     * 담당자별 작가 목록 조회 (ARTIST_ASSIGNMENT 테이블에서 managerNo로 조회)
+     */
+    List<MemberResponse> getArtistsByManagerNo(Long managerNo);
+
+    /**
+     * 회원을 에이전시에서 제거 (agencyNo를 null로 설정)
+     */
+    void removeFromAgency(Long memberNo);
 }
