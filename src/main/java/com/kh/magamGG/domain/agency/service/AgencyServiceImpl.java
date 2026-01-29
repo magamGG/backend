@@ -5,6 +5,8 @@ import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
+import com.kh.magamGG.domain.attendance.entity.LeaveBalance;
+import com.kh.magamGG.domain.attendance.repository.LeaveBalanceRepository;
 import com.kh.magamGG.domain.manager.entity.Manager;
 import com.kh.magamGG.domain.manager.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.entity.Member;
@@ -36,6 +38,7 @@ public class AgencyServiceImpl implements AgencyService {
     private final AgencyMapper agencyMapper; // MyBatis Mapper
     private final NotificationService notificationService;
     private final ManagerRepository managerRepository;
+    private final LeaveBalanceRepository leaveBalanceRepository;
 
     @Override
     @Transactional
@@ -151,7 +154,23 @@ public class AgencyServiceImpl implements AgencyService {
         }
         log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
 
-        // 3. 담당자인 경우 MANAGER 테이블에 등록 (작가 배정 기능을 위해)
+        // 3. LEAVE_BALANCE 초기 데이터 생성 (AGENCY.AGENCY_LEAVE → 총 연차일, 사용 0, 잔여 = 총 연차일, 연도 = 현재 연도)
+        int totalDays = newRequest.getAgency().getAgencyLeave() != null
+                ? newRequest.getAgency().getAgencyLeave() : 15;
+        Member memberForBalance = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+        LeaveBalance leaveBalance = new LeaveBalance();
+        leaveBalance.setMember(memberForBalance);
+        leaveBalance.setLeaveType("ANNUAL");
+        leaveBalance.setLeaveBalanceTotalDays(totalDays);
+        leaveBalance.setLeaveBalanceUsedDays(0);
+        leaveBalance.setLeaveBalanceRemainDays(totalDays);
+        leaveBalance.setLeaveBalanceYear(String.valueOf(java.time.Year.now().getValue()));
+        leaveBalance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+        leaveBalanceRepository.save(leaveBalance);
+        log.info("LEAVE_BALANCE 초기 데이터 생성 완료: 회원번호 {}, 총연차일 {}, 연도 {}", memberNo, totalDays, leaveBalance.getLeaveBalanceYear());
+
+        // 4. 담당자인 경우 MANAGER 테이블에 등록 (작가 배정 기능을 위해)
         String memberRole = newRequest.getMember().getMemberRole();
         if ("담당자".equals(memberRole)) {
             // 이미 Manager로 등록되어 있는지 확인
