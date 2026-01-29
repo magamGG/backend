@@ -5,6 +5,8 @@ import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
+import com.kh.magamGG.domain.manager.entity.Manager;
+import com.kh.magamGG.domain.manager.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
@@ -33,6 +35,7 @@ public class AgencyServiceImpl implements AgencyService {
     private final NewRequestRepository newRequestRepository;
     private final AgencyMapper agencyMapper; // MyBatis Mapper
     private final NotificationService notificationService;
+    private final ManagerRepository managerRepository;
 
     @Override
     @Transactional
@@ -147,6 +150,23 @@ public class AgencyServiceImpl implements AgencyService {
             throw new IllegalStateException("회원의 에이전시 정보 업데이트에 실패했습니다.");
         }
         log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
+
+        // 3. 담당자인 경우 MANAGER 테이블에 등록 (작가 배정 기능을 위해)
+        String memberRole = newRequest.getMember().getMemberRole();
+        if ("담당자".equals(memberRole)) {
+            // 이미 Manager로 등록되어 있는지 확인
+            boolean alreadyManager = managerRepository.findByMember_MemberNo(memberNo).isPresent();
+            if (!alreadyManager) {
+                Member memberEntity = memberRepository.findById(memberNo)
+                        .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+                
+                Manager manager = Manager.builder()
+                        .member(memberEntity)
+                        .build();
+                managerRepository.save(manager);
+                log.info("MANAGER 테이블에 담당자 등록 완료: 회원번호 {}, 회원명 {}", memberNo, memberName);
+            }
+        }
 
         log.info("에이전시 가입 요청 승인 완료: 요청번호 {}, 회원 {} -> 에이전시 {} 소속으로 변경",
                 newRequestNo, memberName, agencyName);
