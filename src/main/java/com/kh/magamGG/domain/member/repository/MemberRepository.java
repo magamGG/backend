@@ -36,4 +36,26 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
      */
     @Query("SELECT m.memberRole, COUNT(m) FROM Member m WHERE m.agency.agencyNo = :agencyNo GROUP BY m.memberRole")
     List<Object[]> countByAgencyNoAndMemberRole(@Param("agencyNo") Long agencyNo);
+
+    /**
+     * 에이전시별 담당자 목록 조회 (member_role = "담당자")
+     * 주의: 이제 MANAGER 테이블을 통해 조회하므로 이 메서드는 사용하지 않음
+     */
+    @Deprecated
+    @Query("SELECT DISTINCT m FROM Member m LEFT JOIN FETCH m.agency WHERE m.agency.agencyNo = :agencyNo AND m.memberRole = '담당자'")
+    List<Member> findManagersByAgencyNo(@Param("agencyNo") Long agencyNo);
+
+    /**
+     * 에이전시별 작가 목록 조회 (member_role IN ("웹툰 작가", "웹소설 작가"))
+     * manager는 필요할 때만 조회하도록 별도 처리
+     */
+    @Query("SELECT DISTINCT m FROM Member m LEFT JOIN FETCH m.agency WHERE m.agency.agencyNo = :agencyNo AND (m.memberRole = '웹툰 작가' OR m.memberRole = '웹소설 작가')")
+    List<Member> findArtistsByAgencyNo(@Param("agencyNo") Long agencyNo);
+
+    /**
+     * 특정 담당자에게 배정된 작가 목록 조회
+     * TODO: MANAGER_NO 컬럼 추가 후 주석 해제
+     */
+    // @Query("SELECT m FROM Member m WHERE m.manager.memberNo = :managerNo")
+    // List<Member> findArtistsByManagerNo(@Param("managerNo") Long managerNo);
 }

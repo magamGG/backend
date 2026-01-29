@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.Map;
 
 @RestController
@@ -29,6 +32,18 @@ public class MemberController {
     public ResponseEntity<MemberResponse> register(@RequestBody MemberRequest request) {
         MemberResponse response = memberService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * 담당자별 작가 목록 조회 (ARTIST_ASSIGNMENT 테이블에서 managerNo로 조회)
+     * 더 구체적인 경로를 먼저 배치하여 경로 매칭 충돌 방지
+     */
+    @GetMapping("/manager/{managerNo}/artists")
+    public ResponseEntity<List<MemberResponse>> getArtistsByManagerNo(
+        @PathVariable Long managerNo
+    ) {
+        List<MemberResponse> response = memberService.getArtistsByManagerNo(managerNo);
+        return ResponseEntity.ok(response);
     }
 
     /**
@@ -99,15 +114,79 @@ public class MemberController {
     }
 
     /**
-     * 회원 탈퇴 (비밀번호 확인 필요)
+     * 회원 탈퇴
      */
     @DeleteMapping("/{memberNo}")
-    public ResponseEntity<Void> deleteMember(
-        @PathVariable Long memberNo,
-        @RequestBody(required = false) Map<String, String> request
+    public ResponseEntity<Void> deleteMember(@PathVariable Long memberNo) {
+        memberService.deleteMember(memberNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 회원 상세 정보 조회 (프로젝트, 건강 체크 등)
+     */
+    @GetMapping("/{memberNo}/details")
+    public ResponseEntity<com.kh.magamGG.domain.member.dto.response.MemberDetailResponse> getMemberDetails(
+        @PathVariable Long memberNo
     ) {
-        String password = request != null ? request.get("password") : null;
-        memberService.deleteMember(memberNo, password);
+        com.kh.magamGG.domain.member.dto.response.MemberDetailResponse response = memberService.getMemberDetails(memberNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 에이전시별 담당자 목록 조회
+     */
+    @GetMapping("/agency/{agencyNo}/managers")
+    public ResponseEntity<List<MemberResponse>> getManagersByAgencyNo(
+        @PathVariable Long agencyNo
+    ) {
+        List<MemberResponse> response = memberService.getManagersByAgencyNo(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 에이전시별 작가 목록 조회
+     */
+    @GetMapping("/agency/{agencyNo}/artists")
+    public ResponseEntity<List<MemberResponse>> getArtistsByAgencyNo(
+        @PathVariable Long agencyNo
+    ) {
+        List<MemberResponse> response = memberService.getArtistsByAgencyNo(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 작가를 담당자에게 배정
+     */
+    @PostMapping("/{artistNo}/assign/{managerNo}")
+    public ResponseEntity<Void> assignArtistToManager(
+        @PathVariable Long artistNo,
+        @PathVariable Long managerNo
+    ) {
+        memberService.assignArtistToManager(artistNo, managerNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 작가의 담당자 배정 해제
+     */
+    @DeleteMapping("/{artistNo}/assign")
+    public ResponseEntity<Void> unassignArtistFromManager(
+        @PathVariable Long artistNo
+    ) {
+        memberService.unassignArtistFromManager(artistNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 회원을 에이전시에서 제거 (agencyNo를 null로 설정)
+     * 더 구체적인 경로를 나중에 배치하여 경로 매칭 충돌 방지
+     */
+    @PutMapping("/{memberNo}/remove-from-agency")
+    public ResponseEntity<Void> removeFromAgency(
+        @PathVariable Long memberNo
+    ) {
+        memberService.removeFromAgency(memberNo);
         return ResponseEntity.ok().build();
     }
 }

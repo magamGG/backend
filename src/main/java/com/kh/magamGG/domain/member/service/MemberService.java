@@ -42,12 +42,47 @@ public interface MemberService {
     EmployeeStatisticsResponseDto getEmployeeStatistics(Long agencyNo);
 
     /**
-     * 회원 탈퇴 (비밀번호 확인 필요)
+     * 회원 탈퇴
      */
-    void deleteMember(Long memberNo, String password);
+    void deleteMember(Long memberNo);
 
     /**
      * 에이전시별 회원 목록 조회
      */
     List<MemberResponse> getMembersByAgencyNo(Long agencyNo);
+
+    /**
+     * 회원 상세 정보 조회 (프로젝트, 건강 체크 등)
+     */
+    com.kh.magamGG.domain.member.dto.response.MemberDetailResponse getMemberDetails(Long memberNo);
+
+    /**
+     * 에이전시별 담당자 목록 조회
+     */
+    List<MemberResponse> getManagersByAgencyNo(Long agencyNo);
+
+    /**
+     * 에이전시별 작가 목록 조회
+     */
+    List<MemberResponse> getArtistsByAgencyNo(Long agencyNo);
+
+    /**
+     * 작가를 담당자에게 배정
+     */
+    void assignArtistToManager(Long artistNo, Long managerNo);
+
+    /**
+     * 작가의 담당자 배정 해제
+     */
+    void unassignArtistFromManager(Long artistNo);
+
+    /**
+     * 담당자별 작가 목록 조회 (ARTIST_ASSIGNMENT 테이블에서 managerNo로 조회)
+     */
+    List<MemberResponse> getArtistsByManagerNo(Long managerNo);
+
+    /**
+     * 회원을 에이전시에서 제거 (agencyNo를 null로 설정)
+     */
+    void removeFromAgency(Long memberNo);
 }

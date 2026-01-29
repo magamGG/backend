@@ -47,7 +47,7 @@ public class Member {
 	public void setAgency(Agency agency) {
 		this.agency = agency;
 	}
-	
+
 	@Column(name = "MEMBER_NAME", nullable = false, length = 20)
 	private String memberName;
 	
@@ -62,7 +62,7 @@ public class Member {
 
     @Column(name = "MEMBER_ADDRESS", length = 100)
     private String memberAddress;
-	
+
 	@Column(name = "MEMBER_STATUS", nullable = false, length = 20)
 	private String memberStatus;
 	
@@ -70,7 +70,7 @@ public class Member {
 	public void setMemberStatus(String memberStatus) {
 		this.memberStatus = memberStatus;
 	}
-	
+
 	@Column(name = "MEMBER_PROFILE_IMAGE", length = 100)
 	private String memberProfileImage;
 	
@@ -90,7 +90,7 @@ public class Member {
 	public void setMemberUpdatedAt(LocalDateTime memberUpdatedAt) {
 		this.memberUpdatedAt = memberUpdatedAt;
 	}
-	
+
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Attendance> attendances = new ArrayList<>();
 	
@@ -127,9 +127,11 @@ public class Member {
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
 
+
+
     @OneToMany(mappedBy = "artist")
     private List<ArtistAssignment> artistAssignments = new ArrayList<>();
-    
+
     // 프로필 정보 수정
     public void updateProfile(String memberName, String memberEmail, String memberPhone, String memberAddress) {
     	this.memberName = memberName;
@@ -138,19 +140,19 @@ public class Member {
     	this.memberAddress = memberAddress;
     	this.memberUpdatedAt = LocalDateTime.now();
     }
-    
+
     // 프로필 이미지 업데이트
     public void updateProfileImage(String memberProfileImage) {
     	this.memberProfileImage = memberProfileImage;
     	this.memberUpdatedAt = LocalDateTime.now();
     }
-    
+
     // 배경 이미지 업데이트
     public void updateBackgroundImage(String memberProfileBannerImage) {
     	this.memberProfileBannerImage = memberProfileBannerImage;
     	this.memberUpdatedAt = LocalDateTime.now();
     }
-    
+
     // 비밀번호 업데이트
     public void updatePassword(String memberPassword) {
     	this.memberPassword = memberPassword;
