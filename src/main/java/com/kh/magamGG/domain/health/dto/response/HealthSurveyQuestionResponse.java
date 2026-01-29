@@ -1,4 +1,4 @@
-package com.kh.magamGG.domain.health.dto;
+package com.kh.magamGG.domain.health.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,7 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class HealthSurveyQuestionResponseDto {
+public class HealthSurveyQuestionResponse {
 
     private Long healthSurveyQuestionNo;
     private Long healthSurveyNo;
