@@ -2,6 +2,8 @@ package com.kh.magamGG.domain.member.entity;
 
 import com.kh.magamGG.domain.agency.entity.Agency;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +13,9 @@ import java.time.LocalDateTime;
 @Table(name = "NEW_REQUEST")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@org.hibernate.annotations.DynamicUpdate
 public class NewRequest {
 
     @Id
@@ -29,7 +34,11 @@ public class NewRequest {
     @Column(name = "NEW_REQUEST_DATE")
     private LocalDateTime newRequestDate;
 
-    @Column(name = "NEW_REQUEST_STATUS", nullable = false, length = 1)
+    @Column(name = "NEW_REQUEST_STATUS", nullable = false, length = 10)
     private String newRequestStatus;
-
+    
+    // 상태 업데이트 메서드
+    public void setNewRequestStatus(String newRequestStatus) {
+        this.newRequestStatus = newRequestStatus;
+    }
 }

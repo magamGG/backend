@@ -2,16 +2,19 @@ package com.kh.magamGG.domain.attendance.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ATTENDANCE_REQUEST")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class AttendanceRequest {
 	
 	@Id
