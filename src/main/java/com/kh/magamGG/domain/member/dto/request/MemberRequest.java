@@ -12,6 +12,7 @@ public class MemberRequest {
     private String memberEmail;
     private String memberPassword;
     private String memberPhone;
+    private String memberAddress;
     private String memberRole;
 
     // 에이전시 회원가입 시 사용
