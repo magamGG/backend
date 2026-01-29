@@ -58,4 +58,22 @@ public class AttendanceRequest {
 	
 	@Column(name = "ATTENDANCE_REQUEST_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime attendanceRequestUpdatedAt;
+	
+	/**
+	 * 근태 신청 승인 처리
+	 */
+	public void approve() {
+		this.attendanceRequestStatus = "APPROVED";
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
+	
+	/**
+	 * 근태 신청 반려 처리
+	 * @param rejectReason 반려 사유
+	 */
+	public void reject(String rejectReason) {
+		this.attendanceRequestStatus = "REJECTED";
+		this.attendanceRequestRejectReason = rejectReason;
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
 }

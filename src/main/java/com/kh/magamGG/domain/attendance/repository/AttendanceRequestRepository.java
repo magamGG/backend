@@ -42,6 +42,17 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
     List<AttendanceRequest> findByAgencyNoAndStatusWithMember(
             @Param("agencyNo") Long agencyNo, 
             @Param("status") String status);
+    
+    /**
+     * 특정 회원의 승인된 근태 신청 조회 (날짜 필터링은 서비스 레이어에서 처리)
+     * - ATTENDANCE_REQUEST_STATUS = 'APPROVED'
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "WHERE m.memberNo = :memberNo " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "ORDER BY ar.attendanceRequestCreatedAt DESC")
+    List<AttendanceRequest> findApprovedByMemberNo(@Param("memberNo") Long memberNo);
 }
 
 

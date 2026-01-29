@@ -109,4 +109,77 @@ public class AttendanceRequestController {
         
         return ResponseEntity.ok(responses);
     }
+    
+    /**
+     * 현재 로그인한 회원의 현재 적용 중인 근태 상태 조회
+     * GET /api/leave/current-status
+     * 
+     * - 승인(APPROVED)된 근태 신청 중
+     * - 현재 날짜가 시작일~종료일 사이인 것
+     * 
+     * @param memberNo 회원 번호 (헤더에서 추출)
+     * @return 현재 적용 중인 근태 상태 (없으면 null 반환)
+     */
+    @GetMapping("/current-status")
+    public ResponseEntity<AttendanceRequestResponse> getCurrentAttendanceStatus(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        
+        log.info("회원 {}의 현재 근태 상태 조회", memberNo);
+        
+        AttendanceRequestResponse response = attendanceService.getCurrentAttendanceStatus(memberNo);
+        
+        if (response == null) {
+            log.info("회원 {}의 현재 근태 상태 없음 - null 반환", memberNo);
+            return ResponseEntity.ok(null);
+        }
+        
+        log.info("회원 {}의 현재 근태 상태 반환: {}", memberNo, response.getAttendanceRequestType());
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 근태 신청 승인
+     * POST /api/leave/{attendanceRequestNo}/approve
+     * 
+     * @param attendanceRequestNo 근태 신청 번호
+     * @return 승인된 근태 신청 정보
+     */
+    @PostMapping("/{attendanceRequestNo}/approve")
+    public ResponseEntity<AttendanceRequestResponse> approveAttendanceRequest(
+            @PathVariable Long attendanceRequestNo) {
+        
+        log.info("근태 신청 승인 요청: 신청번호={}", attendanceRequestNo);
+        
+        AttendanceRequestResponse response = attendanceService.approveAttendanceRequest(attendanceRequestNo);
+        
+        log.info("근태 신청 승인 완료: 신청번호={}", attendanceRequestNo);
+        
+        return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * 근태 신청 반려
+     * POST /api/leave/{attendanceRequestNo}/reject
+     * 
+     * @param attendanceRequestNo 근태 신청 번호
+     * @param rejectReason 반려 사유 (요청 본문)
+     * @return 반려된 근태 신청 정보
+     */
+    @PostMapping("/{attendanceRequestNo}/reject")
+    public ResponseEntity<AttendanceRequestResponse> rejectAttendanceRequest(
+            @PathVariable Long attendanceRequestNo,
+            @RequestBody(required = false) java.util.Map<String, String> requestBody) {
+        
+        String rejectReason = requestBody != null && requestBody.containsKey("rejectReason") 
+                ? requestBody.get("rejectReason") 
+                : "";
+        
+        log.info("근태 신청 반려 요청: 신청번호={}, 사유={}", attendanceRequestNo, rejectReason);
+        
+        AttendanceRequestResponse response = attendanceService.rejectAttendanceRequest(attendanceRequestNo, rejectReason);
+        
+        log.info("근태 신청 반려 완료: 신청번호={}", attendanceRequestNo);
+        
+        return ResponseEntity.ok(response);
+    }
 }

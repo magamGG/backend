@@ -4,13 +4,18 @@ import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.attendance.dto.AttendanceStatisticsResponseDto;
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
+import com.kh.magamGG.domain.attendance.entity.Attendance;
 import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRequestRepository;
+import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
+import com.kh.magamGG.domain.health.service.DailyHealthCheckService;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
+import com.kh.magamGG.global.exception.AccountBlockedException;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
+import com.kh.magamGG.global.exception.AlreadyCheckedInException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +41,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final MemberRepository memberRepository;
     private final AgencyRepository agencyRepository;
     private final NotificationService notificationService;
+    private final DailyHealthCheckService dailyHealthCheckService;
     
     @Override
     @Transactional
@@ -172,6 +178,131 @@ public class AttendanceServiceImpl implements AttendanceService {
             .build();
     }
     
+    @Override
+    public AttendanceRequestResponse getCurrentAttendanceStatus(Long memberNo) {
+        // 회원 존재 확인
+        memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
+        
+        // 현재 날짜만 추출 (시간 무시)
+        LocalDateTime now = LocalDateTime.now();
+        java.time.LocalDate today = now.toLocalDate();
+        
+        log.info("회원 {}의 현재 근태 상태 조회 시작 - 오늘 날짜: {}", memberNo, today);
+        
+        // 승인된 근태 신청 목록 조회
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository
+                .findApprovedByMemberNo(memberNo);
+        
+        log.info("회원 {}의 승인된 근태 신청 수: {}", memberNo, approvedRequests.size());
+        
+        // 현재 날짜가 시작일과 종료일 사이에 있는 것만 필터링
+        List<AttendanceRequest> currentRequests = approvedRequests.stream()
+                .filter(request -> {
+                    java.time.LocalDate startDate = request.getAttendanceRequestStartDate().toLocalDate();
+                    java.time.LocalDate endDate = request.getAttendanceRequestEndDate().toLocalDate();
+                    boolean isInRange = !today.isBefore(startDate) && !today.isAfter(endDate);
+                    log.info("근태 신청 {}: 시작일={}, 종료일={}, 오늘={}, 범위 내={}", 
+                            request.getAttendanceRequestNo(), startDate, endDate, today, isInRange);
+                    return isInRange;
+                })
+                .collect(Collectors.toList());
+        
+        if (currentRequests.isEmpty()) {
+            log.info("회원 {}의 현재 적용 중인 근태 상태 없음 (승인된 신청 {}건 중 현재 날짜 범위 내 신청 없음)", 
+                    memberNo, approvedRequests.size());
+            return null;
+        }
+        
+        // 가장 최근 승인된 것 반환 (여러 개일 경우)
+        AttendanceRequest currentRequest = currentRequests.get(0);
+        log.info("회원 {}의 현재 근태 상태: {} ({} ~ {})", 
+                memberNo, 
+                currentRequest.getAttendanceRequestType(),
+                currentRequest.getAttendanceRequestStartDate(),
+                currentRequest.getAttendanceRequestEndDate());
+        
+        return AttendanceRequestResponse.fromEntity(currentRequest);
+    }
+    
+    @Override
+    @Transactional
+    public AttendanceRequestResponse approveAttendanceRequest(Long attendanceRequestNo) {
+        // 근태 신청 조회
+        AttendanceRequest request = attendanceRequestRepository.findById(attendanceRequestNo)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 근태 신청입니다."));
+        
+        // 이미 처리된 경우 예외 처리
+        if (!"PENDING".equals(request.getAttendanceRequestStatus())) {
+            throw new RuntimeException("이미 처리된 근태 신청입니다.");
+        }
+        
+        // 승인 처리
+        request.approve();
+        AttendanceRequest savedRequest = attendanceRequestRepository.save(request);
+        
+        log.info("근태 신청 승인 완료: 신청번호={}, 회원={}", 
+                attendanceRequestNo, 
+                savedRequest.getMember().getMemberName());
+        
+        // 신청자에게 알림 발송
+        if (savedRequest.getMember() != null) {
+            String notificationName = "근태 신청 승인";
+            String notificationText = String.format("%s 신청이 승인되었습니다. (%s ~ %s)", 
+                    savedRequest.getAttendanceRequestType(),
+                    savedRequest.getAttendanceRequestStartDate().toLocalDate(),
+                    savedRequest.getAttendanceRequestEndDate().toLocalDate());
+            
+            notificationService.createNotification(
+                    savedRequest.getMember().getMemberNo(),
+                    notificationName,
+                    notificationText,
+                    "LEAVE_APP"
+            );
+        }
+        
+        return AttendanceRequestResponse.fromEntity(savedRequest);
+    }
+    
+    @Override
+    @Transactional
+    public AttendanceRequestResponse rejectAttendanceRequest(Long attendanceRequestNo, String rejectReason) {
+        // 근태 신청 조회
+        AttendanceRequest request = attendanceRequestRepository.findById(attendanceRequestNo)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 근태 신청입니다."));
+        
+        // 이미 처리된 경우 예외 처리
+        if (!"PENDING".equals(request.getAttendanceRequestStatus())) {
+            throw new RuntimeException("이미 처리된 근태 신청입니다.");
+        }
+        
+        // 반려 처리
+        request.reject(rejectReason);
+        AttendanceRequest savedRequest = attendanceRequestRepository.save(request);
+        
+        log.info("근태 신청 반려 완료: 신청번호={}, 회원={}, 사유={}", 
+                attendanceRequestNo, 
+                savedRequest.getMember().getMemberName(),
+                rejectReason);
+        
+        // 신청자에게 알림 발송
+        if (savedRequest.getMember() != null) {
+            String notificationName = "근태 신청 반려";
+            String notificationText = String.format("%s 신청이 반려되었습니다. 사유: %s", 
+                    savedRequest.getAttendanceRequestType(),
+                    rejectReason);
+            
+            notificationService.createNotification(
+                    savedRequest.getMember().getMemberNo(),
+                    notificationName,
+                    notificationText,
+                    "LEAVE_REJ"
+            );
+        }
+        
+        return AttendanceRequestResponse.fromEntity(savedRequest);
+    }
+    
     /**
      * 문자열을 LocalDateTime으로 파싱
      * YYYY-MM-DD 또는 YYYY-MM-DDTHH:mm:ss 형식 지원
@@ -196,5 +327,82 @@ public class AttendanceServiceImpl implements AttendanceService {
             log.warn("날짜 파싱 실패: {}, 기본값 사용", dateTimeStr);
             return LocalDateTime.now();
         }
+    }
+    
+    @Override
+    @Transactional
+    public boolean startAttendance(DailyHealthCheckRequest healthCheckRequest, Long memberNo) {
+        // 1. 회원 조회 및 검증
+        Member member = memberRepository.findByIdWithAgency(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("회원 정보를 찾을 수 없습니다."));
+        
+        if (member.getAgency() == null) {
+            throw new MemberNotFoundException("에이전시에 소속되지 않은 회원입니다.");
+        }
+        
+        // 2. 회원 상태 확인 (ACTIVE만 출근 가능)
+        if (member.getMemberStatus() == null || !"ACTIVE".equals(member.getMemberStatus())) {
+            throw new AccountBlockedException("휴면 계정입니다.");
+        }
+        
+        // 3. 오늘 이미 출근했는지 확인
+        String lastType = getTodayLastAttendanceType(memberNo);
+        if ("출근".equals(lastType)) {
+            throw new AlreadyCheckedInException("이미 출근 처리되었습니다.");
+        }
+        
+        // 4. DAILY_HEALTH_CHECK 저장 (건강 체크)
+        dailyHealthCheckService.createDailyHealthCheck(healthCheckRequest, memberNo);
+        
+        // 5. ATTENDANCE 테이블에 출근 기록 생성
+        Attendance attendance = new Attendance();
+        attendance.setMember(member);
+        attendance.setAgency(member.getAgency());
+        attendance.setAttendanceType("출근");
+        attendance.setAttendanceTime(LocalDateTime.now());
+        attendanceRepository.save(attendance);
+        
+        log.info("출근 시작 완료: 회원번호={}, 에이전시번호={}, ATTENDANCE 저장됨", memberNo, member.getAgency().getAgencyNo());
+        
+        return true;
+    }
+    
+    @Override
+    public String getTodayLastAttendanceType(Long memberNo) {
+        // 회원 존재 확인
+        memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
+        
+        // 오늘 날짜
+        java.time.LocalDate today = java.time.LocalDate.now();
+        
+        // 오늘 날짜의 마지막 출근 기록 조회
+        List<Attendance> todayAttendances = attendanceRepository.findTodayLastAttendanceByMemberNo(memberNo, today);
+        
+        if (todayAttendances.isEmpty()) {
+            return null;
+        }
+        
+        // 가장 최근 기록의 타입 반환
+        Attendance lastAttendance = todayAttendances.get(0);
+        return lastAttendance.getAttendanceType();
+    }
+
+    @Override
+    @Transactional
+    public boolean endAttendance(Long memberNo) {
+        Member member = memberRepository.findByIdWithAgency(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
+        if (member.getAgency() == null) {
+            throw new MemberNotFoundException("에이전시에 소속되지 않은 회원입니다.");
+        }
+        Attendance attendance = new Attendance();
+        attendance.setMember(member);
+        attendance.setAgency(member.getAgency());
+        attendance.setAttendanceType("퇴근");
+        attendance.setAttendanceTime(LocalDateTime.now());
+        attendanceRepository.save(attendance);
+        log.info("출근 종료(퇴근) 완료: 회원번호={}", memberNo);
+        return true;
     }
 }

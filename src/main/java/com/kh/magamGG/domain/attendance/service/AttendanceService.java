@@ -54,6 +54,52 @@ public interface AttendanceService {
      * @return 근태 통계
      */
     AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month);
+    
+    /**
+     * 특정 회원의 현재 적용 중인 근태 상태 조회
+     * - 승인(APPROVED)된 근태 신청 중
+     * - 현재 날짜가 시작일~종료일 사이인 것
+     * @param memberNo 회원 번호
+     * @return 현재 적용 중인 근태 신청 정보 (없으면 null)
+     */
+    AttendanceRequestResponse getCurrentAttendanceStatus(Long memberNo);
+    
+    /**
+     * 근태 신청 승인
+     * @param attendanceRequestNo 근태 신청 번호
+     * @return 승인된 근태 신청 정보
+     */
+    AttendanceRequestResponse approveAttendanceRequest(Long attendanceRequestNo);
+    
+    /**
+     * 근태 신청 반려
+     * @param attendanceRequestNo 근태 신청 번호
+     * @param rejectReason 반려 사유
+     * @return 반려된 근태 신청 정보
+     */
+    AttendanceRequestResponse rejectAttendanceRequest(Long attendanceRequestNo, String rejectReason);
+    
+    /**
+     * 출근 시작 (건강 체크 + 출근 기록)
+     * @param healthCheckRequest 건강 체크 정보
+     * @param memberNo 회원 번호
+     * @return 출근 기록이 생성되었는지 여부
+     */
+    boolean startAttendance(com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest healthCheckRequest, Long memberNo);
+    
+    /**
+     * 오늘 날짜의 마지막 출근 상태 조회
+     * @param memberNo 회원 번호
+     * @return 마지막 출근 타입 ('출근' 또는 null)
+     */
+    String getTodayLastAttendanceType(Long memberNo);
+
+    /**
+     * 출근 종료 (퇴근 기록)
+     * @param memberNo 회원 번호
+     * @return 퇴근 기록 생성 여부
+     */
+    boolean endAttendance(Long memberNo);
 }
 
 
