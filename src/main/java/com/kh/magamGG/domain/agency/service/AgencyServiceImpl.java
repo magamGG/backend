@@ -5,10 +5,13 @@ import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
+import com.kh.magamGG.domain.manager.entity.Manager;
+import com.kh.magamGG.domain.manager.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.member.repository.NewRequestRepository;
+import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import com.kh.magamGG.global.exception.NewRequestNotFoundException;
@@ -31,6 +34,8 @@ public class AgencyServiceImpl implements AgencyService {
     private final MemberRepository memberRepository;
     private final NewRequestRepository newRequestRepository;
     private final AgencyMapper agencyMapper; // MyBatis Mapper
+    private final NotificationService notificationService;
+    private final ManagerRepository managerRepository;
 
     @Override
     @Transactional
@@ -64,6 +69,19 @@ public class AgencyServiceImpl implements AgencyService {
         newRequest = newRequestRepository.save(newRequest);
         log.info("에이전시 가입 요청 생성: 회원 {} -> 에이전시 {} (요청번호: {})",
                 member.getMemberName(), agency.getAgencyName(), newRequest.getNewRequestNo());
+
+        // 에이전시 담당자에게 알림 발송
+        String notificationName = "가입 요청";
+        String notificationText = String.format("%s님(%s)이 에이전시 가입을 요청했습니다.", 
+                member.getMemberName(),
+                member.getMemberRole());
+        
+        notificationService.notifyAgencyManagers(
+                agency.getAgencyNo(),
+                notificationName,
+                notificationText,
+                "JOIN_REQ"
+        );
 
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
@@ -133,6 +151,23 @@ public class AgencyServiceImpl implements AgencyService {
         }
         log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
 
+        // 3. 담당자인 경우 MANAGER 테이블에 등록 (작가 배정 기능을 위해)
+        String memberRole = newRequest.getMember().getMemberRole();
+        if ("담당자".equals(memberRole)) {
+            // 이미 Manager로 등록되어 있는지 확인
+            boolean alreadyManager = managerRepository.findByMember_MemberNo(memberNo).isPresent();
+            if (!alreadyManager) {
+                Member memberEntity = memberRepository.findById(memberNo)
+                        .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+                
+                Manager manager = Manager.builder()
+                        .member(memberEntity)
+                        .build();
+                managerRepository.save(manager);
+                log.info("MANAGER 테이블에 담당자 등록 완료: 회원번호 {}, 회원명 {}", memberNo, memberName);
+            }
+        }
+
         log.info("에이전시 가입 요청 승인 완료: 요청번호 {}, 회원 {} -> 에이전시 {} 소속으로 변경",
                 newRequestNo, memberName, agencyName);
 
@@ -174,7 +209,7 @@ public class AgencyServiceImpl implements AgencyService {
         if (updated == 0) {
             throw new IllegalStateException("가입 요청 상태 업데이트에 실패했습니다.");
         }
-
+        
         log.info("에이전시 가입 요청 거절: 요청번호 {}, 회원 {}, 사유: {}",
                 newRequestNo, memberName, rejectionReason);
 
@@ -195,25 +230,25 @@ public class AgencyServiceImpl implements AgencyService {
                 .build();
     }
 
-	@Override
-	public Agency getAgency(Long agencyNo) {
-		return agencyRepository.findById(agencyNo)
-			.orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
-	}
+    @Override
+    public Agency getAgency(Long agencyNo) {
+        return agencyRepository.findById(agencyNo)
+            .orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
+    }
 
-	@Override
-	public Agency getAgencyByCode(String agencyCode) {
-		return agencyRepository.findByAgencyCode(agencyCode)
-			.orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
-	}
+    @Override
+    public Agency getAgencyByCode(String agencyCode) {
+        return agencyRepository.findByAgencyCode(agencyCode)
+            .orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
+    }
 
-	@Override
-	@Transactional
-	public void updateAgencyName(Long agencyNo, String agencyName) {
-		Agency agency = agencyRepository.findById(agencyNo)
-			.orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
+    @Override
+    @Transactional
+    public void updateAgencyName(Long agencyNo, String agencyName) {
+        Agency agency = agencyRepository.findById(agencyNo)
+            .orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
 
-		agency.updateAgencyName(agencyName);
-		agencyRepository.save(agency);
-	}
+        agency.updateAgencyName(agencyName);
+        agencyRepository.save(agency);
+    }
 }

@@ -34,7 +34,7 @@ public class AuthService {
         }
 
         // 계정 상태 확인
-        if (!"ACTIVE".equals(member.getMemberStatus())) {
+        if (!"ACTIVE".equals(member.getMemberStatus()) && !"활성".equals(member.getMemberStatus())) {
             throw new InvalidCredentialsException("비활성화된 계정입니다.");
         }
 

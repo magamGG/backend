@@ -27,6 +27,11 @@ public class Agency {
 	@Column(name = "AGENCY_NAME", length = 30, unique = true)
 	private String agencyName;
 	
+	// 에이전시 이름 수정을 위한 메서드
+	public void updateAgencyName(String agencyName) {
+		this.agencyName = agencyName;
+	}
+	
 	@Column(name = "AGENCY_CODE", length = 11, unique = true)
 	private String agencyCode;
 
@@ -40,9 +45,4 @@ public class Agency {
     @Builder.Default
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
-
-    // 에이전시 소속명(스튜디오) 수정
-    public void updateAgencyName(String agencyName) {
-    	this.agencyName = agencyName;
-    }
 }

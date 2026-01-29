@@ -15,6 +15,8 @@ import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.entity.TaskHistory;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -28,6 +30,8 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Member {
 	
 	@Id
@@ -39,13 +43,18 @@ public class Member {
 	@JoinColumn(name = "AGENCY_NO")
 	private Agency agency;
 	
+	// 에이전시 설정을 위한 setter
+	public void setAgency(Agency agency) {
+		this.agency = agency;
+	}
+	
 	@Column(name = "MEMBER_NAME", nullable = false, length = 20)
 	private String memberName;
 	
 	@Column(name = "MEMBER_PASSWORD", nullable = false, length = 100)
 	private String memberPassword;
 	
-	@Column(name = "MEMBER_EMAIL", nullable = false, length = 50, unique = true)
+	@Column(name = "MEMBER_EMAIL", nullable = false, length = 50)
 	private String memberEmail;
 	
 	@Column(name = "MEMBER_PHONE", nullable = false, length = 15)
@@ -57,13 +66,18 @@ public class Member {
 	@Column(name = "MEMBER_STATUS", nullable = false, length = 20)
 	private String memberStatus;
 	
+	// 멤버 상태 설정을 위한 setter
+	public void setMemberStatus(String memberStatus) {
+		this.memberStatus = memberStatus;
+	}
+	
 	@Column(name = "MEMBER_PROFILE_IMAGE", length = 100)
 	private String memberProfileImage;
 	
 	@Column(name = "MEMBER_PROFILE_BANNER_IMAGE", length = 100)
 	private String memberProfileBannerImage;
 	
-	@Column(name = "MEMBER_ROLE", nullable = false, length = 20)
+	@Column(name = "MEMBER_ROLE", nullable = false, length = 100)
 	private String memberRole;
 	
 	@Column(name = "MEMBER_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
@@ -71,6 +85,11 @@ public class Member {
 	
 	@Column(name = "MEMBER_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime memberUpdatedAt;
+	
+	// 업데이트 시간 설정을 위한 setter
+	public void setMemberUpdatedAt(LocalDateTime memberUpdatedAt) {
+		this.memberUpdatedAt = memberUpdatedAt;
+	}
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Attendance> attendances = new ArrayList<>();
