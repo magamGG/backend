@@ -42,9 +42,9 @@ public interface MemberService {
     EmployeeStatisticsResponseDto getEmployeeStatistics(Long agencyNo);
 
     /**
-     * 회원 탈퇴
+     * 회원 탈퇴 (비밀번호 확인 필요)
      */
-    void deleteMember(Long memberNo);
+    void deleteMember(Long memberNo, String password);
 
     /**
      * 에이전시별 회원 목록 조회

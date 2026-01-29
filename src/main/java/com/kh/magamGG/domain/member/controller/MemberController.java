@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/members")
@@ -98,11 +99,15 @@ public class MemberController {
     }
 
     /**
-     * 회원 탈퇴
+     * 회원 탈퇴 (비밀번호 확인 필요)
      */
     @DeleteMapping("/{memberNo}")
-    public ResponseEntity<Void> deleteMember(@PathVariable Long memberNo) {
-        memberService.deleteMember(memberNo);
+    public ResponseEntity<Void> deleteMember(
+        @PathVariable Long memberNo,
+        @RequestBody(required = false) Map<String, String> request
+    ) {
+        String password = request != null ? request.get("password") : null;
+        memberService.deleteMember(memberNo, password);
         return ResponseEntity.ok().build();
     }
 }

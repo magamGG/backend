@@ -8,6 +8,7 @@ import com.kh.magamGG.domain.attendance.entity.LeaveHistory;
 import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
 import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponse;
+import com.kh.magamGG.domain.manager.entity.ArtistAssignment;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
@@ -125,6 +126,9 @@ public class Member {
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
+
+    @OneToMany(mappedBy = "artist")
+    private List<ArtistAssignment> artistAssignments = new ArrayList<>();
     
     // 프로필 정보 수정
     public void updateProfile(String memberName, String memberEmail, String memberPhone, String memberAddress) {
