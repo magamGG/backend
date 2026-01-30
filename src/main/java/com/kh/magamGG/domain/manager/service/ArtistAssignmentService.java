@@ -1,9 +1,9 @@
 package com.kh.magamGG.domain.manager.service;
 
-import com.kh.magamGG.domain.manager.entity.ArtistAssignment;
-import com.kh.magamGG.domain.manager.entity.Manager;
-import com.kh.magamGG.domain.manager.repository.ArtistAssignmentRepository;
-import com.kh.magamGG.domain.manager.repository.ManagerRepository;
+import com.kh.magamGG.domain.member.entity.ArtistAssignment;
+import com.kh.magamGG.domain.member.entity.Manager;
+import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
+import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -23,9 +23,7 @@ public class ArtistAssignmentService {
 
     public void assignArtist(Long managerNo, Long artistMemberNo) {
 
-        if (assignmentRepository
-                .existsByManager_ManagerNoAndArtist_MemberNo(
-                        managerNo, artistMemberNo)) {
+        if (assignmentRepository.existsByManager_ManagerNoAndArtist_MemberNo(managerNo, artistMemberNo)) {
             throw new IllegalStateException("이미 배정된 작가입니다.");
         }
 
@@ -41,6 +39,6 @@ public class ArtistAssignmentService {
     }
 
     public List<ArtistAssignment> getAssignedArtists(Long managerNo) {
-        return assignmentRepository.findByManager_ManagerNo(managerNo);
+        return assignmentRepository.findByManagerNo(managerNo);
     }
 }

@@ -21,7 +21,12 @@ public interface ArtistAssignmentRepository extends JpaRepository<ArtistAssignme
      */
     @Query("SELECT a FROM ArtistAssignment a JOIN FETCH a.artist WHERE a.manager.managerNo = :managerNo")
     List<ArtistAssignment> findByManagerNo(@Param("managerNo") Long managerNo);
-    
+
+    /**
+     * 담당자-작가 배정 존재 여부 (manager 패키지 서비스 호환)
+     */
+    boolean existsByManager_ManagerNoAndArtist_MemberNo(Long managerNo, Long artistMemberNo);
+
     /**
      * 특정 작가의 배정 삭제
      */

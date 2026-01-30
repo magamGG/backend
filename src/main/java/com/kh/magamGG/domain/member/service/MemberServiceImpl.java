@@ -8,11 +8,19 @@ import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
+import com.kh.magamGG.domain.member.dto.response.MemberDetailResponse;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+import com.kh.magamGG.domain.member.repository.ManagerRepository;
+import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
+import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
+import com.kh.magamGG.domain.health.repository.DailyHealthCheckRepository;
+import com.kh.magamGG.domain.project.entity.ProjectMember;
+import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
+import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.DuplicateAgencyCodeException;
 import com.kh.magamGG.global.exception.DuplicateEmailException;
@@ -336,7 +344,7 @@ public class MemberServiceImpl implements MemberService {
                 .condition(latest.getHealthCondition() != null ? latest.getHealthCondition() : "보통")
                 .sleepHours(latest.getSleepHours() != null ? latest.getSleepHours() : 0)
                 .discomfortLevel(latest.getDiscomfortLevel() != null ? latest.getDiscomfortLevel() : 0)
-                .memo(latest.getHealthCheckNotes() != null ? latest.getHealthCheckNotes().toString() : "")
+                .memo(latest.getHealthCheckNotes() != null ? latest.getHealthCheckNotes() : "")
                 .build();
         }
 

@@ -8,7 +8,7 @@ import com.kh.magamGG.domain.attendance.entity.LeaveHistory;
 import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
 import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponse;
-import com.kh.magamGG.domain.manager.entity.ArtistAssignment;
+import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;

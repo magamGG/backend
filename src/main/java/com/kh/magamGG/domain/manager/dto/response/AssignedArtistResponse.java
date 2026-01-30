@@ -1,6 +1,6 @@
 package com.kh.magamGG.domain.manager.dto.response;
 
-import com.kh.magamGG.domain.manager.entity.ArtistAssignment;
+import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 

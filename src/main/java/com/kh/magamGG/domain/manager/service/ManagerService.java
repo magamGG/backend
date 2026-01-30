@@ -1,7 +1,7 @@
 package com.kh.magamGG.domain.manager.service;
 
-import com.kh.magamGG.domain.manager.entity.Manager;
-import com.kh.magamGG.domain.manager.repository.ManagerRepository;
+import com.kh.magamGG.domain.member.entity.Manager;
+import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
