@@ -5,6 +5,7 @@ import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
+import com.kh.magamGG.domain.member.dto.response.WorkingArtistResponse;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -80,6 +81,11 @@ public interface MemberService {
      * 담당자별 작가 목록 조회 (ARTIST_ASSIGNMENT 테이블에서 managerNo로 조회)
      */
     List<MemberResponse> getArtistsByManagerNo(Long managerNo);
+
+    /**
+     * 담당자별 현재 작업중인 작가 목록 (ARTIST_ASSIGNMENT 배정 + 오늘 마지막 ATTENDANCE 이력이 '출근'인 경우, 출근 시각 포함)
+     */
+    List<WorkingArtistResponse> getWorkingArtistsByManagerNo(Long managerNo);
 
     /**
      * 회원을 에이전시에서 제거 (agencyNo를 null로 설정)

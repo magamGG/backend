@@ -19,7 +19,7 @@ public class DailyHealthCheck {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "HEALTH_CHECK_NO")
+    @Column(name = "DAILY_HEALTH_NO")
     private Long dailyHealthNo;
 
     @ManyToOne(fetch = FetchType.LAZY)

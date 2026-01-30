@@ -10,12 +10,15 @@ import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
 import com.kh.magamGG.domain.member.dto.response.MemberDetailResponse;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
+import com.kh.magamGG.domain.member.dto.response.WorkingArtistResponse;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
+import com.kh.magamGG.domain.attendance.entity.Attendance;
+import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.repository.DailyHealthCheckRepository;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
@@ -37,6 +40,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +63,7 @@ public class MemberServiceImpl implements MemberService {
     private final ManagerRepository managerRepository;
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final NotificationService notificationService;
+    private final AttendanceRepository attendanceRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -265,10 +270,33 @@ public class MemberServiceImpl implements MemberService {
     @Transactional(readOnly = true)
     public List<MemberResponse> getMembersByAgencyNo(Long agencyNo) {
         List<Member> members = memberRepository.findByAgency_AgencyNo(agencyNo);
+        LocalDate today = LocalDate.now();
 
         return members.stream()
-            .map(this::convertToResponse)
+            .map(member -> {
+                String todayWorkStatus = resolveTodayWorkStatus(member.getMemberNo(), today);
+                return convertToResponseWithManagerNo(member, null, todayWorkStatus);
+            })
             .collect(Collectors.toList());
+    }
+
+    /**
+     * 오늘 ATTENDANCE 마지막 기록 기준 작업 상태 반환.
+     * 출근만 있으면 근무중, 퇴근이 마지막이면 작업 종료, 기록 없으면 작업 시작전.
+     */
+    private String resolveTodayWorkStatus(Long memberNo, LocalDate today) {
+        List<Attendance> list = attendanceRepository.findTodayLastAttendanceByMemberNo(memberNo, today);
+        if (list == null || list.isEmpty()) {
+            return "작업 시작전";
+        }
+        String lastType = list.get(0).getAttendanceType();
+        if ("출근".equals(lastType)) {
+            return "근무중";
+        }
+        if ("퇴근".equals(lastType)) {
+            return "작업 종료";
+        }
+        return "작업 시작전";
     }
 
     @Override
@@ -330,11 +358,11 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
-        // 최신 건강 체크 정보 조회
+        // 해당 회원의 가장 최근 데일리 체크 1건만 조회
         MemberDetailResponse.HealthCheckInfo healthCheck = null;
-        List<DailyHealthCheck> healthChecks = dailyHealthCheckRepository.findByMember_MemberNoOrderByHealthCheckCreatedAtDesc(memberNo);
-        if (!healthChecks.isEmpty()) {
-            DailyHealthCheck latest = healthChecks.get(0);
+        Optional<DailyHealthCheck> latestOpt = dailyHealthCheckRepository.findFirstByMember_MemberNoOrderByHealthCheckCreatedAtDesc(memberNo);
+        if (latestOpt.isPresent()) {
+            DailyHealthCheck latest = latestOpt.get();
             healthCheck = MemberDetailResponse.HealthCheckInfo.builder()
                 .date(latest.getHealthCheckCreatedAt() != null
                     ? latest.getHealthCheckCreatedAt().toLocalDate().toString()
@@ -393,7 +421,11 @@ public class MemberServiceImpl implements MemberService {
     }
 
     private MemberResponse convertToResponseWithManagerNo(Member member, Long managerNo) {
-        return MemberResponse.builder()
+        return convertToResponseWithManagerNo(member, managerNo, null);
+    }
+
+    private MemberResponse convertToResponseWithManagerNo(Member member, Long managerNo, String todayWorkStatus) {
+        MemberResponse.MemberResponseBuilder builder = MemberResponse.builder()
             .memberNo(member.getMemberNo())
             .memberName(member.getMemberName())
             .memberEmail(member.getMemberEmail())
@@ -406,8 +438,11 @@ public class MemberServiceImpl implements MemberService {
             .agencyCode(member.getAgency() != null ? member.getAgency().getAgencyCode() : null)
             .managerNo(managerNo)
             .memberCreatedAt(member.getMemberCreatedAt())
-            .memberUpdatedAt(member.getMemberUpdatedAt())
-            .build();
+            .memberUpdatedAt(member.getMemberUpdatedAt());
+        if (todayWorkStatus != null) {
+            builder.todayWorkStatus(todayWorkStatus);
+        }
+        return builder.build();
     }
 
     @Override
@@ -573,6 +608,41 @@ public class MemberServiceImpl implements MemberService {
         }
     }
 
+    /**
+     * 담당자(manager_no)에게 배정된 작가(ARTIST_ASSIGNMENT.ARTIST_MEMBER_NO) 중,
+     * 오늘 ATTENDANCE 마지막 이력이 '출근'인 사람만 반환. (로그인한 담당자 본인 출근 여부는 조회하지 않음)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<WorkingArtistResponse> getWorkingArtistsByManagerNo(Long managerNo) {
+        LocalDate today = LocalDate.now();
+        List<ArtistAssignment> assignments = artistAssignmentRepository.findByManagerNo(managerNo);
+        log.info("현재 작업중인 작가 조회: managerNo={}, 오늘={}, 배정 수={}", managerNo, today, assignments.size());
+        List<WorkingArtistResponse> result = assignments.stream()
+            .map(ArtistAssignment::getArtist)  // ARTIST_MEMBER_NO 해당 회원
+            .map(artist -> {
+                List<Attendance> todayAttendances = attendanceRepository.findTodayLastAttendanceByMemberNo(artist.getMemberNo(), today);
+                if (todayAttendances.isEmpty()) {
+                    log.trace("작가 memberNo={} 오늘 출퇴근 기록 없음", artist.getMemberNo());
+                    return null;
+                }
+                Attendance last = todayAttendances.get(0);
+                if (!"출근".equals(last.getAttendanceType())) {
+                    log.trace("작가 memberNo={} 마지막 타입={} (출근만 포함)", artist.getMemberNo(), last.getAttendanceType());
+                    return null;
+                }
+                return WorkingArtistResponse.builder()
+                    .memberNo(artist.getMemberNo())
+                    .memberName(artist.getMemberName())
+                    .clockInTime(last.getAttendanceTime())
+                    .build();
+            })
+            .filter(r -> r != null)
+            .collect(Collectors.toList());
+        log.info("현재 작업중인 작가 조회 완료: managerNo={}, 반환 수={}", managerNo, result.size());
+        return result;
+    }
+
     @Override
     @Transactional
     public void removeFromAgency(Long memberNo) {
@@ -594,7 +664,7 @@ public class MemberServiceImpl implements MemberService {
     }
 
     private MemberResponse convertToResponse(Member member) {
-        return convertToResponseWithManagerNo(member, null);
+        return convertToResponseWithManagerNo(member, null, null);
     }
 
     /**
