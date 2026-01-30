@@ -92,44 +92,57 @@ public class Member {
 	}
 
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<Attendance> attendances = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<AttendanceRequest> attendanceRequests = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<LeaveBalance> leaveBalances = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<ProjectMember> projectMembers = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<CalendarEvent> calendarEvents = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<Memo> memos = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<Notification> notifications = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<HealthSurveyResponse> healthSurveyResponses = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
 	private List<TaskHistory> taskHistories = new ArrayList<>();
 
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<DailyHealthCheck> dailyHealthChecks = new ArrayList<>();
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<NewRequest> newRequests = new ArrayList<>();
 
     @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
 
 
 
     @OneToMany(mappedBy = "artist")
+    @Builder.Default
     private List<ArtistAssignment> artistAssignments = new ArrayList<>();
 
     // 프로필 정보 수정
@@ -156,6 +169,12 @@ public class Member {
     // 비밀번호 업데이트
     public void updatePassword(String memberPassword) {
     	this.memberPassword = memberPassword;
+    	this.memberUpdatedAt = LocalDateTime.now();
+    }
+    
+    // 회원 상태 업데이트
+    public void updateStatus(String memberStatus) {
+    	this.memberStatus = memberStatus;
     	this.memberUpdatedAt = LocalDateTime.now();
     }
 }

@@ -3,7 +3,9 @@ package com.kh.magamGG.domain.member.controller;
 import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
+import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
+import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 import com.kh.magamGG.domain.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
@@ -13,9 +15,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
-
 import java.util.Map;
 
 @RestController
