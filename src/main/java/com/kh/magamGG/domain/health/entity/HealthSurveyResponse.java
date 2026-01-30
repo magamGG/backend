@@ -39,4 +39,25 @@ public class HealthSurveyResponse {
 	
 	@OneToMany(mappedBy = "healthSurveyResponse", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<HealthSurveyResponseItem> healthSurveyResponseItems = new ArrayList<>();
+
+	// Setter methods
+	public void setHealthSurvey(HealthSurvey healthSurvey) {
+		this.healthSurvey = healthSurvey;
+	}
+
+	public void setMember(Member member) {
+		this.member = member;
+	}
+
+	public void setHealthSurveyResponseTotalScore(Integer totalScore) {
+		this.healthSurveyResponseTotalScore = totalScore;
+	}
+
+	public void setHealthSurveyResponseStatus(String status) {
+		this.healthSurveyResponseStatus = status;
+	}
+
+	public void setHealthSurveyResponseCreatedAt(LocalDateTime createdAt) {
+		this.healthSurveyResponseCreatedAt = createdAt;
+	}
 }

@@ -4,12 +4,14 @@ import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "LEAVE_BALANCE")
 @Getter
+@Setter
 @NoArgsConstructor
 public class LeaveBalance {
 	
@@ -32,7 +34,7 @@ public class LeaveBalance {
 	private Integer leaveBalanceUsedDays;
 	
 	@Column(name = "LEAVE_BALANCE_REMAIN_DAYS")
-	private Integer leaveBalanceRemainDays;
+	private Double leaveBalanceRemainDays;
 	
 	@Column(name = "LEAVE_BALANCE_YEAR", nullable = false, length = 4)
 	private String leaveBalanceYear;

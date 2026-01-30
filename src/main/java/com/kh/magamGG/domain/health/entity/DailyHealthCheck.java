@@ -4,20 +4,22 @@ import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "Daily_Health_Check")
+@Table(name = "DAILY_HEALTH_CHECK")
 @Getter
+@Setter
 @NoArgsConstructor
 public class DailyHealthCheck {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "DAILY_HEALTH_NO")
+    @Column(name = "HEALTH_CHECK_NO")
     private Long dailyHealthNo;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -34,7 +36,7 @@ public class DailyHealthCheck {
     private Integer discomfortLevel;
 
     @Column(name = "HEALTH_CHECK_NOTES", length = 1000)
-    private Long healthCheckNotes;
+    private String healthCheckNotes;
 
     @Column(name = "HEALTH_CHECK_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
     private LocalDateTime healthCheckCreatedAt;

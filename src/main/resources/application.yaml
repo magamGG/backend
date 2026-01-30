@@ -11,15 +11,24 @@ spring:
   servlet:
     multipart:
       max-file-size: 20MB
-      max-request-size: 100MB
+      max-request-size: 20MB
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
         format_sql: true
+
+  # 캐싱 설정 (최적화)
+  cache:
+    type: simple
+    cache-names: leaveBalance, agencyInfo
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.kh.magamGG.domain
 
 jwt:
   secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
@@ -33,3 +42,6 @@ server:
       charset: UTF-8
       enabled: true
       force: true
+
+file:
+  upload-dir: uploads

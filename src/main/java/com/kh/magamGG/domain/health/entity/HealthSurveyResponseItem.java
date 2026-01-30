@@ -30,4 +30,21 @@ public class HealthSurveyResponseItem {
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyQuestionItemCreatedAt;
+
+	// Setter methods
+	public void setHealthSurveyResponse(HealthSurveyResponse healthSurveyResponse) {
+		this.healthSurveyResponse = healthSurveyResponse;
+	}
+
+	public void setHealthSurveyQuestion(HealthSurveyQuestion healthSurveyQuestion) {
+		this.healthSurveyQuestion = healthSurveyQuestion;
+	}
+
+	public void setHealthSurveyQuestionItemAnswerScore(Integer score) {
+		this.healthSurveyQuestionItemAnswerScore = score;
+	}
+
+	public void setHealthSurveyQuestionItemCreatedAt(LocalDateTime createdAt) {
+		this.healthSurveyQuestionItemCreatedAt = createdAt;
+	}
 }
