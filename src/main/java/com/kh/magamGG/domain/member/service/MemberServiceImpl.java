@@ -282,15 +282,6 @@ public class MemberServiceImpl implements MemberService {
             throw new IllegalArgumentException("이미 탈퇴 처리된 회원입니다.");
         }
 
-        // 비밀번호 확인
-        if (password == null || password.trim().isEmpty()) {
-            throw new IllegalArgumentException("비밀번호를 입력해주세요.");
-        }
-
-        if (!passwordEncoder.matches(password, member.getMemberPassword())) {
-            throw new IllegalArgumentException("비밀번호가 일치하지 않습니다.");
-        }
-
         // 실제 삭제 대신 상태를 BLOCKED로 변경
         member.updateStatus("BLOCKED");
         memberRepository.save(member);
