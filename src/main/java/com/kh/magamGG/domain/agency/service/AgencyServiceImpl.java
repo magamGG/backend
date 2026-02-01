@@ -154,21 +154,34 @@ public class AgencyServiceImpl implements AgencyService {
         }
         log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
 
-        // 3. LEAVE_BALANCE 초기 데이터 생성 (AGENCY.AGENCY_LEAVE → 총 연차일, 사용 0, 잔여 = 총 연차일, 연도 = 현재 연도)
+        // 3. LEAVE_BALANCE: 같은 memberNo + 연도 있으면 덮어쓰기, 없으면 신규 생성
         int totalDays = newRequest.getAgency().getAgencyLeave() != null
                 ? newRequest.getAgency().getAgencyLeave() : 15;
+        String currentYear = String.valueOf(java.time.Year.now().getValue());
         Member memberForBalance = memberRepository.findById(memberNo)
                 .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
-        LeaveBalance leaveBalance = new LeaveBalance();
-        leaveBalance.setMember(memberForBalance);
-        leaveBalance.setLeaveType("ANNUAL");
-        leaveBalance.setLeaveBalanceTotalDays(totalDays);
-        leaveBalance.setLeaveBalanceUsedDays(0);
-        leaveBalance.setLeaveBalanceRemainDays(totalDays);
-        leaveBalance.setLeaveBalanceYear(String.valueOf(java.time.Year.now().getValue()));
-        leaveBalance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
-        leaveBalanceRepository.save(leaveBalance);
-        log.info("LEAVE_BALANCE 초기 데이터 생성 완료: 회원번호 {}, 총연차일 {}, 연도 {}", memberNo, totalDays, leaveBalance.getLeaveBalanceYear());
+        LeaveBalance leaveBalance = leaveBalanceRepository
+                .findByMember_MemberNoAndLeaveBalanceYear(memberNo, currentYear)
+                .orElse(null);
+        if (leaveBalance != null) {
+            leaveBalance.setLeaveBalanceTotalDays(totalDays);
+            leaveBalance.setLeaveBalanceUsedDays(0);
+            leaveBalance.setLeaveBalanceRemainDays((double) totalDays);
+            leaveBalance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+            leaveBalanceRepository.save(leaveBalance);
+            log.info("LEAVE_BALANCE 덮어쓰기 완료: 회원번호 {}, 총연차일 {}, 연도 {}", memberNo, totalDays, currentYear);
+        } else {
+            leaveBalance = new LeaveBalance();
+            leaveBalance.setMember(memberForBalance);
+            leaveBalance.setLeaveType("ANNUAL");
+            leaveBalance.setLeaveBalanceTotalDays(totalDays);
+            leaveBalance.setLeaveBalanceUsedDays(0);
+            leaveBalance.setLeaveBalanceRemainDays((double) totalDays);
+            leaveBalance.setLeaveBalanceYear(currentYear);
+            leaveBalance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+            leaveBalanceRepository.save(leaveBalance);
+            log.info("LEAVE_BALANCE 초기 데이터 생성 완료: 회원번호 {}, 총연차일 {}, 연도 {}", memberNo, totalDays, currentYear);
+        }
 
         // 4. 담당자인 경우 MANAGER 테이블에 등록 (작가 배정 기능을 위해)
         String memberRole = newRequest.getMember().getMemberRole();
@@ -249,25 +262,57 @@ public class AgencyServiceImpl implements AgencyService {
                 .build();
     }
 
+    /**
+     * 에이전시 조회 (없으면 AgencyNotFoundException) — 연차 관리 등 공통 사용
+     */
+    private Agency findAgencyOrThrow(Long agencyNo) {
+        return agencyRepository.findById(agencyNo)
+                .orElseThrow(() -> new AgencyNotFoundException("존재하지 않는 에이전시입니다."));
+    }
+
     @Override
     public Agency getAgency(Long agencyNo) {
-        return agencyRepository.findById(agencyNo)
-            .orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
+        return findAgencyOrThrow(agencyNo);
     }
 
     @Override
     public Agency getAgencyByCode(String agencyCode) {
         return agencyRepository.findByAgencyCode(agencyCode)
-            .orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
+                .orElseThrow(() -> new AgencyNotFoundException("존재하지 않는 에이전시 코드입니다."));
     }
 
     @Override
     @Transactional
     public void updateAgencyName(Long agencyNo, String agencyName) {
-        Agency agency = agencyRepository.findById(agencyNo)
-            .orElseThrow(() -> new IllegalArgumentException("에이전시를 찾을 수 없습니다."));
-
+        Agency agency = findAgencyOrThrow(agencyNo);
         agency.updateAgencyName(agencyName);
         agencyRepository.save(agency);
+    }
+
+    @Override
+    @Transactional
+    public void updateAgencyLeave(Long agencyNo, Integer agencyLeave) {
+        if (agencyLeave == null || agencyLeave < 0) {
+            throw new IllegalArgumentException("기본 연차는 0 이상이어야 합니다.");
+        }
+        Agency agency = findAgencyOrThrow(agencyNo);
+        agency.updateAgencyLeave(agencyLeave);
+        agencyRepository.save(agency);
+
+        // 해당 에이전시 소속 회원들의 당해 연도 LeaveBalance.leaveBalanceTotalDays 동일 값으로 갱신
+        String currentYear = String.valueOf(java.time.Year.now().getValue());
+        List<Member> members = memberRepository.findByAgency_AgencyNo(agencyNo);
+        for (Member member : members) {
+            leaveBalanceRepository.findByMember_MemberNoAndLeaveBalanceYear(member.getMemberNo(), currentYear)
+                    .ifPresent(balance -> {
+                        balance.setLeaveBalanceTotalDays(agencyLeave);
+                        int used = balance.getLeaveBalanceUsedDays() != null ? balance.getLeaveBalanceUsedDays() : 0;
+                        double newRemain = agencyLeave - used;
+                        balance.setLeaveBalanceRemainDays(newRemain >= 0 ? newRemain : 0.0);
+                        balance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+                        leaveBalanceRepository.save(balance);
+                        log.info("LeaveBalance 갱신: 회원번호={}, totalDays={}, remainDays={}", member.getMemberNo(), agencyLeave, balance.getLeaveBalanceRemainDays());
+                    });
+        }
     }
 }

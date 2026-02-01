@@ -26,4 +26,9 @@ public interface AgencyService {
      * 에이전시 소속명(스튜디오) 수정
      */
     void updateAgencyName(Long agencyNo, String agencyName);
+
+    /**
+     * 에이전시 기본 연차(agencyLeave) 수정
+     */
+    void updateAgencyLeave(Long agencyNo, Integer agencyLeave);
 }

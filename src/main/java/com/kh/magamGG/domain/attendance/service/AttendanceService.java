@@ -2,7 +2,10 @@ package com.kh.magamGG.domain.attendance.service;
 
 import com.kh.magamGG.domain.attendance.dto.AttendanceStatisticsResponseDto;
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
+import com.kh.magamGG.domain.attendance.dto.request.LeaveBalanceAdjustRequest;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
+import com.kh.magamGG.domain.attendance.dto.response.LeaveBalanceResponse;
+import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
 
 import java.util.List;
 
@@ -78,7 +81,29 @@ public interface AttendanceService {
      * @return 반려된 근태 신청 정보
      */
     AttendanceRequestResponse rejectAttendanceRequest(Long attendanceRequestNo, String rejectReason);
-    
+
+    /**
+     * 에이전시 소속 회원들의 연차 변경 이력(leaveHistory) 조회
+     * @param agencyNo 에이전시 번호
+     * @return 연차 변경 이력 목록
+     */
+    List<LeaveHistoryResponse> getLeaveHistoryByAgency(Long agencyNo);
+
+    /**
+     * 회원의 연차 잔액 조회 (당해 연도 기준, 없으면 최신 연도)
+     * @param memberNo 회원 번호
+     * @return 연차 잔액 (없으면 null)
+     */
+    LeaveBalanceResponse getLeaveBalance(Long memberNo);
+
+    /**
+     * 회원 연차 조정 (LeaveBalance 갱신 + LeaveHistory 생성)
+     * @param memberNo 회원 번호
+     * @param request 조정 일수, 사유, 메모
+     * @return 갱신된 연차 잔액
+     */
+    LeaveBalanceResponse adjustLeaveBalance(Long memberNo, LeaveBalanceAdjustRequest request);
+
     /**
      * 출근 시작 (건강 체크 + 출근 기록)
      * @param healthCheckRequest 건강 체크 정보

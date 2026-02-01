@@ -27,11 +27,16 @@ public class Agency {
 	@Column(name = "AGENCY_NAME", length = 30, unique = true)
 	private String agencyName;
 	
-	// 에이전시 이름 수정을 위한 메서드
+    // 에이전시 이름 수정을 위한 메서드
 	public void updateAgencyName(String agencyName) {
 		this.agencyName = agencyName;
 	}
-	
+
+	/** 기본 연차(agencyLeave) 수정 */
+	public void updateAgencyLeave(Integer agencyLeave) {
+		this.agencyLeave = agencyLeave;
+	}
+
 	@Column(name = "AGENCY_CODE", length = 11, unique = true)
 	private String agencyCode;
 

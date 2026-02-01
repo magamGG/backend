@@ -34,7 +34,7 @@ public class LeaveBalance {
 	private Integer leaveBalanceUsedDays;
 	
 	@Column(name = "LEAVE_BALANCE_REMAIN_DAYS")
-	private Integer leaveBalanceRemainDays;
+	private Double leaveBalanceRemainDays;
 	
 	@Column(name = "LEAVE_BALANCE_YEAR", nullable = false, length = 4)
 	private String leaveBalanceYear;

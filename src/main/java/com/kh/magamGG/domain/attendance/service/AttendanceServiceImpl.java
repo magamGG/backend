@@ -3,11 +3,18 @@ package com.kh.magamGG.domain.attendance.service;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.attendance.dto.AttendanceStatisticsResponseDto;
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
+import com.kh.magamGG.domain.attendance.dto.request.LeaveBalanceAdjustRequest;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
+import com.kh.magamGG.domain.attendance.dto.response.LeaveBalanceResponse;
+import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
 import com.kh.magamGG.domain.attendance.entity.Attendance;
 import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
+import com.kh.magamGG.domain.attendance.entity.LeaveBalance;
+import com.kh.magamGG.domain.attendance.entity.LeaveHistory;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRequestRepository;
+import com.kh.magamGG.domain.attendance.repository.LeaveBalanceRepository;
+import com.kh.magamGG.domain.attendance.repository.LeaveHistoryRepository;
 import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
 import com.kh.magamGG.domain.health.service.DailyHealthCheckService;
 import com.kh.magamGG.domain.member.entity.Member;
@@ -20,6 +27,8 @@ import com.kh.magamGG.global.exception.AlreadyCheckedInException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,11 +48,17 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     private final AttendanceRequestRepository attendanceRequestRepository;
     private final AttendanceRepository attendanceRepository;
+    private final LeaveHistoryRepository leaveHistoryRepository;
+    private final LeaveBalanceRepository leaveBalanceRepository;
     private final MemberRepository memberRepository;
     private final AgencyRepository agencyRepository;
     private final NotificationService notificationService;
     private final DailyHealthCheckService dailyHealthCheckService;
     private final ArtistAssignmentRepository artistAssignmentRepository;
+    // 비즈니스 로직 분리: 연차 차감 서비스
+    private final LeaveBalanceDeductionService leaveBalanceDeductionService;
+    // 비즈니스 로직 분리: 알림 발송 서비스 (비동기 처리)
+    private final AttendanceNotificationService attendanceNotificationService;
 
     @Override
     @Transactional
@@ -78,60 +93,31 @@ public class AttendanceServiceImpl implements AttendanceService {
                 member.getMemberName(), 
                 memberNo, 
                 request.getAttendanceRequestType(),
-                request.getAttendanceRequestStartDate(),
-                request.getAttendanceRequestEndDate());
+                startDate,
+                endDate);
         
-        // 에이전시 담당자에게 알림 발송
-        if (member.getAgency() != null) {
-            String notificationName = "근태 신청";
-            String notificationText = String.format("%s님이 %s을(를) 신청했습니다. (%s ~ %s)",
-                    member.getMemberName(),
-                    request.getAttendanceRequestType(),
-                    request.getAttendanceRequestStartDate(),
-                    request.getAttendanceRequestEndDate());
-
-            notificationService.notifyAgencyManagers(
-                    member.getAgency().getAgencyNo(),
-                    notificationName,
-                    notificationText,
-                    "LEAVE_REQ"
-            );
-        }
-        // 작가의 담당자에게만 알림 발송 (ARTIST_ASSIGNMENT 테이블에서 조회)
-        artistAssignmentRepository.findByArtistMemberNo(memberNo)
-                .ifPresent(assignment -> {
-                    // 담당자의 MEMBER_NO 조회
-                    Long managerMemberNo = assignment.getManager().getMember().getMemberNo();
-
-                    String notificationName = "근태 신청";
-                    String notificationText = String.format("%s님이 %s을(를) 신청했습니다. (%s ~ %s)",
-                            member.getMemberName(),
-                            request.getAttendanceRequestType(),
-                            request.getAttendanceRequestStartDate(),
-                            request.getAttendanceRequestEndDate());
-
-                    // 담당자에게만 알림 발송
-                    notificationService.createNotification(
-                            managerMemberNo,
-                            notificationName,
-                            notificationText,
-                            "LEAVE_REQ"
-                    );
-
-                    log.info("근태 신청 알림 발송: 작가={}, 담당자={}", memberNo, managerMemberNo);
-                });
+        // 알림 발송 (비동기 처리)
+        attendanceNotificationService.sendAttendanceRequestNotification(
+                member,
+                request.getAttendanceRequestType(),
+                startDate,
+                endDate
+        );
 
         return AttendanceRequestResponse.fromEntity(savedRequest);
     }
     
     @Override
     public List<AttendanceRequestResponse> getAttendanceRequestsByMember(Long memberNo) {
-        // 회원 존재 확인
-        memberRepository.findById(memberNo)
-                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
-        
+        // 최적화: JOIN FETCH로 N+1 문제 방지 (Repository에서 이미 처리됨)
         List<AttendanceRequest> requests = attendanceRequestRepository
                 .findByMember_MemberNoOrderByAttendanceRequestCreatedAtDesc(memberNo);
+        
+        if (requests.isEmpty()) {
+            // 회원 존재 확인 (데이터가 없을 때만 확인하여 불필요한 쿼리 제거)
+            memberRepository.findById(memberNo)
+                    .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
+        }
         
         return requests.stream()
                 .map(AttendanceRequestResponse::fromEntity)
@@ -148,12 +134,17 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .collect(Collectors.toList());
     }
     
-    @Override
-    public List<AttendanceRequestResponse> getAttendanceRequestsByAgency(Long agencyNo) {
-        // 에이전시 존재 확인
+    /**
+     * 에이전시 존재 여부 검증 (없으면 AgencyNotFoundException) — 연차/근태 조회 공통
+     */
+    private void validateAgencyExists(Long agencyNo) {
         agencyRepository.findById(agencyNo)
                 .orElseThrow(() -> new AgencyNotFoundException("존재하지 않는 에이전시입니다."));
-        
+    }
+
+    @Override
+    public List<AttendanceRequestResponse> getAttendanceRequestsByAgency(Long agencyNo) {
+        validateAgencyExists(agencyNo);
         // JOIN FETCH로 N+1 문제 방지
         List<AttendanceRequest> requests = attendanceRequestRepository
                 .findByAgencyNoWithMember(agencyNo);
@@ -167,10 +158,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public List<AttendanceRequestResponse> getPendingAttendanceRequestsByAgency(Long agencyNo) {
-        // 에이전시 존재 확인
-        agencyRepository.findById(agencyNo)
-                .orElseThrow(() -> new AgencyNotFoundException("존재하지 않는 에이전시입니다."));
-        
+        validateAgencyExists(agencyNo);
         // JOIN FETCH로 N+1 문제 방지 + 상태 필터링
         List<AttendanceRequest> requests = attendanceRequestRepository
                 .findByAgencyNoAndStatusWithMember(agencyNo, "PENDING");
@@ -205,10 +193,6 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public AttendanceRequestResponse getCurrentAttendanceStatus(Long memberNo) {
-        // 회원 존재 확인
-        memberRepository.findById(memberNo)
-                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
-
         // 현재 날짜만 추출 (시간 무시)
         LocalDateTime now = LocalDateTime.now();
         java.time.LocalDate today = now.toLocalDate();
@@ -236,6 +220,9 @@ public class AttendanceServiceImpl implements AttendanceService {
         if (currentRequests.isEmpty()) {
             log.info("회원 {}의 현재 적용 중인 근태 상태 없음 (승인된 신청 {}건 중 현재 날짜 범위 내 신청 없음)",
                     memberNo, approvedRequests.size());
+            // 데이터가 없을 때만 회원 존재 확인하여 불필요한 쿼리 제거
+            memberRepository.findById(memberNo)
+                    .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
             return null;
         }
 
@@ -262,6 +249,16 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new RuntimeException("이미 처리된 근태 신청입니다.");
         }
 
+        // 반차/반반차인 경우 연차 잔액(remain) 먼저 차감 (차감 실패 시 승인하지 않음)
+        String requestType = request.getAttendanceRequestType();
+        if ("반차".equals(requestType) || "반반차".equals(requestType)) {
+            Long memberNo = request.getMember() != null ? request.getMember().getMemberNo() : null;
+            if (memberNo != null) {
+                // 비즈니스 로직 분리: 연차 차감 서비스로 위임
+                leaveBalanceDeductionService.deductLeaveBalance(memberNo, requestType);
+            }
+        }
+
         // 승인 처리
         request.approve();
         AttendanceRequest savedRequest = attendanceRequestRepository.save(request);
@@ -270,21 +267,8 @@ public class AttendanceServiceImpl implements AttendanceService {
                 attendanceRequestNo,
                 savedRequest.getMember().getMemberName());
 
-        // 신청자에게 알림 발송
-        if (savedRequest.getMember() != null) {
-            String notificationName = "근태 신청 승인";
-            String notificationText = String.format("%s 신청이 승인되었습니다. (%s ~ %s)",
-                    savedRequest.getAttendanceRequestType(),
-                    savedRequest.getAttendanceRequestStartDate().toLocalDate(),
-                    savedRequest.getAttendanceRequestEndDate().toLocalDate());
-
-            notificationService.createNotification(
-                    savedRequest.getMember().getMemberNo(),
-                    notificationName,
-                    notificationText,
-                    "LEAVE_APP"
-            );
-        }
+        // 알림 발송 (비동기 처리)
+        attendanceNotificationService.sendApprovalNotification(savedRequest);
 
         return AttendanceRequestResponse.fromEntity(savedRequest);
     }
@@ -310,28 +294,71 @@ public class AttendanceServiceImpl implements AttendanceService {
                 savedRequest.getMember().getMemberName(),
                 rejectReason);
 
-        // 신청자에게 알림 발송
-        if (savedRequest.getMember() != null) {
-            String notificationName = "근태 신청 반려";
-            String notificationText = String.format("%s 신청이 반려되었습니다. 사유: %s",
-                    savedRequest.getAttendanceRequestType(),
-                    rejectReason);
-
-            notificationService.createNotification(
-                    savedRequest.getMember().getMemberNo(),
-                    notificationName,
-                    notificationText,
-                    "LEAVE_REJ"
-            );
-        }
+        // 알림 발송 (비동기 처리)
+        attendanceNotificationService.sendRejectionNotification(savedRequest, rejectReason);
 
         return AttendanceRequestResponse.fromEntity(savedRequest);
+    }
+
+    @Override
+    public List<LeaveHistoryResponse> getLeaveHistoryByAgency(Long agencyNo) {
+        validateAgencyExists(agencyNo);
+        return leaveHistoryRepository.findByAgencyNoWithMember(agencyNo).stream()
+                .map(LeaveHistoryResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Cacheable(value = "leaveBalance", key = "#memberNo")
+    public LeaveBalanceResponse getLeaveBalance(Long memberNo) {
+        // 최적화: 데이터가 없을 때만 회원 존재 확인하여 불필요한 쿼리 제거
+        // 캐싱: 자주 조회되는 연차 잔액 정보 캐싱
+        return leaveBalanceRepository.findTop1ByMember_MemberNoOrderByLeaveBalanceYearDesc(memberNo)
+                .map(LeaveBalanceResponse::fromEntity)
+                .orElseGet(() -> {
+                    // 데이터가 없을 때만 회원 존재 확인
+                    memberRepository.findById(memberNo)
+                            .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
+                    return null;
+                });
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "leaveBalance", key = "#memberNo")
+    public LeaveBalanceResponse adjustLeaveBalance(Long memberNo, LeaveBalanceAdjustRequest request) {
+        Member member = memberRepository.findByIdWithAgency(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("존재하지 않는 회원입니다."));
+        LeaveBalance balance = leaveBalanceRepository.findTop1ByMember_MemberNoOrderByLeaveBalanceYearDesc(memberNo)
+                .orElseThrow(() -> new IllegalArgumentException("해당 회원의 연차 잔액이 없습니다. 연차를 먼저 부여해주세요."));
+        int adjustment = request.getAdjustment() != null ? request.getAdjustment() : 0;
+        double currentRemain = balance.getLeaveBalanceRemainDays() != null ? balance.getLeaveBalanceRemainDays() : 0.0;
+        double newRemain = currentRemain + adjustment;
+        if (newRemain < 0) {
+            throw new IllegalArgumentException("조정 후 잔여 연차는 0 미만이 될 수 없습니다.");
+        }
+        // total은 변경하지 않고 remain만 변경
+        balance.setLeaveBalanceRemainDays(newRemain);
+        balance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+        leaveBalanceRepository.save(balance);
+
+        LeaveHistory history = new LeaveHistory();
+        history.setMember(member);
+        history.setLeaveHistoryDate(LocalDateTime.now());
+        history.setLeaveHistoryType(request.getReason() != null ? request.getReason() : "");
+        history.setLeaveHistoryReason(request.getNote() != null ? request.getNote() : "");
+        history.setLeaveHistoryAmount(adjustment);
+        leaveHistoryRepository.save(history);
+
+        log.info("연차 조정 완료: 회원번호={}, 사유={}, 조정일수={}, 조정 후 잔여={}", memberNo, request.getReason(), adjustment, newRemain);
+        // 캐싱: 연차 조정 시 캐시 무효화
+        return LeaveBalanceResponse.fromEntity(balance);
     }
 
     /**
      * 문자열을 LocalDateTime으로 파싱
      * YYYY-MM-DD 또는 YYYY-MM-DDTHH:mm:ss 형식 지원
-     * 
+     *
      * @param dateTimeStr 날짜 문자열
      * @param isEndDate 종료일 여부 (true: 23:59:59, false: 00:00:00)
      */

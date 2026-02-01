@@ -21,6 +21,11 @@ spring:
       hibernate:
         format_sql: true
 
+  # 캐싱 설정 (최적화)
+  cache:
+    type: simple
+    cache-names: leaveBalance, agencyInfo
+
 mybatis:
   mapper-locations: classpath:mapper/*.xml
   type-aliases-package: com.kh.magamGG.domain

@@ -1,7 +1,10 @@
 package com.kh.magamGG.domain.attendance.controller;
 
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
+import com.kh.magamGG.domain.attendance.dto.request.LeaveBalanceAdjustRequest;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
+import com.kh.magamGG.domain.attendance.dto.response.LeaveBalanceResponse;
+import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
 import com.kh.magamGG.domain.attendance.service.AttendanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -109,7 +112,56 @@ public class AttendanceRequestController {
         
         return ResponseEntity.ok(responses);
     }
-    
+
+    /**
+     * 에이전시 소속 회원들의 연차 변경 이력(leaveHistory) 조회
+     * GET /api/leave/agency/{agencyNo}/history
+     *
+     * @param agencyNo 에이전시 번호
+     * @return 연차 변경 이력 목록
+     */
+    @GetMapping("/agency/{agencyNo}/history")
+    public ResponseEntity<List<LeaveHistoryResponse>> getLeaveHistoryByAgency(@PathVariable Long agencyNo) {
+        log.info("에이전시 {} 연차 변경 이력 조회", agencyNo);
+        List<LeaveHistoryResponse> responses = attendanceService.getLeaveHistoryByAgency(agencyNo);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 회원 연차 잔액 조회 (당해 연도 기준)
+     * GET /api/leave/balance/{memberNo}
+     *
+     * @param memberNo 회원 번호
+     * @return 연차 잔액 (없으면 404 없음, null 반환 시 204 또는 200 with null body 정책에 따라 200 + body null)
+     */
+    @GetMapping("/balance/{memberNo}")
+    public ResponseEntity<LeaveBalanceResponse> getLeaveBalance(@PathVariable Long memberNo) {
+        log.info("회원 {} 연차 잔액 조회", memberNo);
+        LeaveBalanceResponse response = attendanceService.getLeaveBalance(memberNo);
+        if (response == null) {
+            return ResponseEntity.noContent().build();
+        }
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 회원 연차 조정 (LeaveBalance 갱신 + LeaveHistory 생성)
+     * POST /api/leave/adjust-balance (body에 memberNo, adjustment, reason, note)
+     *
+     * @param request 대상 회원 번호, 조정 일수, 사유, 메모
+     * @return 갱신된 연차 잔액
+     */
+    @PostMapping("/adjust-balance")
+    public ResponseEntity<LeaveBalanceResponse> adjustLeaveBalance(@RequestBody LeaveBalanceAdjustRequest request) {
+        Long memberNo = request.getMemberNo();
+        if (memberNo == null) {
+            throw new IllegalArgumentException("memberNo는 필수입니다.");
+        }
+        log.info("회원 {} 연차 조정 요청: 사유={}, 조정일수={}", memberNo, request.getReason(), request.getAdjustment());
+        LeaveBalanceResponse response = attendanceService.adjustLeaveBalance(memberNo, request);
+        return ResponseEntity.ok(response);
+    }
+
     /**
      * 현재 로그인한 회원의 현재 적용 중인 근태 상태 조회
      * GET /api/leave/current-status
