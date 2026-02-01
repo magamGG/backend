@@ -47,7 +47,6 @@ public class Agency {
 	@OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Member> members = new ArrayList<>();
 
-    @Builder.Default
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
 }
