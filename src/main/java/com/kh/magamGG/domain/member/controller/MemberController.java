@@ -15,6 +15,7 @@ import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
 import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
+import com.kh.magamGG.domain.member.dto.response.WorkingArtistResponse;
 import com.kh.magamGG.domain.member.service.MemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -50,6 +51,17 @@ public class MemberController {
         @PathVariable Long managerNo
     ) {
         List<MemberResponse> response = memberService.getArtistsByManagerNo(managerNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 담당자별 현재 작업중인 작가 목록 (배정 작가 중 오늘 출근 중인 사람만)
+     */
+    @GetMapping("/manager/{managerNo}/working-artists")
+    public ResponseEntity<List<WorkingArtistResponse>> getWorkingArtistsByManagerNo(
+        @PathVariable Long managerNo
+    ) {
+        List<WorkingArtistResponse> response = memberService.getWorkingArtistsByManagerNo(managerNo);
         return ResponseEntity.ok(response);
     }
 

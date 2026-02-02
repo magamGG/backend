@@ -249,13 +249,13 @@ public class AttendanceServiceImpl implements AttendanceService {
             throw new RuntimeException("이미 처리된 근태 신청입니다.");
         }
 
-        // 반차/반반차인 경우 연차 잔액(remain) 먼저 차감 (차감 실패 시 승인하지 않음)
+        // 연차/반차/반반차인 경우 연차 잔액(remain) 및 사용일수(usedDays) 차감 (차감 실패 시 승인하지 않음)
         String requestType = request.getAttendanceRequestType();
-        if ("반차".equals(requestType) || "반반차".equals(requestType)) {
+        if ("연차".equals(requestType) || "반차".equals(requestType) || "반반차".equals(requestType)) {
             Long memberNo = request.getMember() != null ? request.getMember().getMemberNo() : null;
+            Integer usingDays = request.getAttendanceRequestUsingDays();
             if (memberNo != null) {
-                // 비즈니스 로직 분리: 연차 차감 서비스로 위임
-                leaveBalanceDeductionService.deductLeaveBalance(memberNo, requestType);
+                leaveBalanceDeductionService.deductLeaveBalance(memberNo, requestType, usingDays);
             }
         }
 
@@ -351,8 +351,15 @@ public class AttendanceServiceImpl implements AttendanceService {
         leaveHistoryRepository.save(history);
 
         log.info("연차 조정 완료: 회원번호={}, 사유={}, 조정일수={}, 조정 후 잔여={}", memberNo, request.getReason(), adjustment, newRemain);
-        // 캐싱: 연차 조정 시 캐시 무효화
-        return LeaveBalanceResponse.fromEntity(balance);
+        // 응답 시 balance.getMember() lazy load 방지: 이미 가진 값으로 DTO 생성
+        return LeaveBalanceResponse.builder()
+                .leaveBalanceNo(balance.getLeaveBalanceNo())
+                .memberNo(memberNo)
+                .leaveBalanceTotalDays(balance.getLeaveBalanceTotalDays() != null ? balance.getLeaveBalanceTotalDays() : 0)
+                .leaveBalanceUsedDays(balance.getLeaveBalanceUsedDays() != null ? balance.getLeaveBalanceUsedDays() : 0)
+                .leaveBalanceRemainDays(newRemain)
+                .leaveBalanceYear(balance.getLeaveBalanceYear() != null ? balance.getLeaveBalanceYear() : "")
+                .build();
     }
 
     /**
