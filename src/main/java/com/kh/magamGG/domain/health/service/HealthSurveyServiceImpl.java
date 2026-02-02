@@ -4,15 +4,11 @@ import com.kh.magamGG.domain.health.dto.response.HealthSurveyQuestionResponse;
 import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
 import com.kh.magamGG.domain.health.dto.request.HealthSurveySubmitRequest;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveySubmitResponse;
-import com.kh.magamGG.domain.health.dto.request.HealthSurveyAnswerRequest;
 import com.kh.magamGG.domain.health.entity.HealthSurvey;
-import com.kh.magamGG.domain.health.entity.HealthSurveyQuestion;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponse;
-import com.kh.magamGG.domain.health.entity.HealthSurveyResponseItem;
 import com.kh.magamGG.domain.health.repository.HealthSurveyQuestionRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyResponseRepository;
-import com.kh.magamGG.domain.health.repository.HealthSurveyResponseItemRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
@@ -31,7 +27,6 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
     private final HealthSurveyQuestionRepository healthSurveyQuestionRepository;
     private final HealthSurveyRepository healthSurveyRepository;
     private final HealthSurveyResponseRepository healthSurveyResponseRepository;
-    private final HealthSurveyResponseItemRepository healthSurveyResponseItemRepository;
     private final MemberRepository memberRepository;
 
     @Override
@@ -73,61 +68,26 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         Member member = memberRepository.findById(request.getMemberNo())
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + request.getMemberNo()));
 
-        // 2. 문항/점수 검증 + 총점 계산
-        int totalScore = 0;
-
-        // 응답 엔티티 생성
-        HealthSurveyResponse response = new HealthSurveyResponse();
-        response.setHealthSurvey(survey);
-        response.setMember(member);
-        response.setHealthSurveyResponseStatus("Y");
-        response.setHealthSurveyResponseCreatedAt(LocalDateTime.now());
-
-        // 일단 응답 헤더 저장 (PK 생성)
-        healthSurveyResponseRepository.save(response);
-
-        for (HealthSurveyAnswerRequest answer : request.getAnswers()) {
-            HealthSurveyQuestion question = healthSurveyQuestionRepository.findById(answer.getQuestionId())
-                .orElseThrow(() -> new IllegalArgumentException("문항을 찾을 수 없습니다: " + answer.getQuestionId()));
-
-            // 설문에 속한 문항인지 검증
-            if (!question.getHealthSurvey().getHealthSurveyNo().equals(healthSurveyNo)) {
-                throw new IllegalArgumentException("설문에 속하지 않은 문항입니다: " + answer.getQuestionId());
-            }
-
-            int score = answer.getScore();
-
-            // 최소/최대 점수 범위 검증
-            Integer min = question.getHealthSurveyQuestionMinScore();
-            Integer max = question.getHealthSurveyQuestionMaxScore();
-            if (min != null && score < min) {
-                throw new IllegalArgumentException("점수가 최소값보다 작습니다. questionId=" + answer.getQuestionId());
-            }
-            if (max != null && score > max) {
-                throw new IllegalArgumentException("점수가 최대값보다 큽니다. questionId=" + answer.getQuestionId());
-            }
-
-            totalScore += score;
-
-            // 개별 문항 응답 저장
-            HealthSurveyResponseItem item = new HealthSurveyResponseItem();
-            item.setHealthSurveyResponse(response);
-            item.setHealthSurveyQuestion(question);
-            item.setHealthSurveyQuestionItemAnswerScore(score);
-            item.setHealthSurveyQuestionItemCreatedAt(LocalDateTime.now());
-
-            healthSurveyResponseItemRepository.save(item);
+        // 2. 총점 검증 (프론트엔드에서 계산된 값)
+        Integer totalScore = request.getTotalScore();
+        if (totalScore == null || totalScore < 0) {
+            throw new IllegalArgumentException("총점이 유효하지 않습니다: " + totalScore);
         }
 
         // 3. 총점/위험도 등급 계산
         String surveyType = survey.getHealthSurveyType(); // "데일리 정신" / "데일리 신체" / "월간 정신" / "월간 신체"
         String riskLevel = evaluateRiskLevel(surveyType, totalScore);
 
-        // 응답 엔티티에 총점 반영
-        response.setHealthSurveyResponseTotalScore(totalScore);
+        // 4. 건강 설문 응답 저장 (총점만 저장)
+        HealthSurveyResponse response = new HealthSurveyResponse();
+        response.setMember(member);
+        response.setHealthSurvey(survey);
+        response.setTotalScore(totalScore);
+        response.setHealthSurveyResponseCreatedAt(LocalDateTime.now());
+
         healthSurveyResponseRepository.save(response);
 
-        // 4. 클라이언트로 반환
+        // 5. 클라이언트로 반환
         return HealthSurveySubmitResponse.builder()
             .healthSurveyNo(healthSurveyNo)
             .memberNo(member.getMemberNo())
