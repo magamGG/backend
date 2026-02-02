@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "CALENDAR_EVENT")
+@Table(name = "calendar_event")
 @Getter
 @NoArgsConstructor
 public class CalendarEvent {

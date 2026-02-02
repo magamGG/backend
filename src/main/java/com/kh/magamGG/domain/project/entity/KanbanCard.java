@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "KANBAN_CARD")
+@Table(name = "kanban_card")
 @Getter
 @NoArgsConstructor
 public class KanbanCard {
@@ -48,7 +48,4 @@ public class KanbanCard {
 	
 	@OneToMany(mappedBy = "kanbanCard", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Comment> comments = new ArrayList<>();
-	
-	@OneToMany(mappedBy = "kanbanCard", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<TaskHistory> taskHistories = new ArrayList<>();
 }
