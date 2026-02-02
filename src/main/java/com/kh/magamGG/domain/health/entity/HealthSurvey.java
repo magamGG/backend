@@ -20,14 +20,8 @@ public class HealthSurvey {
 	@Column(name = "HEALTH_SURVEY_NO")
 	private Long healthSurveyNo;
 	
-	@Column(name = "HEALTH_SURVEY_NAME", length = 100)
-	private String healthSurveyName;
-	
 	@Column(name = "HEALTH_SURVEY_TYPE", length = 30)
 	private String healthSurveyType;
-	
-	@Column(name = "HEALTH_SURVEY_CONTENT", length = 30)
-	private String healthSurveyContent;
 	
 	@Column(name = "HEALTH_SURVEY_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
 	private String healthSurveyStatus;
