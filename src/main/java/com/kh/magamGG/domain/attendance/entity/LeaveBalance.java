@@ -9,7 +9,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "LEAVE_BALANCE")
+@Table(name = "leave_balance")
 @Getter
 @Setter
 @NoArgsConstructor
