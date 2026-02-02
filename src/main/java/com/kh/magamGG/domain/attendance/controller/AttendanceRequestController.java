@@ -234,4 +234,42 @@ public class AttendanceRequestController {
         
         return ResponseEntity.ok(response);
     }
+
+    /**
+     * 근태 신청 취소 (신청자 본인만)
+     * POST /api/leave/{attendanceRequestNo}/cancel
+     */
+    @PostMapping("/{attendanceRequestNo}/cancel")
+    public ResponseEntity<AttendanceRequestResponse> cancelAttendanceRequest(
+            @PathVariable Long attendanceRequestNo,
+            @RequestHeader("X-Member-No") Long memberNo) {
+
+        log.info("근태 신청 취소 요청: 신청번호={}, 회원={}", attendanceRequestNo, memberNo);
+
+        AttendanceRequestResponse response = attendanceService.cancelAttendanceRequest(attendanceRequestNo, memberNo);
+
+        log.info("근태 신청 취소 완료: 신청번호={}", attendanceRequestNo);
+
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 근태 신청 수정 (신청자 본인만, PENDING 상태에서만)
+     * PUT /api/leave/{attendanceRequestNo}
+     */
+    @PutMapping("/{attendanceRequestNo}")
+    public ResponseEntity<AttendanceRequestResponse> updateAttendanceRequest(
+            @PathVariable Long attendanceRequestNo,
+            @RequestBody AttendanceRequestCreateRequest request,
+            @RequestHeader("X-Member-No") Long memberNo) {
+
+        log.info("근태 신청 수정 요청: 신청번호={}, 회원={}", attendanceRequestNo, memberNo);
+
+        AttendanceRequestResponse response = attendanceService.updateAttendanceRequest(
+                attendanceRequestNo, request, memberNo);
+
+        log.info("근태 신청 수정 완료: 신청번호={}", attendanceRequestNo);
+
+        return ResponseEntity.ok(response);
+    }
 }

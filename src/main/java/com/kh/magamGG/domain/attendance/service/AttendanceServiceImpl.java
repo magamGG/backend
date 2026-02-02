@@ -301,6 +301,60 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     @Override
+    @Transactional
+    public AttendanceRequestResponse cancelAttendanceRequest(Long attendanceRequestNo, Long memberNo) {
+        AttendanceRequest request = attendanceRequestRepository.findById(attendanceRequestNo)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 근태 신청입니다."));
+
+        if (!request.getMember().getMemberNo().equals(memberNo)) {
+            throw new RuntimeException("본인의 신청만 취소할 수 있습니다.");
+        }
+
+        if (!"PENDING".equals(request.getAttendanceRequestStatus()) && !"REJECTED".equals(request.getAttendanceRequestStatus())) {
+            throw new RuntimeException("대기 또는 반려 상태의 신청만 취소할 수 있습니다.");
+        }
+
+        request.cancel();
+        AttendanceRequest savedRequest = attendanceRequestRepository.save(request);
+
+        log.info("근태 신청 취소 완료: 신청번호={}, 회원={}", attendanceRequestNo, memberNo);
+        return AttendanceRequestResponse.fromEntity(savedRequest);
+    }
+
+    @Override
+    @Transactional
+    public AttendanceRequestResponse updateAttendanceRequest(Long attendanceRequestNo,
+            AttendanceRequestCreateRequest request, Long memberNo) {
+        AttendanceRequest entity = attendanceRequestRepository.findById(attendanceRequestNo)
+                .orElseThrow(() -> new RuntimeException("존재하지 않는 근태 신청입니다."));
+
+        if (!entity.getMember().getMemberNo().equals(memberNo)) {
+            throw new RuntimeException("본인의 신청만 수정할 수 있습니다.");
+        }
+
+        if (!"PENDING".equals(entity.getAttendanceRequestStatus())) {
+            throw new RuntimeException("대기 상태의 신청만 수정할 수 있습니다.");
+        }
+
+        LocalDateTime startDate = parseDateTime(request.getAttendanceRequestStartDate(), false);
+        LocalDateTime endDate = parseDateTime(request.getAttendanceRequestEndDate(), true);
+
+        entity.update(
+                request.getAttendanceRequestType(),
+                startDate,
+                endDate,
+                request.getAttendanceRequestUsingDays(),
+                request.getAttendanceRequestReason(),
+                request.getWorkcationLocation(),
+                request.getMedicalFileUrl() != null ? request.getMedicalFileUrl() : ""
+        );
+        AttendanceRequest savedRequest = attendanceRequestRepository.save(entity);
+
+        log.info("근태 신청 수정 완료: 신청번호={}, 회원={}", attendanceRequestNo, memberNo);
+        return AttendanceRequestResponse.fromEntity(savedRequest);
+    }
+
+    @Override
     public List<LeaveHistoryResponse> getLeaveHistoryByAgency(Long agencyNo) {
         validateAgencyExists(agencyNo);
         return leaveHistoryRepository.findByAgencyNoWithMember(agencyNo).stream()
