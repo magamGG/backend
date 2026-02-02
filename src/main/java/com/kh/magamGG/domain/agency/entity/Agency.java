@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.agency.entity;
 
+import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
@@ -49,4 +50,7 @@ public class Agency {
 
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
+
+    @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<HealthSurvey> healthSurveys = new ArrayList<>();
 }

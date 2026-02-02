@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.health.entity;
 
+import com.kh.magamGG.domain.agency.entity.Agency;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -48,4 +49,8 @@ public class HealthSurvey {
 	
 	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<HealthSurveyResponse> healthSurveyResponses = new ArrayList<>();
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "AGENCY_NO", nullable = false)
+    private Agency agency;
 }
