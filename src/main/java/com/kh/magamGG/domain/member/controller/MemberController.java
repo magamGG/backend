@@ -3,17 +3,8 @@ package com.kh.magamGG.domain.member.controller;
 import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
-import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
 import com.kh.magamGG.domain.member.dto.request.MemberRequest;
-import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
-import com.kh.magamGG.domain.member.dto.response.MemberResponse;
-import com.kh.magamGG.domain.member.dto.response.WorkingArtistResponse;
-import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
-import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
-import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
-import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
-import com.kh.magamGG.domain.member.dto.request.MemberRequest;
-import com.kh.magamGG.domain.member.dto.request.MemberDeleteRequest;
+import com.kh.magamGG.domain.member.dto.response.MemberDetailResponse;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 import com.kh.magamGG.domain.member.dto.response.WorkingArtistResponse;
 import com.kh.magamGG.domain.member.service.MemberService;
@@ -24,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/members")
@@ -145,10 +135,10 @@ public class MemberController {
      * 회원 상세 정보 조회 (프로젝트, 건강 체크 등)
      */
     @GetMapping("/{memberNo}/details")
-    public ResponseEntity<com.kh.magamGG.domain.member.dto.response.MemberDetailResponse> getMemberDetails(
+    public ResponseEntity<MemberDetailResponse> getMemberDetails(
         @PathVariable Long memberNo
     ) {
-        com.kh.magamGG.domain.member.dto.response.MemberDetailResponse response = memberService.getMemberDetails(memberNo);
+        MemberDetailResponse response = memberService.getMemberDetails(memberNo);
         return ResponseEntity.ok(response);
     }
 

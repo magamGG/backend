@@ -4,7 +4,14 @@ import com.kh.magamGG.domain.project.entity.ProjectMember;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Long> {
     List<ProjectMember> findByMember_MemberNo(Long memberNo);
+
+    List<ProjectMember> findByProject_ProjectNo(Long projectNo);
+
+    boolean existsByProject_ProjectNoAndMember_MemberNo(Long projectNo, Long memberNo);
+
+    Optional<ProjectMember> findByProject_ProjectNoAndMember_MemberNo(Long projectNo, Long memberNo);
 }

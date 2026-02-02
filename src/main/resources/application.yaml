@@ -1,3 +1,8 @@
+logging:
+  level:
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+
 spring:
   application:
     name: magamgg
@@ -15,7 +20,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: true
     properties:
       hibernate:
@@ -25,10 +30,6 @@ spring:
   cache:
     type: simple
     cache-names: leaveBalance, agencyInfo
-
-mybatis:
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.kh.magamGG.domain
 
 jwt:
   secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=

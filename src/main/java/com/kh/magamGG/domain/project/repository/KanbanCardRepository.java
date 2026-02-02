@@ -1,6 +1,13 @@
 package com.kh.magamGG.domain.project.repository;
 
-public interface KanbanCardRepository {
+import com.kh.magamGG.domain.project.entity.KanbanCard;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.List;
+
+public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
+
+    List<KanbanCard> findByKanbanBoard_KanbanBoardNoOrderByKanbanCardNoAsc(Long kanbanBoardNo);
 }
 
 

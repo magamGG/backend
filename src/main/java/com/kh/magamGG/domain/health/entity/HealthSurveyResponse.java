@@ -6,9 +6,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
-@Table(name = "health_survey_response")
+@Table(name = "HEALTH_SURVEY_RESPONSE")
 @Getter
 @NoArgsConstructor
 public class HealthSurveyResponse {
@@ -19,30 +21,40 @@ public class HealthSurveyResponse {
 	private Long healthSurveyResponseNo;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "MEMBER_NO", nullable = false)
-	private Member member;
-	
-	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "HEALTH_SURVEY_NO", nullable = false)
 	private HealthSurvey healthSurvey;
 	
-	@Column(name = "HEALTH_SURVEY_RESPONSE_TOTAL_SCORE", nullable = false)
-	private Integer totalScore;
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "MEMBER_NO", nullable = false)
+	private Member member;
 	
-	@Column(name = "HEALTH_SURVEY_RESPONSE_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
+	@Column(name = "HEALTH_SURVEY_RESPONSE_TOTAL_SCORE")
+	private Integer healthSurveyResponseTotalScore;
+	
+	@Column(name = "HEALTH_SURVEY_RESPONSE_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
+	private String healthSurveyResponseStatus;
+	
+	@Column(name = "HEALTH_SURVEY_RESPONSE_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyResponseCreatedAt;
+	
+	@OneToMany(mappedBy = "healthSurveyResponse", cascade = CascadeType.ALL, orphanRemoval = true)
+	private List<HealthSurveyResponseItem> healthSurveyResponseItems = new ArrayList<>();
 
 	// Setter methods
-	public void setMember(Member member) {
-		this.member = member;
-	}
-
 	public void setHealthSurvey(HealthSurvey healthSurvey) {
 		this.healthSurvey = healthSurvey;
 	}
 
-	public void setTotalScore(Integer totalScore) {
-		this.totalScore = totalScore;
+	public void setMember(Member member) {
+		this.member = member;
+	}
+
+	public void setHealthSurveyResponseTotalScore(Integer totalScore) {
+		this.healthSurveyResponseTotalScore = totalScore;
+	}
+
+	public void setHealthSurveyResponseStatus(String status) {
+		this.healthSurveyResponseStatus = status;
 	}
 
 	public void setHealthSurveyResponseCreatedAt(LocalDateTime createdAt) {

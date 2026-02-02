@@ -12,6 +12,7 @@ import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
+import com.kh.magamGG.domain.project.entity.TaskHistory;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "member")
+@Table(name = "MEMBER")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -121,6 +122,10 @@ public class Member {
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
 	private List<HealthSurveyResponse> healthSurveyResponses = new ArrayList<>();
+	
+	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+	private List<TaskHistory> taskHistories = new ArrayList<>();
 
 	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

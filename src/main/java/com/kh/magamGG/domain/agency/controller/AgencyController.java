@@ -4,7 +4,6 @@ import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.RejectJoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.UpdateAgencyLeaveRequest;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
-import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.service.AgencyService;

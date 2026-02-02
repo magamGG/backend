@@ -3,7 +3,6 @@ package com.kh.magamGG.domain.agency.service;
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
-import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.attendance.entity.LeaveBalance;
 import com.kh.magamGG.domain.attendance.repository.LeaveBalanceRepository;
@@ -35,7 +34,6 @@ public class AgencyServiceImpl implements AgencyService {
     private final AgencyRepository agencyRepository;
     private final MemberRepository memberRepository;
     private final NewRequestRepository newRequestRepository;
-    private final AgencyMapper agencyMapper; // MyBatis Mapper
     private final NotificationService notificationService;
     private final ManagerRepository managerRepository;
     private final LeaveBalanceRepository leaveBalanceRepository;
@@ -140,18 +138,18 @@ public class AgencyServiceImpl implements AgencyService {
         String memberName = newRequest.getMember().getMemberName();
         String agencyName = newRequest.getAgency().getAgencyName();
 
-        // 1. NEW_REQUEST 상태를 "승인"으로 변경 (MyBatis 직접 SQL)
-        int requestUpdated = agencyMapper.updateNewRequestStatus(newRequestNo, "승인");
-        if (requestUpdated == 0) {
-            throw new IllegalStateException("가입 요청 상태 업데이트에 실패했습니다.");
-        }
+        // 1. NEW_REQUEST 상태를 "승인"으로 변경 (JPA)
+        newRequest.setNewRequestStatus("승인");
+        newRequestRepository.save(newRequest);
         log.info("NEW_REQUEST 상태 업데이트 완료: {} -> 승인", newRequestNo);
 
-        // 2. MEMBER의 AGENCY_NO를 업데이트 (MyBatis 직접 SQL)
-        int memberUpdated = agencyMapper.updateMemberAgencyNo(memberNo, agencyNo);
-        if (memberUpdated == 0) {
-            throw new IllegalStateException("회원의 에이전시 정보 업데이트에 실패했습니다.");
-        }
+        // 2. MEMBER의 AGENCY_NO를 업데이트 (JPA)
+        Member memberToUpdate = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+        Agency agencyToAssign = agencyRepository.findById(agencyNo)
+                .orElseThrow(() -> new AgencyNotFoundException("에이전시를 찾을 수 없습니다."));
+        memberToUpdate.setAgency(agencyToAssign);
+        memberRepository.save(memberToUpdate);
         log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
 
         // 3. LEAVE_BALANCE: 같은 memberNo + 연도 있으면 덮어쓰기, 없으면 신규 생성
@@ -236,11 +234,9 @@ public class AgencyServiceImpl implements AgencyService {
 
         String memberName = newRequest.getMember().getMemberName();
 
-        // 가입 요청 상태를 "거절"로 변경 (MyBatis 직접 SQL)
-        int updated = agencyMapper.updateNewRequestStatus(newRequestNo, "거절");
-        if (updated == 0) {
-            throw new IllegalStateException("가입 요청 상태 업데이트에 실패했습니다.");
-        }
+        // 가입 요청 상태를 "거절"로 변경 (JPA)
+        newRequest.setNewRequestStatus("거절");
+        newRequestRepository.save(newRequest);
         
         log.info("에이전시 가입 요청 거절: 요청번호 {}, 회원 {}, 사유: {}",
                 newRequestNo, memberName, rejectionReason);
