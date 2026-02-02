@@ -50,7 +50,4 @@ public class HealthSurvey {
 	
 	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<HealthSurveyQuestion> healthSurveyQuestions = new ArrayList<>();
-	
-	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<HealthSurveyResponse> healthSurveyResponses = new ArrayList<>();
 }
