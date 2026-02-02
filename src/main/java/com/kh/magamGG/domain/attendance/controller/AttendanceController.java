@@ -49,7 +49,7 @@ public class AttendanceController {
 	@PostMapping("/start")
 	public ResponseEntity<AttendanceStartResponse> startAttendance(
 			@RequestBody DailyHealthCheckRequest healthCheckRequest,
-			@RequestHeader("X-Member-No") Long memberNo) {
+			@RequestHeader("Member-No") Long memberNo) {
 		
 		log.info("출근 시작 요청: 회원번호={}", memberNo);
 		
@@ -74,7 +74,7 @@ public class AttendanceController {
 	 */
 	@GetMapping("/today-status")
 	public ResponseEntity<TodayAttendanceStatusResponse> getTodayAttendanceStatus(
-			@RequestHeader("X-Member-No") Long memberNo) {
+			@RequestHeader("Member-No") Long memberNo) {
 		
 		log.info("오늘 출근 상태 조회: 회원번호={}", memberNo);
 		
@@ -96,7 +96,7 @@ public class AttendanceController {
 	 */
 	@PostMapping("/end")
 	public ResponseEntity<AttendanceStartResponse> endAttendance(
-			@RequestHeader("X-Member-No") Long memberNo) {
+			@RequestHeader("Member-No") Long memberNo) {
 		log.info("출근 종료 요청: 회원번호={}", memberNo);
 		boolean success = attendanceService.endAttendance(memberNo);
 		AttendanceStartResponse response = AttendanceStartResponse.builder()
@@ -106,4 +106,5 @@ public class AttendanceController {
 		return ResponseEntity.ok(response);
 	}
 }
+
 

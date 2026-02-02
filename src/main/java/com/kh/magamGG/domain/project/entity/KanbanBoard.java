@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "KANBAN_BOARD")
+@Table(name = "kanban_board")
 @Getter
 @NoArgsConstructor
 public class KanbanBoard {

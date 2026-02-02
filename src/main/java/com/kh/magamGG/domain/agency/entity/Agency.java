@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.agency.entity;
 
+import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
@@ -12,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "AGENCY")
+@Table(name = "agency")
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -47,6 +48,11 @@ public class Agency {
 	@OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Member> members = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<HealthSurvey> healthSurveys = new ArrayList<>();
 }
