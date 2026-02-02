@@ -30,6 +30,12 @@ public class HealthSurvey {
 	
 	@Column(name = "HEALTH_SURVEY_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
 	private String healthSurveyStatus;
+
+    @Column(name = "HEALTH_SURVEY_PERIOD", columnDefinition = "INT DEFAULT 15")
+    private Integer healthsSurveyPeriod;
+
+    @Column(name = "HEALTH_SURVEY_CYCLE", columnDefinition = "INT DEFAULT 30")
+    private Integer healthSurveyCycle;
 	
 	@Column(name = "HEALTH_SURVEY_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyCreatedAt;

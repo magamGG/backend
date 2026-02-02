@@ -31,6 +31,9 @@ public class Project {
     @Column(name = "PROJECT_CYCLE")
     private Integer projectCycle;
 
+    @Column(name = "PLATFORM", length = 100)
+    private String platform;
+
     @Column(name = "THUMBNAIL_FILE", length = 500)
     private String thumbnailFile;
 
