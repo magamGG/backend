@@ -11,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "DAILY_HEALTH_CHECK")
+@Table(name = "daily_health_check")
 @Getter
 @Setter
 @NoArgsConstructor

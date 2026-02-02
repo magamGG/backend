@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "AGENCY")
+@Table(name = "agency")
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
@@ -48,9 +48,11 @@ public class Agency {
 	@OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Member> members = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<NewRequest> newRequests = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "agency", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<HealthSurvey> healthSurveys = new ArrayList<>();
 }

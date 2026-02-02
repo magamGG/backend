@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "KANBAN_CARD")
+@Table(name = "kanban_card")
 @Getter
 @NoArgsConstructor
 public class KanbanCard {

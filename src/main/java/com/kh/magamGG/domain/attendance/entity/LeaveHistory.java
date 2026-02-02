@@ -9,7 +9,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "LEAVE_HISTORY")
+@Table(name = "leave_history")
 @Getter
 @Setter
 @NoArgsConstructor
