@@ -5,8 +5,6 @@ import com.kh.magamGG.domain.agency.dto.request.RejectJoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.UpdateAgencyLeaveRequest;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
-import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
-import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
@@ -132,30 +130,5 @@ public class AgencyController {
             @RequestBody UpdateAgencyLeaveRequest request) {
         agencyService.updateAgencyLeave(agencyNo, request.getAgencyLeave());
         return ResponseEntity.noContent().build();
-    }
-
-    @GetMapping("/{agencyNo}/dashboard-metrics")
-    public ResponseEntity<DashboardMetricsResponse> getDashboardMetrics(@PathVariable Long agencyNo) {
-        return ResponseEntity.ok(agencyService.getDashboardMetrics(agencyNo));
-    }
-
-    @GetMapping("/{agencyNo}/compliance-trend")
-    public ResponseEntity<ComplianceTrendResponse> getComplianceTrend(@PathVariable Long agencyNo) {
-        return ResponseEntity.ok(agencyService.getComplianceTrend(agencyNo));
-    }
-
-    @GetMapping("/{agencyNo}/artist-distribution")
-    public ResponseEntity<ArtistDistributionResponse> getArtistDistribution(@PathVariable Long agencyNo) {
-        return ResponseEntity.ok(agencyService.getArtistDistribution(agencyNo));
-    }
-
-    @GetMapping("/{agencyNo}/attendance-distribution")
-    public ResponseEntity<AttendanceDistributionResponse> getAttendanceDistribution(@PathVariable Long agencyNo) {
-        return ResponseEntity.ok(agencyService.getAttendanceDistribution(agencyNo));
-    }
-
-    @GetMapping("/{agencyNo}/health-distribution")
-    public ResponseEntity<HealthDistributionResponse> getHealthDistribution(@PathVariable Long agencyNo) {
-        return ResponseEntity.ok(agencyService.getHealthDistribution(agencyNo));
     }
 }

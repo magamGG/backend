@@ -2,6 +2,7 @@ package com.kh.magamGG.domain.health.service;
 
 import com.kh.magamGG.domain.health.dto.response.HealthSurveyQuestionResponse;
 import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
+import com.kh.magamGG.domain.health.dto.request.HealthSurveyAnswerRequest;
 import com.kh.magamGG.domain.health.dto.request.HealthSurveySubmitRequest;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveySubmitResponse;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveyResponseStatusResponse;
@@ -72,9 +73,15 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         Member member = memberRepository.findById(request.getMemberNo())
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + request.getMemberNo()));
 
-        // 2. 총점 검증 (프론트엔드에서 계산된 각 문항별 점수의 총합)
-        Integer totalScore = request.getTotalScore();
-        if (totalScore == null || totalScore < 0) {
+        // 2. 총점 계산 (answers의 각 문항 점수 합산)
+        List<HealthSurveyAnswerRequest> answers = request.getAnswers();
+        if (answers == null || answers.isEmpty()) {
+            throw new IllegalArgumentException("응답 항목이 없습니다.");
+        }
+        int totalScore = answers.stream()
+            .mapToInt(a -> a.getScore() != null ? a.getScore() : 0)
+            .sum();
+        if (totalScore < 0) {
             throw new IllegalArgumentException("총점이 유효하지 않습니다: " + totalScore);
         }
 

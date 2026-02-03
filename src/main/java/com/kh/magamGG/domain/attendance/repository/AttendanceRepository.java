@@ -27,7 +27,22 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 		@Param("year") int year,
 		@Param("month") int month
 	);
-	
+
+	/**
+	 * 회원별 월별 출근한 날 수 (날짜별 1회 집계, 같은 날 여러 출근/퇴근 있어도 1일로 카운트)
+	 * 마이페이지 근태 통계용 - '출근'만 표시
+	 */
+	@Query("SELECT COUNT(DISTINCT FUNCTION('DATE', a.attendanceTime)) FROM Attendance a " +
+		   "WHERE a.member.memberNo = :memberNo " +
+		   "AND YEAR(a.attendanceTime) = :year " +
+		   "AND MONTH(a.attendanceTime) = :month " +
+		   "AND a.attendanceType = '출근'")
+	long countDistinctCheckInDaysByMemberNoAndMonth(
+		@Param("memberNo") Long memberNo,
+		@Param("year") int year,
+		@Param("month") int month
+	);
+
 	/**
 	 * 회원의 오늘 날짜의 마지막 출근 기록 조회
 	 * @param memberNo 회원 번호

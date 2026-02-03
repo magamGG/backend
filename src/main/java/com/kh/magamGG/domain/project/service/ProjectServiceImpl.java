@@ -9,6 +9,7 @@ import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
+import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
@@ -23,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -120,6 +122,39 @@ public class ProjectServiceImpl implements ProjectService {
 
         result.sort(Comparator.comparing(ManagedProjectResponse::getProjectNo));
         return result;
+    }
+
+    @Override
+    public List<NextSerialProjectItemResponse> getNextSerialProjectsForMember(Long memberNo, int limit) {
+        LocalDate today = LocalDate.now();
+        List<ProjectMember> projectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
+        Set<Long> seen = new HashSet<>();
+        List<NextSerialProjectItemResponse> list = new ArrayList<>();
+        for (ProjectMember pm : projectMembers) {
+            Project p = pm.getProject();
+            Long pno = p.getProjectNo();
+            if (seen.contains(pno)) continue;
+            seen.add(pno);
+
+            LocalDateTime startedAt = p.getProjectStartedAt();
+            if (startedAt == null) continue;
+            LocalDate startDate = startedAt.toLocalDate();
+            int cycleDays = (p.getProjectCycle() != null && p.getProjectCycle() > 0) ? p.getProjectCycle() : 7;
+
+            long daysBetween = ChronoUnit.DAYS.between(startDate, today);
+            int n = daysBetween <= 0 ? 0 : (int) Math.ceil((double) daysBetween / cycleDays);
+            LocalDate nextDate = startDate.plusDays((long) n * cycleDays);
+
+            list.add(NextSerialProjectItemResponse.builder()
+                .projectNo(pno)
+                .projectName(p.getProjectName())
+                .projectColor(p.getProjectColor())
+                .nextDeadline(nextDate.toString())
+                .today(nextDate.equals(today))
+                .build());
+        }
+        list.sort(Comparator.comparing(NextSerialProjectItemResponse::getNextDeadline));
+        return list.size() <= limit ? list : list.subList(0, limit);
     }
 
     @Override

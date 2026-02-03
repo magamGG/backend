@@ -6,6 +6,7 @@ import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
+import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import com.kh.magamGG.domain.project.entity.KanbanBoard;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
 import com.kh.magamGG.domain.project.entity.Project;
@@ -34,6 +35,32 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     private final ProjectMemberRepository projectMemberRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
+
+    @Override
+    public List<TodayTaskResponse> getTodayTasksForMember(Long memberNo) {
+        List<KanbanCard> cards = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
+        return cards.stream().map(this::toTodayTaskResponse).collect(Collectors.toList());
+    }
+
+    private TodayTaskResponse toTodayTaskResponse(KanbanCard card) {
+        Project project = card.getKanbanBoard() != null ? card.getKanbanBoard().getProject() : null;
+        String projectName = project != null ? project.getProjectName() : "";
+        String projectColor = project != null ? project.getProjectColor() : null;
+        Long projectNo = project != null ? project.getProjectNo() : null;
+        Long boardId = card.getKanbanBoard() != null ? card.getKanbanBoard().getKanbanBoardNo() : null;
+        String dueDate = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt().format(DATE_FMT) : null;
+        return TodayTaskResponse.builder()
+            .id(card.getKanbanCardNo())
+            .projectNo(projectNo)
+            .projectName(projectName)
+            .projectColor(projectColor)
+            .boardId(boardId)
+            .title(card.getKanbanCardName())
+            .description(card.getKanbanCardDescription())
+            .dueDate(dueDate)
+            .build();
+    }
 
     @Override
     @Transactional

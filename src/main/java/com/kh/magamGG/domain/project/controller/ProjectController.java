@@ -15,7 +15,9 @@ import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
+import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
+import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import com.kh.magamGG.domain.project.service.CommentService;
 import com.kh.magamGG.domain.project.service.KanbanBoardService;
 import com.kh.magamGG.domain.project.service.ProjectService;
@@ -65,6 +67,28 @@ public class ProjectController {
             @RequestHeader("X-Member-No") Long memberNo,
             @RequestParam(value = "limit", defaultValue = "50") int limit) {
         List<DashboardFeedbackResponse> list = commentService.getRecentFeedbackForMember(memberNo, Math.min(limit, 100));
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 아티스트 대시보드 오늘 할 일 - 담당자 배정 + 마감일 오늘 + 미완료(N) 칸반 카드만
+     * GET /api/projects/my-today-tasks
+     */
+    @GetMapping("/my-today-tasks")
+    public ResponseEntity<List<TodayTaskResponse>> getMyTodayTasks(@RequestHeader("X-Member-No") Long memberNo) {
+        List<TodayTaskResponse> list = kanbanBoardService.getTodayTasksForMember(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 아티스트 대시보드 다음 연재 프로젝트 - PROJECT_MEMBER 소속 + PROJECT_STARTED_AT, PROJECT_CYCLE로 계산한 다음 연재일
+     * GET /api/projects/next-serial
+     */
+    @GetMapping("/next-serial")
+    public ResponseEntity<List<NextSerialProjectItemResponse>> getNextSerialProjects(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        List<NextSerialProjectItemResponse> list = projectService.getNextSerialProjectsForMember(memberNo, Math.min(limit, 50));
         return ResponseEntity.ok(list);
     }
 

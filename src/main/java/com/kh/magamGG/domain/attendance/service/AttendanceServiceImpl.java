@@ -183,22 +183,17 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month) {
-        List<Object[]> results = attendanceRepository.countByMemberNoAndMonth(memberNo, year, month);
-        
-        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = results.stream()
-            .map(result -> AttendanceStatisticsResponseDto.TypeCount.builder()
-                .type((String) result[0])
-                .count((Long) result[1])
-                .build())
-            .collect(Collectors.toList());
-        
-        Integer totalCount = typeCounts.stream()
-            .mapToInt(count -> count.getCount().intValue())
-            .sum();
-        
+        // 출근만 표시, 날짜별 1회 집계 (같은 날 여러 출근/퇴근 있어도 그 날은 1일로만 카운트)
+        long distinctCheckInDays = attendanceRepository.countDistinctCheckInDaysByMemberNoAndMonth(memberNo, year, month);
+        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = List.of(
+            AttendanceStatisticsResponseDto.TypeCount.builder()
+                .type("출근")
+                .count(distinctCheckInDays)
+                .build()
+        );
         return AttendanceStatisticsResponseDto.builder()
             .typeCounts(typeCounts)
-            .totalCount(totalCount)
+            .totalCount((int) distinctCheckInDays)
             .build();
     }
     
