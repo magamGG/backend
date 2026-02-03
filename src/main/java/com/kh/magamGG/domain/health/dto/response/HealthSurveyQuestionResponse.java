@@ -15,6 +15,7 @@ public class HealthSurveyQuestionResponse {
     private Long healthSurveyNo;
     private Integer healthSurveyOrder;
     private String healthSurveyQuestionContent;
+    private String healthSurveyQuestionType;
     private Integer healthSurveyQuestionMinScore;
     private Integer healthSurveyQuestionMaxScore;
 }

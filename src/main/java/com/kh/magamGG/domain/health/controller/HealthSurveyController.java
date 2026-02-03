@@ -44,19 +44,6 @@ public class HealthSurveyController {
     }
 
     /**
-     * 설문 이름(PHQ-9, GAD, QuickDASH 등)으로 질문 목록 조회
-     * 예: GET /api/health-surveys/name/PHQ-9/questions
-     */
-    @GetMapping("/name/{healthSurveyName}/questions")
-    public ResponseEntity<List<HealthSurveyQuestionResponse>> getQuestionsBySurveyName(
-        @PathVariable String healthSurveyName
-    ) {
-        List<HealthSurveyQuestionResponse> questions =
-            healthSurveyService.getQuestionsBySurveyName(healthSurveyName);
-        return ResponseEntity.ok(questions);
-    }
-
-    /**
      * 설문 응답 제출
      * POST /api/health-surveys/{healthSurveyNo}/responses
      * 

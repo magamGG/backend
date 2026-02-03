@@ -15,8 +15,8 @@ public interface HealthSurveyQuestionRepository extends JpaRepository<HealthSurv
     List<HealthSurveyQuestion> findByHealthSurvey_HealthSurveyNoOrderByHealthSurveyOrderAsc(Long healthSurveyNo);
 
     /**
-     * HEALTH_SURVEY_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 문항 목록 조회
+     * HEALTH_SURVEY_QUESTION_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 문항 목록 조회
      */
-    List<HealthSurveyQuestion> findByHealthSurvey_HealthSurveyTypeOrderByHealthSurveyOrderAsc(String healthSurveyType);
+    List<HealthSurveyQuestion> findByHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(String healthSurveyType);
 }
 

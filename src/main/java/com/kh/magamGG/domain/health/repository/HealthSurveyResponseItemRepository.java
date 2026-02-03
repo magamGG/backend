@@ -27,10 +27,11 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
     
     /**
      * 특정 회원이 특정 설문 타입에 대해 응답했는지 확인
+     * (설문 타입은 HEALTH_SURVEY_QUESTION_TYPE 기준)
      */
     @Query("SELECT i FROM HealthSurveyResponseItem i " +
            "WHERE i.member.memberNo = :memberNo " +
-           "AND i.healthSurveyQuestion.healthSurvey.healthSurveyType = :healthSurveyType")
+           "AND i.healthSurveyQuestion.healthSurveyQuestionType = :healthSurveyType")
     List<HealthSurveyResponseItem> findByMemberNoAndHealthSurveyType(
         @Param("memberNo") Long memberNo,
         @Param("healthSurveyType") String healthSurveyType
