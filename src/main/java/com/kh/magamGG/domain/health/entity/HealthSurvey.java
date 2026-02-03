@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.health.entity;
 
+import com.kh.magamGG.domain.agency.entity.Agency;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,27 +23,6 @@ public class HealthSurvey {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "HEALTH_SURVEY_NO")
 	private Long healthSurveyNo;
-<<<<<<< HEAD
-	
-	@Column(name = "HEALTH_SURVEY_NAME", length = 100)
-	private String healthSurveyName;
-	
-	@Column(name = "HEALTH_SURVEY_TYPE", length = 30)
-	private String healthSurveyType;
-	
-	@Column(name = "HEALTH_SURVEY_CONTENT", length = 30)
-	private String healthSurveyContent;
-	
-	@Column(name = "HEALTH_SURVEY_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
-	private String healthSurveyStatus;
-	
-	@Column(name = "HEALTH_SURVEY_CREATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
-	private LocalDateTime healthSurveyCreatedAt;
-	
-	@Column(name = "HEALTH_SURVEY_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
-	private LocalDateTime healthSurveyUpdatedAt;
-	
-=======
 
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "AGENCY_NO", nullable = false)
@@ -60,11 +40,7 @@ public class HealthSurvey {
 	@Column(name = "HEALTH_SURVEY_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyUpdatedAt;
 
->>>>>>> origin/develop/0202
 	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)
 	@Builder.Default
 	private List<HealthSurveyQuestion> healthSurveyQuestions = new ArrayList<>();
-	
-	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<HealthSurveyResponse> healthSurveyResponses = new ArrayList<>();
 }
