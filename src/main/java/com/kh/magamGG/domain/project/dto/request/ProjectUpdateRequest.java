@@ -24,4 +24,6 @@ public class ProjectUpdateRequest {
     private LocalDateTime projectStartedAt;
     private String projectGenre;
     private String platform;
+    /** 작가 회원 번호 (MEMBER_NO) — 변경 시 PROJECT_MEMBER의 작가 역할 행 업데이트 */
+    private Long artistMemberNo;
 }

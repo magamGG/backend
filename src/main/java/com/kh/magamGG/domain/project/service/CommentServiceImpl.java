@@ -40,13 +40,16 @@ public class CommentServiceImpl implements CommentService {
         if (!card.getKanbanBoard().getProject().getProjectNo().equals(projectNo)) {
             throw new IllegalArgumentException("해당 프로젝트의 카드가 아닙니다.");
         }
-        List<Comment> comments = commentRepository.findByKanbanCard_KanbanCardNoOrderByCommentCreatedAtAsc(cardId);
+        List<Comment> comments = commentRepository.findByKanbanCard_KanbanCardNoAndCommentStatusOrderByCommentCreatedAtAsc(cardId, "ACTIVE");
         return comments.stream().map(this::toCommentResponse).collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public CommentResponse createComment(Long projectNo, Long cardId, Long memberNo, CommentCreateRequest request) {
+        if (memberNo == null) {
+            throw new IllegalArgumentException("회원 번호(X-Member-No)가 필요합니다. 로그인 후 다시 시도해주세요.");
+        }
         KanbanCard card = kanbanCardRepository.findById(cardId)
             .orElseThrow(() -> new IllegalArgumentException("카드를 찾을 수 없습니다: " + cardId));
         if (!card.getKanbanBoard().getProject().getProjectNo().equals(projectNo)) {
@@ -60,6 +63,9 @@ public class CommentServiceImpl implements CommentService {
         comment.setCommentContent(request.getContent() != null ? request.getContent() : "");
         comment.setCommentStatus("ACTIVE");
         comment.setCommentCreatedAt(java.time.LocalDateTime.now());
+        if (comment.getMember() == null) {
+            throw new IllegalStateException("댓글 작성자 정보가 설정되지 않았습니다. X-Member-No 헤더를 확인해주세요.");
+        }
         Comment saved = commentRepository.save(comment);
         return toCommentResponse(saved);
     }
@@ -92,14 +98,19 @@ public class CommentServiceImpl implements CommentService {
         if (projectNos.isEmpty()) {
             return new ArrayList<>();
         }
-        List<Comment> comments = commentRepository.findRecentByProjectNos(projectNos, PageRequest.of(0, limit));
+        // 담당자인 카드에 다른 사람이 작성한 코멘트만 조회 (본인 코멘트 제외)
+        List<Comment> comments = commentRepository.findRecentFeedbackForAssignee(projectNos, memberNo, PageRequest.of(0, limit));
         return comments.stream().map(this::toDashboardFeedbackResponse).collect(Collectors.toList());
     }
 
     private CommentResponse toCommentResponse(Comment c) {
         String createdAt = c.getCommentCreatedAt() != null ? c.getCommentCreatedAt().format(DATETIME_FMT) : null;
+        Long authorMemberNo = c.getMember() != null ? c.getMember().getMemberNo() : null;
+        String authorName = c.getMember() != null ? c.getMember().getMemberName() : null;
         return CommentResponse.builder()
             .id(c.getCommentNo())
+            .authorMemberNo(authorMemberNo)
+            .authorName(authorName)
             .content(c.getCommentContent())
             .commentCreatedAt(createdAt)
             .build();

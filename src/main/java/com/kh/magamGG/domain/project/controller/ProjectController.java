@@ -15,7 +15,9 @@ import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
+import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
+import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import com.kh.magamGG.domain.project.service.CommentService;
 import com.kh.magamGG.domain.project.service.KanbanBoardService;
 import com.kh.magamGG.domain.project.service.ProjectService;
@@ -69,6 +71,28 @@ public class ProjectController {
     }
 
     /**
+     * 아티스트 대시보드 오늘 할 일 - 담당자 배정 + 마감일 오늘 + 미완료(N) 칸반 카드만
+     * GET /api/projects/my-today-tasks
+     */
+    @GetMapping("/my-today-tasks")
+    public ResponseEntity<List<TodayTaskResponse>> getMyTodayTasks(@RequestHeader("X-Member-No") Long memberNo) {
+        List<TodayTaskResponse> list = kanbanBoardService.getTodayTasksForMember(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 아티스트 대시보드 다음 연재 프로젝트 - PROJECT_MEMBER 소속 + PROJECT_STARTED_AT, PROJECT_CYCLE로 계산한 다음 연재일
+     * GET /api/projects/next-serial
+     */
+    @GetMapping("/next-serial")
+    public ResponseEntity<List<NextSerialProjectItemResponse>> getNextSerialProjects(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam(value = "limit", defaultValue = "10") int limit) {
+        List<NextSerialProjectItemResponse> list = projectService.getNextSerialProjectsForMember(memberNo, Math.min(limit, 50));
+        return ResponseEntity.ok(list);
+    }
+
+    /**
      * 프로젝트 목록 조회 (로그인 회원 기준, PROJECT_MEMBER 소속 프로젝트)
      * GET /api/projects
      *
@@ -79,6 +103,19 @@ public class ProjectController {
             @RequestHeader("X-Member-No") Long memberNo
     ) {
         List<ProjectListResponse> list = projectService.getProjectsByMemberNo(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 에이전시 소속 전체 프로젝트 조회 (에이전시 관리자만 가능)
+     * GET /api/projects/agency/{agencyNo}
+     */
+    @GetMapping("/agency/{agencyNo}")
+    public ResponseEntity<List<ProjectListResponse>> getProjectsByAgency(
+            @PathVariable Long agencyNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        List<ProjectListResponse> list = projectService.getProjectsByAgencyNo(agencyNo, memberNo);
         return ResponseEntity.ok(list);
     }
 
@@ -96,6 +133,13 @@ public class ProjectController {
         return ResponseEntity.ok(fileName);
     }
 
+    /**
+     * 프로젝트 생성
+     * POST /api/projects
+     *
+     * @param request     프로젝트 생성 요청 (projectName, artistMemberNo 필수)
+     * @param creatorNo   생성자 회원 번호 (X-Member-No 헤더)
+     */
     @PostMapping
     public ResponseEntity<ProjectListResponse> createProject(
             @RequestBody ProjectCreateRequest request,
@@ -177,6 +221,21 @@ public class ProjectController {
         if (memberNos != null && !memberNos.isEmpty()) {
             projectService.addProjectMembers(projectNo, memberNos);
         }
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 프로젝트에서 팀원 삭제 (PROJECT_MEMBER 테이블에서 삭제)
+     * DELETE /api/projects/{projectNo}/members/remove/{projectMemberNo}
+     */
+    @DeleteMapping("/{projectNo}/members/remove/{projectMemberNo}")
+    public ResponseEntity<Void> removeProjectMember(
+            @PathVariable Long projectNo,
+            @PathVariable Long projectMemberNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        projectService.removeProjectMember(projectNo, projectMemberNo);
         return ResponseEntity.ok().build();
     }
 
@@ -264,7 +323,7 @@ public class ProjectController {
             @PathVariable Long projectNo,
             @PathVariable Long cardId,
             @RequestBody CommentCreateRequest request,
-            @RequestHeader("X-Member-No") Long memberNo
+            @RequestHeader(value = "X-Member-No", required = true) Long memberNo
     ) {
         projectService.ensureProjectAccess(memberNo, projectNo);
         CommentResponse created = commentService.createComment(projectNo, cardId, memberNo, request);

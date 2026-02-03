@@ -5,9 +5,11 @@ import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
 import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
+import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,6 +40,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final MemberRepository memberRepository;
+    private final NotificationService notificationService;
     private final KanbanCardRepository kanbanCardRepository;
 
     private static final int DEADLINE_WARNING_DAYS = 7;
@@ -121,6 +125,39 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    public List<NextSerialProjectItemResponse> getNextSerialProjectsForMember(Long memberNo, int limit) {
+        LocalDate today = LocalDate.now();
+        List<ProjectMember> projectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
+        Set<Long> seen = new HashSet<>();
+        List<NextSerialProjectItemResponse> list = new ArrayList<>();
+        for (ProjectMember pm : projectMembers) {
+            Project p = pm.getProject();
+            Long pno = p.getProjectNo();
+            if (seen.contains(pno)) continue;
+            seen.add(pno);
+
+            LocalDateTime startedAt = p.getProjectStartedAt();
+            if (startedAt == null) continue;
+            LocalDate startDate = startedAt.toLocalDate();
+            int cycleDays = (p.getProjectCycle() != null && p.getProjectCycle() > 0) ? p.getProjectCycle() : 7;
+
+            long daysBetween = ChronoUnit.DAYS.between(startDate, today);
+            int n = daysBetween <= 0 ? 0 : (int) Math.ceil((double) daysBetween / cycleDays);
+            LocalDate nextDate = startDate.plusDays((long) n * cycleDays);
+
+            list.add(NextSerialProjectItemResponse.builder()
+                .projectNo(pno)
+                .projectName(p.getProjectName())
+                .projectColor(p.getProjectColor())
+                .nextDeadline(nextDate.toString())
+                .today(nextDate.equals(today))
+                .build());
+        }
+        list.sort(Comparator.comparing(NextSerialProjectItemResponse::getNextDeadline));
+        return list.size() <= limit ? list : list.subList(0, limit);
+    }
+
+    @Override
     public List<ProjectListResponse> getProjectsByMemberNo(Long memberNo) {
         List<ProjectMember> projectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
         Set<Long> seen = new HashSet<>();
@@ -132,6 +169,27 @@ public class ProjectServiceImpl implements ProjectService {
             Project p = pm.getProject();
             List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(pno);
             result.add(toProjectListResponse(p, members));
+        }
+        return result;
+    }
+
+    @Override
+    public List<ProjectListResponse> getProjectsByAgencyNo(Long agencyNo, Long requesterMemberNo) {
+        Member requester = memberRepository.findById(requesterMemberNo)
+            .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+        if (requester.getAgency() == null || !requester.getAgency().getAgencyNo().equals(agencyNo)) {
+            throw new IllegalArgumentException("해당 에이전시에 대한 접근 권한이 없습니다.");
+        }
+        if (!"에이전시 관리자".equals(requester.getMemberRole())) {
+            throw new IllegalArgumentException("에이전시 관리자만 전체 프로젝트를 조회할 수 있습니다.");
+        }
+        List<Long> projectNos = projectMemberRepository.findDistinctProjectNosByMember_Agency_AgencyNo(agencyNo);
+        List<ProjectListResponse> result = new ArrayList<>();
+        for (Long pno : projectNos) {
+            Project project = projectRepository.findById(pno).orElse(null);
+            if (project == null) continue;
+            List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(pno);
+            result.add(toProjectListResponse(project, members));
         }
         return result;
     }
@@ -173,10 +231,23 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public void ensureProjectAccess(Long memberNo, Long projectNo) {
-        boolean exists = projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo);
-        if (!exists) {
-            throw new IllegalArgumentException("해당 프로젝트에 대한 접근 권한이 없습니다.");
+        if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) {
+            return;
         }
+        // 에이전시 관리자: 소속 에이전시의 프로젝트면 조회 허용 (PROJECT_MEMBER가 아니어도 됨)
+        Member requester = memberRepository.findById(memberNo).orElse(null);
+        if (requester != null && "에이전시 관리자".equals(requester.getMemberRole())
+            && requester.getAgency() != null) {
+            Long agencyNo = requester.getAgency().getAgencyNo();
+            List<ProjectMember> projectMembers = projectMemberRepository.findByProject_ProjectNo(projectNo);
+            boolean projectBelongsToAgency = projectMembers.stream()
+                .anyMatch(pm -> pm.getMember().getAgency() != null
+                    && agencyNo.equals(pm.getMember().getAgency().getAgencyNo()));
+            if (projectBelongsToAgency) {
+                return;
+            }
+        }
+        throw new IllegalArgumentException("해당 프로젝트에 대한 접근 권한이 없습니다.");
     }
 
     @Override
@@ -200,6 +271,37 @@ public class ProjectServiceImpl implements ProjectService {
         if (request.getThumbnailFile() != null) project.setThumbnailFile(request.getThumbnailFile());
         if (request.getProjectStartedAt() != null) project.setProjectStartedAt(request.getProjectStartedAt());
         projectRepository.save(project);
+
+        if (request.getArtistMemberNo() != null) {
+            Long newArtistNo = request.getArtistMemberNo();
+            Member newArtist = memberRepository.findById(newArtistNo)
+                .orElseThrow(() -> new IllegalArgumentException("작가로 지정할 회원을 찾을 수 없습니다: " + newArtistNo));
+            var optionalArtistRow = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(projectNo, "작가");
+            if (optionalArtistRow.isPresent()) {
+                ProjectMember artistPm = optionalArtistRow.get();
+                if (!artistPm.getMember().getMemberNo().equals(newArtistNo)) {
+                    artistPm.setMember(newArtist);
+                    projectMemberRepository.save(artistPm);
+                }
+            } else {
+                if (!projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, newArtistNo)) {
+                    ProjectMember artistPm = new ProjectMember();
+                    artistPm.setProject(project);
+                    artistPm.setMember(newArtist);
+                    artistPm.setProjectMemberRole("작가");
+                    projectMemberRepository.save(artistPm);
+                } else {
+                    projectMemberRepository.findByProject_ProjectNo(projectNo).stream()
+                        .filter(pm -> pm.getMember().getMemberNo().equals(newArtistNo))
+                        .findFirst()
+                        .ifPresent(pm -> {
+                            pm.setProjectMemberRole("작가");
+                            projectMemberRepository.save(pm);
+                        });
+                }
+            }
+        }
+
         List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(projectNo);
         return toProjectListResponse(project, members);
     }
@@ -221,6 +323,7 @@ public class ProjectServiceImpl implements ProjectService {
     public void addProjectMembers(Long projectNo, List<Long> memberNos) {
         Project project = projectRepository.findById(projectNo)
             .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        String projectName = project.getProjectName() != null ? project.getProjectName() : "프로젝트";
         for (Long memberNo : memberNos) {
             if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) continue;
             Member member = memberRepository.findById(memberNo)
@@ -230,6 +333,41 @@ public class ProjectServiceImpl implements ProjectService {
             pm.setProject(project);
             pm.setProjectMemberRole("어시스트");
             projectMemberRepository.save(pm);
+            // 추가된 멤버에게만 알림 저장 (NOTIFICATION_TYPE은 VARCHAR(10))
+            try {
+                notificationService.createNotification(
+                    memberNo,
+                    "프로젝트 추가",
+                    projectName + " 프로젝트에 추가되었습니다.",
+                    "PROJ_ADD"
+                );
+            } catch (Exception e) {
+                log.error("팀원 추가 알림 저장 실패 memberNo={}, projectName={} - 원인: {}", memberNo, projectName, e.getMessage(), e);
+            }
+        }
+    }
+
+    @Override
+    @Transactional
+    public void removeProjectMember(Long projectNo, Long projectMemberNo) {
+        ProjectMember pm = projectMemberRepository.findById(projectMemberNo)
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트 멤버를 찾을 수 없습니다: " + projectMemberNo));
+        if (!pm.getProject().getProjectNo().equals(projectNo)) {
+            throw new IllegalArgumentException("해당 프로젝트의 멤버가 아닙니다.");
+        }
+        Long memberNo = pm.getMember().getMemberNo();
+        String projectName = pm.getProject().getProjectName() != null ? pm.getProject().getProjectName() : "프로젝트";
+        projectMemberRepository.delete(pm);
+        // 제외된 멤버에게만 알림 저장 (NOTIFICATION_TYPE VARCHAR(10) 이하로)
+        try {
+            notificationService.createNotification(
+                memberNo,
+                "프로젝트 제외",
+                projectName + " 프로젝트에서 제외되었습니다.",
+                "PROJ_REM"
+            );
+        } catch (Exception e) {
+            log.error("팀원 제외 알림 저장 실패 memberNo={}, projectName={} - 원인: {}", memberNo, projectName, e.getMessage(), e);
         }
     }
 
@@ -241,7 +379,7 @@ public class ProjectServiceImpl implements ProjectService {
         if (existing.isEmpty()) return List.of();
         Long agencyNo = existing.get(0).getMember().getAgency().getAgencyNo();
         Set<Long> existingMemberNos = existing.stream().map(pm -> pm.getMember().getMemberNo()).collect(Collectors.toSet());
-        List<String> excludeRoles = List.of("담당자", "웹툰 작가", "웹소설 작가");
+        List<String> excludeRoles = List.of("담당자", "웹툰 작가", "웹소설 작가", "에이전시 관리자");
         return memberRepository.findByAgency_AgencyNo(agencyNo).stream()
             .filter(m -> !existingMemberNos.contains(m.getMemberNo()))
             .filter(m -> !excludeRoles.contains(m.getMemberRole()))
@@ -261,11 +399,15 @@ public class ProjectServiceImpl implements ProjectService {
     private ProjectListResponse toProjectListResponse(Project project, List<ProjectMember> members) {
         String artistName = null;
         Long artistMemberNo = null;
+        String managerName = null;
+        Long managerMemberNo = null;
         for (ProjectMember pm : members) {
             if ("작가".equals(pm.getProjectMemberRole())) {
                 artistName = pm.getMember().getMemberName();
                 artistMemberNo = pm.getMember().getMemberNo();
-                break;
+            } else if ("담당자".equals(pm.getProjectMemberRole()) && managerName == null) {
+                managerName = pm.getMember().getMemberName();
+                managerMemberNo = pm.getMember().getMemberNo();
             }
         }
         return ProjectListResponse.builder()
@@ -280,6 +422,8 @@ public class ProjectServiceImpl implements ProjectService {
             .platform(project.getPlatform())
             .projectCycle(project.getProjectCycle())
             .projectStartedAt(project.getProjectStartedAt())
+            .managerName(managerName)
+            .managerMemberNo(managerMemberNo)
             .build();
     }
 

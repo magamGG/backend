@@ -6,6 +6,7 @@ import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
+import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import com.kh.magamGG.domain.project.entity.KanbanBoard;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
 import com.kh.magamGG.domain.project.entity.Project;
@@ -34,6 +35,32 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     private final ProjectMemberRepository projectMemberRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
+
+    @Override
+    public List<TodayTaskResponse> getTodayTasksForMember(Long memberNo) {
+        List<KanbanCard> cards = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
+        return cards.stream().map(this::toTodayTaskResponse).collect(Collectors.toList());
+    }
+
+    private TodayTaskResponse toTodayTaskResponse(KanbanCard card) {
+        Project project = card.getKanbanBoard() != null ? card.getKanbanBoard().getProject() : null;
+        String projectName = project != null ? project.getProjectName() : "";
+        String projectColor = project != null ? project.getProjectColor() : null;
+        Long projectNo = project != null ? project.getProjectNo() : null;
+        Long boardId = card.getKanbanBoard() != null ? card.getKanbanBoard().getKanbanBoardNo() : null;
+        String dueDate = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt().format(DATE_FMT) : null;
+        return TodayTaskResponse.builder()
+            .id(card.getKanbanCardNo())
+            .projectNo(projectNo)
+            .projectName(projectName)
+            .projectColor(projectColor)
+            .boardId(boardId)
+            .title(card.getKanbanCardName())
+            .description(card.getKanbanCardDescription())
+            .dueDate(dueDate)
+            .build();
+    }
 
     @Override
     @Transactional
@@ -80,6 +107,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         KanbanCard card = new KanbanCard();
         card.setKanbanBoard(board);
         card.setKanbanCardName(request.getTitle() != null ? request.getTitle() : "카드");
+        card.setKanbanCardDescription(request.getDescription());
         card.setKanbanCardStatus("N");
         card.setProjectMember(assignee);
         if (request.getStartDate() != null && !request.getStartDate().isEmpty()) {
@@ -101,11 +129,12 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             throw new IllegalArgumentException("해당 프로젝트의 카드가 아닙니다.");
         }
         if (request.getStatus() != null && "D".equalsIgnoreCase(request.getStatus())) {
-            card.setKanbanCardStatus("N");
+            card.setKanbanCardStatus("D");
             kanbanCardRepository.save(card);
             return toCardResponse(card);
         }
         if (request.getTitle() != null) card.setKanbanCardName(request.getTitle());
+        if (request.getDescription() != null) card.setKanbanCardDescription(request.getDescription());
         if (request.getCompleted() != null) card.setKanbanCardStatus(request.getCompleted() ? "Y" : "N");
         if (request.getBoardId() != null) {
             KanbanBoard board = kanbanBoardRepository.findById(request.getBoardId())
@@ -156,6 +185,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
 
     private KanbanBoardResponse toBoardResponse(KanbanBoard board) {
         List<KanbanCardResponse> cards = board.getKanbanCards().stream()
+            .filter(card -> !"D".equals(card.getKanbanCardStatus()))
             .map(this::toCardResponse)
             .collect(Collectors.toList());
         return KanbanBoardResponse.builder()
@@ -180,7 +210,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         return KanbanCardResponse.builder()
             .id(card.getKanbanCardNo())
             .title(card.getKanbanCardName())
-            .description(null)
+            .description(card.getKanbanCardDescription())
             .startDate(card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt().format(DATE_FMT) : null)
             .dueDate(card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt().format(DATE_FMT) : null)
             .boardId(card.getKanbanBoard().getKanbanBoardNo())
