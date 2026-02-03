@@ -16,7 +16,7 @@ public interface HealthSurveyService {
     /**
      * HEALTH_SURVEY_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
      */
-    List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(String healthSurveyType);
+    List<HealthSurveyQuestionResponse> getQuestionsByAgencyNo(Long agencyNo);
 
     /**
      * 설문 응답 제출 (문항별 점수 → 총점 계산 + 등급 산정 + DB 저장)

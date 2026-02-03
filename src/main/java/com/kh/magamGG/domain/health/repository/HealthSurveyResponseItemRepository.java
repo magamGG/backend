@@ -24,19 +24,7 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
         @Param("memberNo") Long memberNo,
         @Param("healthSurveyNo") Long healthSurveyNo
     );
-    
-    /**
-     * 특정 회원이 특정 설문 타입에 대해 응답했는지 확인
-     * (설문 타입은 HEALTH_SURVEY_QUESTION_TYPE 기준)
-     */
-    @Query("SELECT i FROM HealthSurveyResponseItem i " +
-           "WHERE i.member.memberNo = :memberNo " +
-           "AND i.healthSurveyQuestion.healthSurveyQuestionType = :healthSurveyType")
-    List<HealthSurveyResponseItem> findByMemberNoAndHealthSurveyType(
-        @Param("memberNo") Long memberNo,
-        @Param("healthSurveyType") String healthSurveyType
-    );
-    
+
     /**
      * 특정 회원의 특정 설문 응답 생성일 조회 (가장 최근 것)
      * CREATED_AT의 유무로 검진 완료 여부 판단

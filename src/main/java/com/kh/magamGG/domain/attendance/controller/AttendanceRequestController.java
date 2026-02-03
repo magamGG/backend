@@ -36,7 +36,7 @@ public class AttendanceRequestController {
     @PostMapping("/request")
     public ResponseEntity<AttendanceRequestResponse> createAttendanceRequest(
             @RequestBody AttendanceRequestCreateRequest request,
-            @RequestHeader("Member-No") Long memberNo) {
+            @RequestHeader("X-Member-No") Long memberNo) {
         
         log.info("근태 신청 요청: 회원번호={}, 타입={}", memberNo, request.getAttendanceRequestType());
         
@@ -56,7 +56,7 @@ public class AttendanceRequestController {
      */
     @GetMapping("/my-requests")
     public ResponseEntity<List<AttendanceRequestResponse>> getMyAttendanceRequests(
-            @RequestHeader("Member-No") Long memberNo) {
+            @RequestHeader("X-Member-No") Long memberNo) {
         
         List<AttendanceRequestResponse> responses = attendanceService.getAttendanceRequestsByMember(memberNo);
         
@@ -174,7 +174,7 @@ public class AttendanceRequestController {
      */
     @GetMapping("/current-status")
     public ResponseEntity<AttendanceRequestResponse> getCurrentAttendanceStatus(
-            @RequestHeader("Member-No") Long memberNo) {
+            @RequestHeader("X-Member-No") Long memberNo) {
         
         log.info("회원 {}의 현재 근태 상태 조회", memberNo);
         

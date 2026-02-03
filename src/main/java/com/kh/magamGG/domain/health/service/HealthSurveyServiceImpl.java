@@ -41,13 +41,10 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
     }
 
     @Override
-    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(String healthSurveyType) {
-        List<HealthSurveyQuestion> questions =
-            healthSurveyQuestionRepository.findByHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(healthSurveyType);
-
-        return questions.stream()
-            .map(this::toDto)
-            .collect(Collectors.toList());
+    public List<HealthSurveyQuestionResponse> getQuestionsByAgencyNo(Long agencyNo) {
+        HealthSurvey survey = healthSurveyRepository.findByAgency_AgencyNo(agencyNo)
+            .orElseThrow(() -> new IllegalArgumentException("해당 에이전시의 설문을 찾을 수 없습니다: agencyNo=" + agencyNo));
+        return getQuestionsBySurveyNo(survey.getHealthSurveyNo());
     }
 
     /**
@@ -97,16 +94,15 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         healthSurveyResponseItemRepository.save(item);
 
         // 5. 총점/위험도 등급 계산
-        // HEALTH_SURVEY 테이블의 HEALTH_SURVEY_TYPE 컬럼이 제거되었으므로,
-        // HEALTH_SURVEY_QUESTION 테이블의 HEALTH_SURVEY_QUESTION_TYPE 컬럼 기준으로 위험도 계산
-        String surveyType = firstQuestion.getHealthSurveyQuestionType(); // "데일리 정신" / "데일리 신체" / "월간 정신" / "월간 신체"
+        String surveyType = survey.getHealthSurveyType(); // "데일리 정신" / "데일리 신체" / "월간 정신" / "월간 신체"
+        String riskLevel = evaluateRiskLevel(surveyType, totalScore);
 
         // 6. 클라이언트로 반환
         return HealthSurveySubmitResponse.builder()
             .healthSurveyNo(healthSurveyNo)
             .memberNo(member.getMemberNo())
             .totalScore(totalScore)
-            .riskLevel(evaluateRiskLevel(surveyType, totalScore))
+            .riskLevel(riskLevel)
             .build();
     }
 
@@ -206,7 +202,6 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
             )
             .healthSurveyOrder(question.getHealthSurveyOrder())
             .healthSurveyQuestionContent(question.getHealthSurveyQuestionContent())
-            .healthSurveyQuestionType(question.getHealthSurveyQuestionType())
             .healthSurveyQuestionMinScore(question.getHealthSurveyQuestionMinScore())
             .healthSurveyQuestionMaxScore(question.getHealthSurveyQuestionMaxScore())
             .build();
