@@ -11,6 +11,7 @@ import com.kh.magamGG.domain.project.dto.request.ProjectMemberAddRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.CommentResponse;
+import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
@@ -52,6 +53,18 @@ public class ProjectController {
 
         log.info("담당 프로젝트 현황 조회: 담당자 회원={}", memberNo);
         List<ManagedProjectResponse> list = projectService.getManagedProjectsByManager(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 작가 대시보드 피드백 - 회원이 소속된 프로젝트의 칸반 카드에 달린 최신 코멘트 목록
+     * GET /api/projects/feedback
+     */
+    @GetMapping("/feedback")
+    public ResponseEntity<List<DashboardFeedbackResponse>> getMyProjectFeedback(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam(value = "limit", defaultValue = "50") int limit) {
+        List<DashboardFeedbackResponse> list = commentService.getRecentFeedbackForMember(memberNo, Math.min(limit, 100));
         return ResponseEntity.ok(list);
     }
 
@@ -254,7 +267,7 @@ public class ProjectController {
             @RequestHeader("X-Member-No") Long memberNo
     ) {
         projectService.ensureProjectAccess(memberNo, projectNo);
-        CommentResponse created = commentService.createComment(projectNo, cardId, request);
+        CommentResponse created = commentService.createComment(projectNo, cardId, memberNo, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

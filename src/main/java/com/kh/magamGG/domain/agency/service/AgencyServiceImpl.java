@@ -563,7 +563,7 @@ public class AgencyServiceImpl implements AgencyService {
         long normalCount = 0;
 
         for (HealthSurveyResponseItem item : latestByMember.values()) {
-            String surveyType = item.getHealthSurveyQuestion().getHealthSurvey().getHealthSurveyType();
+            String surveyType = item.getHealthSurveyQuestion().getHealthSurveyQuestionType();
             int score = item.getHealthSurveyQuestionItemAnswerScore();
             String level;
             try {
