@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.project.entity;
 
+import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -16,6 +17,10 @@ public class Comment {
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "COMMENT_NO")
 	private Long commentNo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "MEMBER_NO", nullable = false)
+    private Member member;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "KANBAN_CARD_NO", nullable = false)
@@ -31,6 +36,10 @@ public class Comment {
 	private LocalDateTime commentCreatedAt;
 
 	// Setter methods
+	public void setKanbanCard(KanbanCard kanbanCard) {
+		this.kanbanCard = kanbanCard;
+	}
+
 	public void setCommentContent(String commentContent) {
 		this.commentContent = commentContent;
 	}

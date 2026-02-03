@@ -14,14 +14,10 @@ public interface HealthSurveyService {
     List<HealthSurveyQuestionResponse> getQuestionsBySurveyNo(Long healthSurveyNo);
 
     /**
-     * HEALTH_SURVEY_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
+     * AgencyNo와 HEALTH_SURVEY_QUESTION_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
+     * 해당 에이전시의 설문만 조회
      */
-    List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(String healthSurveyType);
-
-    /**
-     * 설문 이름(예: PHQ-9, GAD, QuickDASH)으로 질문 목록 조회
-     */
-    List<HealthSurveyQuestionResponse> getQuestionsBySurveyName(String healthSurveyName);
+    List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(Long agencyNo, String healthSurveyType);
 
     /**
      * 설문 응답 제출 (문항별 점수 → 총점 계산 + 등급 산정 + DB 저장)
