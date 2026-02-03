@@ -13,8 +13,6 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
 
     List<ProjectMember> findByProject_ProjectNo(Long projectNo);
 
-    boolean existsByProject_ProjectNoAndMember_MemberNo(Long projectNo, Long memberNo);
-
     Optional<ProjectMember> findFirstByProject_ProjectNoAndProjectMemberRole(Long projectNo, String projectMemberRole);
 
     /** 에이전시 소속 회원이 포함된 프로젝트 번호 목록 (중복 제거) */

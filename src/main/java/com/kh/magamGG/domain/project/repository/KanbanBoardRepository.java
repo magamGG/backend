@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import java.util.List;
 
 public interface KanbanBoardRepository extends JpaRepository<KanbanBoard, Long> {
+    List<KanbanBoard> findByProject_ProjectNo(Long projectNo);
 
     List<KanbanBoard> findByProject_ProjectNoOrderByKanbanBoardOrderAsc(Long projectNo);
 

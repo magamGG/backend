@@ -11,7 +11,9 @@ import com.kh.magamGG.domain.project.dto.request.ProjectMemberAddRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.CommentResponse;
+import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
+import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.service.CommentService;
@@ -19,6 +21,7 @@ import com.kh.magamGG.domain.project.service.KanbanBoardService;
 import com.kh.magamGG.domain.project.service.ProjectService;
 import com.kh.magamGG.global.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,12 +35,38 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/projects")
 @RequiredArgsConstructor
+@Slf4j
 public class ProjectController {
 
     private final ProjectService projectService;
     private final KanbanBoardService kanbanBoardService;
     private final CommentService commentService;
     private final FileStorageService fileStorageService;
+
+    /**
+     * 담당자 대시보드 - 담당 프로젝트 현황 (마감 기한 대비 진행률 → 정상/주의)
+     * GET /api/projects/managed
+     */
+    @GetMapping("/managed")
+    public ResponseEntity<List<ManagedProjectResponse>> getManagedProjects(
+            @RequestHeader("X-Member-No") Long memberNo) {
+
+        log.info("담당 프로젝트 현황 조회: 담당자 회원={}", memberNo);
+        List<ManagedProjectResponse> list = projectService.getManagedProjectsByManager(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 작가 대시보드 피드백 - 회원이 소속된 프로젝트의 칸반 카드에 달린 최신 코멘트 목록
+     * GET /api/projects/feedback
+     */
+    @GetMapping("/feedback")
+    public ResponseEntity<List<DashboardFeedbackResponse>> getMyProjectFeedback(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam(value = "limit", defaultValue = "50") int limit) {
+        List<DashboardFeedbackResponse> list = commentService.getRecentFeedbackForMember(memberNo, Math.min(limit, 100));
+        return ResponseEntity.ok(list);
+    }
 
     /**
      * 프로젝트 목록 조회 (로그인 회원 기준, PROJECT_MEMBER 소속 프로젝트)
@@ -246,10 +275,6 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
-    /**
-     * 칸반 카드 수정 (KANBAN_CARD UPDATE)
-     * PUT /api/projects/{projectNo}/kanban-card/{cardId}
-     */
     /**
      * 칸반 카드 코멘트 목록 조회 (COMMENT - KANBAN_CARD_NO 기준)
      * GET /api/projects/{projectNo}/kanban-card/{cardId}/comments
