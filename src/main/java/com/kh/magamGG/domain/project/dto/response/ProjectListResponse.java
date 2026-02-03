@@ -27,4 +27,8 @@ public class ProjectListResponse {
     private String platform;
     private Integer projectCycle;
     private LocalDateTime projectStartedAt;
+    /** 담당자 이름 (에이전시 전체 프로젝트 조회 시 등) */
+    private String managerName;
+    /** 담당자 회원 번호 */
+    private Long managerMemberNo;
 }

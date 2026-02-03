@@ -16,3 +16,4 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
 
     List<KanbanCard> findByKanbanBoard_Project_ProjectNo(Long projectNo);
 }
+

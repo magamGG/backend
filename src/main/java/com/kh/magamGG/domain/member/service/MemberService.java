@@ -83,6 +83,11 @@ public interface MemberService {
     List<MemberResponse> getArtistsByManagerNo(Long managerNo);
 
     /**
+     * 로그인 회원의 배정 작가 목록 (현재 회원이 담당자일 때 MANAGER·ARTIST_ASSIGNMENT 조회)
+     */
+    List<MemberResponse> getAssignedArtistsByMemberNo(Long memberNo);
+
+    /**
      * 담당자별 현재 작업중인 작가 목록 (ARTIST_ASSIGNMENT 배정 + 오늘 마지막 ATTENDANCE 이력이 '출근'인 경우, 출근 시각 포함)
      */
     List<WorkingArtistResponse> getWorkingArtistsByManagerNo(Long managerNo);
