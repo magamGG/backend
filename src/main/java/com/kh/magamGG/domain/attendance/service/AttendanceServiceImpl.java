@@ -17,8 +17,10 @@ import com.kh.magamGG.domain.attendance.repository.LeaveBalanceRepository;
 import com.kh.magamGG.domain.attendance.repository.LeaveHistoryRepository;
 import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
 import com.kh.magamGG.domain.health.service.DailyHealthCheckService;
+import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
+import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.global.exception.AccountBlockedException;
@@ -32,9 +34,14 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -55,6 +62,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final NotificationService notificationService;
     private final DailyHealthCheckService dailyHealthCheckService;
     private final ArtistAssignmentRepository artistAssignmentRepository;
+    private final ManagerRepository managerRepository;
     // 비즈니스 로직 분리: 연차 차감 서비스
     private final LeaveBalanceDeductionService leaveBalanceDeductionService;
     // 비즈니스 로직 분리: 알림 발송 서비스 (비동기 처리)
@@ -517,5 +525,60 @@ public class AttendanceServiceImpl implements AttendanceService {
         attendanceRepository.save(attendance);
         log.info("출근 종료(퇴근) 완료: 회원번호={}", memberNo);
         return true;
+    }
+
+    @Override
+    public List<AttendanceRequestResponse> getWeeklyAttendanceByManager(Long memberNo) {
+        Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            log.debug("담당자 아님: memberNo={}", memberNo);
+            return List.of();
+        }
+
+        Set<Long> artistMemberNos = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo())
+                .stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+
+        if (artistMemberNos.isEmpty()) {
+            return List.of();
+        }
+
+        Long agencyNo = Optional.ofNullable(managerOpt.get().getMember().getAgency())
+                .map(a -> a.getAgencyNo())
+                .orElse(null);
+        if (agencyNo == null) {
+            agencyNo = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo()).stream()
+                    .map(a -> a.getArtist().getAgency())
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .map(a -> a.getAgencyNo())
+                    .orElse(null);
+        }
+        if (agencyNo == null) {
+            return List.of();
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate monday = today.with(DayOfWeek.MONDAY);
+        LocalDate sunday = monday.plusDays(6);
+
+        List<AttendanceRequest> agencyRequests = attendanceRequestRepository.findByAgencyNoWithMember(agencyNo);
+
+        if (agencyRequests == null || agencyRequests.isEmpty()) {
+            return List.of();
+        }
+
+        return agencyRequests.stream()
+                .filter(req -> !"CANCELLED".equals(req.getAttendanceRequestStatus()))
+                .filter(req -> artistMemberNos.contains(req.getMember().getMemberNo()))
+                .filter(req -> {
+                    LocalDate reqStart = req.getAttendanceRequestStartDate().toLocalDate();
+                    LocalDate reqEnd = req.getAttendanceRequestEndDate().toLocalDate();
+                    return !reqStart.isAfter(sunday) && !reqEnd.isBefore(monday);
+                })
+                .sorted((a, b) -> a.getAttendanceRequestStartDate().compareTo(b.getAttendanceRequestStartDate()))
+                .map(AttendanceRequestResponse::fromEntity)
+                .collect(Collectors.toList());
     }
 }

@@ -142,6 +142,13 @@ public interface AttendanceService {
      * @return 퇴근 기록 생성 여부
      */
     boolean endAttendance(Long memberNo);
+
+    /**
+     * 담당자의 담당 작가들 금주 근태 예정 (이번 주 월~일과 겹치는 근태 신청)
+     * @param memberNo 로그인한 담당자 회원 번호
+     * @return 담당 작가별 근태 신청 목록 (PENDING/APPROVED/REJECTED, CANCELLED 제외)
+     */
+    List<AttendanceRequestResponse> getWeeklyAttendanceByManager(Long memberNo);
 }
 
 

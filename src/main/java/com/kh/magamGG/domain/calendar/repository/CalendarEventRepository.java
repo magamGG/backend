@@ -40,4 +40,20 @@ public interface CalendarEventRepository extends JpaRepository<CalendarEvent, Lo
             @Param("memberNo") Long memberNo,
             @Param("fromDate") LocalDate fromDate,
             Pageable pageable);
+
+    /**
+     * 여러 회원의 특정 기간 내 마감 일정 조회 (담당자 대시보드 마감 임박 현황용)
+     * memberNo IN (...)
+     * AND calendarEventEndedAt BETWEEN :fromDate AND :toDate
+     */
+    @Query("SELECT ce FROM CalendarEvent ce " +
+           "JOIN FETCH ce.member m " +
+           "WHERE m.memberNo IN :memberNos " +
+           "AND ce.calendarEventEndedAt >= :fromDate " +
+           "AND ce.calendarEventEndedAt <= :toDate " +
+           "ORDER BY ce.calendarEventEndedAt ASC")
+    List<CalendarEvent> findByMemberNosAndDateRange(
+            @Param("memberNos") List<Long> memberNos,
+            @Param("fromDate") LocalDate fromDate,
+            @Param("toDate") LocalDate toDate);
 }

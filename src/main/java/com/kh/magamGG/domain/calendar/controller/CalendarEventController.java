@@ -1,6 +1,7 @@
 package com.kh.magamGG.domain.calendar.controller;
 
 import com.kh.magamGG.domain.calendar.dto.response.CalendarEventResponse;
+import com.kh.magamGG.domain.calendar.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.calendar.service.CalendarEventService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,5 +51,33 @@ public class CalendarEventController {
 
         List<CalendarEventResponse> events = calendarEventService.getUpcomingEvents(memberNo, limit);
         return ResponseEntity.ok(events);
+    }
+
+    /**
+     * 담당자 대시보드 마감 임박 현황 (오늘~4일 후별 건수)
+     * GET /api/calendar/deadline-counts
+     */
+    @GetMapping("/deadline-counts")
+    public ResponseEntity<List<DeadlineCountResponse>> getDeadlineCounts(
+            @RequestHeader("X-Member-No") Long memberNo) {
+
+        log.info("마감 임박 현황 조회: 담당자 회원={}", memberNo);
+
+        List<DeadlineCountResponse> counts = calendarEventService.getDeadlineCountsForManager(memberNo);
+        return ResponseEntity.ok(counts);
+    }
+
+    /**
+     * 에이전시 대시보드 마감 임박 현황 (오늘~4일 후별 건수)
+     * GET /api/calendar/deadline-counts/agency/{agencyNo}
+     */
+    @GetMapping("/deadline-counts/agency/{agencyNo}")
+    public ResponseEntity<List<DeadlineCountResponse>> getDeadlineCountsByAgency(
+            @PathVariable Long agencyNo) {
+
+        log.info("마감 임박 현황 조회: 에이전시={}", agencyNo);
+
+        List<DeadlineCountResponse> counts = calendarEventService.getDeadlineCountsForAgency(agencyNo);
+        return ResponseEntity.ok(counts);
     }
 }
