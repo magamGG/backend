@@ -36,6 +36,10 @@ public class Comment {
 	private LocalDateTime commentCreatedAt;
 
 	// Setter methods
+	public void setKanbanCard(KanbanCard kanbanCard) {
+		this.kanbanCard = kanbanCard;
+	}
+
 	public void setCommentContent(String commentContent) {
 		this.commentContent = commentContent;
 	}
