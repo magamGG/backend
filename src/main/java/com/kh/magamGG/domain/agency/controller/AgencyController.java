@@ -5,12 +5,10 @@ import com.kh.magamGG.domain.agency.dto.request.RejectJoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.UpdateAgencyLeaveRequest;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
-
 import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
 import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
-import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.service.AgencyService;
@@ -35,6 +33,56 @@ public class AgencyController {
         return ResponseEntity.ok(response);
     }
     
+    /**
+     * 에이전시 대시보드 메트릭 (평균 마감 준수율, 활동 작가, 진행 프로젝트)
+     * GET /api/agency/{agencyNo}/dashboard-metrics
+     */
+    @GetMapping("/{agencyNo}/dashboard-metrics")
+    public ResponseEntity<AgencyDashboardMetricsResponse> getDashboardMetrics(@PathVariable Long agencyNo) {
+        AgencyDashboardMetricsResponse response = agencyService.getDashboardMetrics(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 평균 마감 준수율 추이 (월별 + 전월 대비)
+     * GET /api/agency/{agencyNo}/compliance-trend
+     */
+    @GetMapping("/{agencyNo}/compliance-trend")
+    public ResponseEntity<ComplianceTrendResponse> getComplianceTrend(@PathVariable Long agencyNo) {
+        ComplianceTrendResponse response = agencyService.getComplianceTrend(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 작품별 아티스트 분포도
+     * GET /api/agency/{agencyNo}/artist-distribution
+     */
+    @GetMapping("/{agencyNo}/artist-distribution")
+    public ResponseEntity<ArtistDistributionResponse> getArtistDistribution(@PathVariable Long agencyNo) {
+        ArtistDistributionResponse response = agencyService.getArtistDistribution(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 금일 출석 현황
+     * GET /api/agency/{agencyNo}/attendance-distribution
+     */
+    @GetMapping("/{agencyNo}/attendance-distribution")
+    public ResponseEntity<AttendanceDistributionResponse> getAttendanceDistribution(@PathVariable Long agencyNo) {
+        AttendanceDistributionResponse response = agencyService.getAttendanceDistribution(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 건강 인원 분포
+     * GET /api/agency/{agencyNo}/health-distribution
+     */
+    @GetMapping("/{agencyNo}/health-distribution")
+    public ResponseEntity<HealthDistributionResponse> getHealthDistribution(@PathVariable Long agencyNo) {
+        HealthDistributionResponse response = agencyService.getHealthDistribution(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
     /**
      * 에이전시 상세 조회 (agencyLeave 등)
      * GET /api/agency/{agencyNo}

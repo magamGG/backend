@@ -67,13 +67,6 @@ public class ProjectController {
     }
 
     /**
-     * 프로젝트 생성
-     * POST /api/projects
-     *
-     * @param request     프로젝트 생성 요청 (projectName, artistMemberNo 필수)
-     * @param creatorNo   생성자 회원 번호 (X-Member-No 헤더)
-     */
-    /**
      * 프로젝트 썸네일 업로드 (프로젝트 생성 전 호출)
      * POST /api/projects/upload-thumbnail
      *
@@ -87,6 +80,13 @@ public class ProjectController {
         return ResponseEntity.ok(fileName);
     }
 
+    /**
+     * 프로젝트 생성
+     * POST /api/projects
+     *
+     * @param request     프로젝트 생성 요청 (projectName, artistMemberNo 필수)
+     * @param creatorNo   생성자 회원 번호 (X-Member-No 헤더)
+     */
     @PostMapping
     public ResponseEntity<ProjectListResponse> createProject(
             @RequestBody ProjectCreateRequest request,
