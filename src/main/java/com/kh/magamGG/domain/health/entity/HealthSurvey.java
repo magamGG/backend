@@ -20,10 +20,6 @@ public class HealthSurvey {
     @Column(name = "HEALTH_SURVEY_NO")
     private Long healthSurveyNo;
 
-    // 건강 설문 상태 (예: Y/N 등) - 컬럼은 남겨두고 사용
-    @Column(name = "HEALTH_SURVEY_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'Y'")
-    private String healthSurveyStatus;
-
     // 건강 설문 주기 관련 컬럼
     @Column(name = "HEALTH_SURVEY_PERIOD", columnDefinition = "INT DEFAULT 15")
     private Integer healthSurveyPeriod;
