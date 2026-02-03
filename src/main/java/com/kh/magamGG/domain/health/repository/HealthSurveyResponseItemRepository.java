@@ -24,7 +24,7 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
         @Param("memberNo") Long memberNo,
         @Param("healthSurveyNo") Long healthSurveyNo
     );
-    
+
     /**
      * 특정 회원의 특정 설문 응답 생성일 조회 (가장 최근 것)
      * CREATED_AT의 유무로 검진 완료 여부 판단
