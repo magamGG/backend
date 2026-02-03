@@ -4,6 +4,7 @@ import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.attendance.dto.AttendanceStatisticsResponseDto;
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
 import com.kh.magamGG.domain.attendance.dto.request.LeaveBalanceAdjustRequest;
+import com.kh.magamGG.domain.attendance.dto.response.AgencyMemberLeaveResponse;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
 import com.kh.magamGG.domain.attendance.dto.response.LeaveBalanceResponse;
 import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
@@ -38,7 +39,9 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -368,6 +371,53 @@ public class AttendanceServiceImpl implements AttendanceService {
         return leaveHistoryRepository.findByAgencyNoWithMember(agencyNo).stream()
                 .map(LeaveHistoryResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<AgencyMemberLeaveResponse> getLeaveBalancesByAgency(Long agencyNo) {
+        validateAgencyExists(agencyNo);
+        int currentYear = LocalDateTime.now().getYear();
+        List<Object[]> adjustmentSums = leaveHistoryRepository.sumAdjustmentByAgencyNoAndYear(agencyNo, currentYear);
+        Map<Long, Integer> adjustmentByMember = adjustmentSums.stream()
+                .collect(Collectors.toMap(row -> (Long) row[0], row -> ((Number) row[1]).intValue(), (a, b) -> a));
+
+        List<Member> members = memberRepository.findByAgency_AgencyNo(agencyNo);
+        List<AgencyMemberLeaveResponse> result = new ArrayList<>();
+        for (Member m : members) {
+            // 직원 연차 관리 목록에는 에이전시 관리자 제외 (담당자·작가 등만 표시)
+            if ("에이전시 관리자".equals(m.getMemberRole())) {
+                continue;
+            }
+            Long memberNo = m.getMemberNo();
+            int currentYearAdjustmentTotal = adjustmentByMember.getOrDefault(memberNo, 0);
+
+            Optional<LeaveBalance> balanceOpt = leaveBalanceRepository.findTop1ByMember_MemberNoOrderByLeaveBalanceYearDesc(memberNo);
+            int total = 0;
+            int used = 0;
+            double remain = 0.0;
+            String year = "";
+            Long leaveBalanceNo = null;
+            if (balanceOpt.isPresent()) {
+                LeaveBalance b = balanceOpt.get();
+                total = b.getLeaveBalanceTotalDays() != null ? b.getLeaveBalanceTotalDays() : 0;
+                used = b.getLeaveBalanceUsedDays() != null ? b.getLeaveBalanceUsedDays() : 0;
+                remain = b.getLeaveBalanceRemainDays() != null ? b.getLeaveBalanceRemainDays() : 0.0;
+                year = b.getLeaveBalanceYear() != null ? b.getLeaveBalanceYear() : "";
+                leaveBalanceNo = b.getLeaveBalanceNo();
+            }
+            result.add(AgencyMemberLeaveResponse.builder()
+                    .memberNo(memberNo)
+                    .memberName(m.getMemberName() != null ? m.getMemberName() : "")
+                    .memberRole(m.getMemberRole() != null ? m.getMemberRole() : "")
+                    .leaveBalanceTotalDays(total)
+                    .leaveBalanceUsedDays(used)
+                    .leaveBalanceRemainDays(remain)
+                    .leaveBalanceYear(year)
+                    .leaveBalanceNo(leaveBalanceNo)
+                    .currentYearAdjustmentTotal(currentYearAdjustmentTotal)
+                    .build());
+        }
+        return result;
     }
 
     @Override

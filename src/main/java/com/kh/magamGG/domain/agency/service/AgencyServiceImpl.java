@@ -10,6 +10,7 @@ import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
+import com.kh.magamGG.domain.attendance.entity.Attendance;
 import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
 import com.kh.magamGG.domain.attendance.entity.LeaveBalance;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
@@ -21,6 +22,8 @@ import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.member.repository.NewRequestRepository;
+import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
+import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponseItem;
@@ -28,8 +31,6 @@ import com.kh.magamGG.domain.health.repository.HealthSurveyResponseItemRepositor
 import com.kh.magamGG.domain.health.service.HealthSurveyService;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
 import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
-import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
-import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import com.kh.magamGG.global.exception.NewRequestNotFoundException;
@@ -40,8 +41,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -360,7 +363,6 @@ public class AgencyServiceImpl implements AgencyService {
         long activeProjectCount = projectRepository.findActiveProjectsByAgencyNo(agencyNo).size();
 
         // 평균 마감 준수율: 에이전시 프로젝트의 KANBAN_CARD 기준
-        // 마감일 지난 카드 중 완료(Y)된 비율
         List<com.kh.magamGG.domain.project.entity.Project> allAgencyProjects =
                 projectRepository.findAllProjectsByAgencyNo(agencyNo);
 
@@ -427,7 +429,6 @@ public class AgencyServiceImpl implements AgencyService {
         List<ComplianceTrendResponse.ComplianceMonthItem> trend = new ArrayList<>();
         Double monthOverMonthChange = null;
         Double prevRate = null;
-        Double currRate = null;
 
         for (Map.Entry<YearMonth, long[]> e : monthStats.entrySet()) {
             long total = e.getValue()[0];
@@ -437,8 +438,7 @@ public class AgencyServiceImpl implements AgencyService {
             trend.add(new ComplianceTrendResponse.ComplianceMonthItem(monthLabel, rate));
 
             if (prevRate != null) {
-                currRate = rate;
-                monthOverMonthChange = Math.round((currRate - prevRate) * 10) / 10.0;
+                monthOverMonthChange = Math.round((rate - prevRate) * 10) / 10.0;
             }
             prevRate = rate;
         }
@@ -452,97 +452,174 @@ public class AgencyServiceImpl implements AgencyService {
     @Override
     public ArtistDistributionResponse getArtistDistribution(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
-
-        List<com.kh.magamGG.domain.project.entity.Project> projects =
-                projectRepository.findAllProjectsByAgencyNo(agencyNo);
-
+        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
+        if (artists.isEmpty()) {
+            return ArtistDistributionResponse.builder()
+                    .distribution(Collections.emptyList())
+                    .maxArtistProjectName(null)
+                    .build();
+        }
+        List<Long> memberNos = artists.stream().map(Member::getMemberNo).collect(Collectors.toList());
+        List<Object[]> rows;
+        try {
+            rows = projectMemberRepository.countArtistsByProjectForMembers(memberNos);
+        } catch (Exception e) {
+            log.warn("작품별 아티스트 분포 조회 중 오류: {}", e.getMessage());
+            return ArtistDistributionResponse.builder()
+                    .distribution(Collections.emptyList())
+                    .maxArtistProjectName(null)
+                    .build();
+        }
         List<ArtistDistributionResponse.ArtistDistributionItem> distribution = new ArrayList<>();
-        String maxProjectName = null;
+        String maxArtistProjectName = null;
         long maxArtists = 0;
-
-        for (var project : projects) {
-            long artistCount = projectMemberRepository.countArtistsByProjectAndAgency(
-                    project.getProjectNo(), agencyNo);
-
-            distribution.add(new ArtistDistributionResponse.ArtistDistributionItem(
-                    project.getProjectName(), artistCount));
-
-            if (artistCount > maxArtists) {
-                maxArtists = artistCount;
-                maxProjectName = project.getProjectName();
+        for (Object[] row : rows) {
+            String projectName = row[0] != null ? String.valueOf(row[0]) : "-";
+            Number count = row[1] instanceof Number ? (Number) row[1] : null;
+            long artistsCount = count != null ? count.longValue() : 0L;
+            distribution.add(ArtistDistributionResponse.ArtistDistributionItem.builder()
+                    .name(projectName)
+                    .artists(artistsCount)
+                    .build());
+            if (artistsCount > maxArtists) {
+                maxArtists = artistsCount;
+                maxArtistProjectName = projectName;
             }
         }
-
-        distribution.sort((a, b) -> Long.compare(b.getArtists(), a.getArtists()));
-
         return ArtistDistributionResponse.builder()
                 .distribution(distribution)
-                .maxArtistProjectName(maxProjectName)
+                .maxArtistProjectName(maxArtistProjectName)
                 .build();
     }
+
+    /** 근태 신청 타입 → 금일 출석 분포 표시용 (휴가/재택근무/워케이션만, 그 외 null) */
+    private static String requestTypeToDisplay(String requestType) {
+        if (requestType == null) return null;
+        String t = requestType.trim();
+        if ("연차".equals(t) || "반차".equals(t) || "반반차".equals(t) || "병가".equals(t) || "휴재".equals(t) || "휴가".equals(t)) {
+            return "휴가";
+        }
+        if ("재택근무".equals(t) || "재택".equals(t)) return "재택근무";
+        if ("워케이션".equals(t)) return "워케이션";
+        return null;
+    }
+
+    /** 금일 출석 분포에서 제외할 역할 (에이전시 관리자·관리자는 직원 현황에 포함하지 않음) */
+    private static final List<String> EXCLUDED_ROLES_FOR_ATTENDANCE = List.of("에이전시 관리자", "관리자");
 
     @Override
     public AttendanceDistributionResponse getAttendanceDistribution(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
-        LocalDate today = LocalDate.now();
-
-        // 에이전시 소속 작가(웹툰/웹소설) 목록
-        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
-        Set<Long> artistNos = artists.stream().map(Member::getMemberNo).collect(Collectors.toSet());
-
-        // 출근: 오늘 체크인한 회원
-        List<Long> checkedInNos = attendanceRepository.findMemberNosCheckedInByAgencyAndDate(agencyNo, today);
-        Set<Long> checkedInSet = new HashSet<>(checkedInNos);
-
-        // 승인된 근태 신청 중 오늘 포함되는 것
-        List<AttendanceRequest> approvedRequests = attendanceRequestRepository.findByAgencyNoWithMember(agencyNo)
-                .stream()
-                .filter(r -> "APPROVED".equals(r.getAttendanceRequestStatus()))
-                .filter(r -> {
-                    LocalDate start = r.getAttendanceRequestStartDate().toLocalDate();
-                    LocalDate end = r.getAttendanceRequestEndDate().toLocalDate();
-                    return !today.isBefore(start) && !today.isAfter(end);
-                })
+        List<Member> allMembers = memberRepository.findByAgency_AgencyNo(agencyNo);
+        List<Member> members = allMembers.stream()
+                .filter(m -> m.getMemberRole() == null || !EXCLUDED_ROLES_FOR_ATTENDANCE.contains(m.getMemberRole().trim()))
                 .collect(Collectors.toList());
+        int totalMembers = members.size();
+        LocalDate today = LocalDate.now();
+        LocalDateTime todayStart = today.atStartOfDay();
+        LocalDateTime todayEnd = today.atTime(LocalTime.MAX);
 
-        Set<Long> inWorkcation = new HashSet<>();
-        Set<Long> inRemote = new HashSet<>();
-        Set<Long> inLeave = new HashSet<>();
-
-        for (AttendanceRequest req : approvedRequests) {
-            Long memberNo = req.getMember().getMemberNo();
-            if (!artistNos.contains(memberNo)) continue;
-
-            String type = req.getAttendanceRequestType();
-            if ("워케이션".equals(type)) {
-                inWorkcation.add(memberNo);
-            } else if ("재택근무".equals(type)) {
-                inRemote.add(memberNo);
-            } else if ("휴재".equals(type) || "휴가".equals(type) || "반차".equals(type) || "병가".equals(type)) {
-                inLeave.add(memberNo);
+        // 1) 오늘 포함된 승인된 근태 신청 → 휴가/재택근무/워케이션
+        List<AttendanceRequest> approvedToday;
+        try {
+            approvedToday = attendanceRequestRepository.findApprovedByAgencyNoAndDateBetween(agencyNo, todayStart, todayEnd);
+        } catch (Exception e) {
+            log.warn("금일 승인 근태 신청 조회 중 오류: {}", e.getMessage());
+            approvedToday = Collections.emptyList();
+        }
+        Map<Long, String> memberStatusFromRequest = new LinkedHashMap<>();
+        for (AttendanceRequest ar : approvedToday) {
+            String displayType = requestTypeToDisplay(ar.getAttendanceRequestType());
+            if (displayType == null) continue;
+            Long memberNo = ar.getMember().getMemberNo();
+            if ("휴가".equals(displayType)) {
+                memberStatusFromRequest.put(memberNo, displayType);
+            }
+        }
+        for (AttendanceRequest ar : approvedToday) {
+            String displayType = requestTypeToDisplay(ar.getAttendanceRequestType());
+            if ("재택근무".equals(displayType)) {
+                Long memberNo = ar.getMember().getMemberNo();
+                if (!memberStatusFromRequest.containsKey(memberNo)) {
+                    memberStatusFromRequest.put(memberNo, displayType);
+                }
+            }
+        }
+        for (AttendanceRequest ar : approvedToday) {
+            String displayType = requestTypeToDisplay(ar.getAttendanceRequestType());
+            if ("워케이션".equals(displayType)) {
+                Long memberNo = ar.getMember().getMemberNo();
+                if (!memberStatusFromRequest.containsKey(memberNo)) {
+                    memberStatusFromRequest.put(memberNo, displayType);
+                }
             }
         }
 
-        // 우선순위: 워케이션 > 재택근무 > 휴재 > 출근 (한 사람은 하나의 카테고리만)
-        Set<Long> assigned = new HashSet<>();
-        assigned.addAll(inWorkcation);
-        assigned.addAll(inRemote);
-        assigned.addAll(inLeave);
+        // 2) 금일 출근/퇴근 기록(Attendance) 있는 회원 → 출근
+        List<Attendance> todayRecords;
+        try {
+            todayRecords = attendanceRepository.findByAgency_AgencyNoAndDate(agencyNo, today);
+        } catch (Exception e) {
+            log.warn("금일 출석 조회 중 오류: {}", e.getMessage());
+            todayRecords = Collections.emptyList();
+        }
+        Map<Long, Boolean> hasAttendanceToday = new LinkedHashMap<>();
+        for (Attendance a : todayRecords) {
+            hasAttendanceToday.putIfAbsent(a.getMember().getMemberNo(), Boolean.TRUE);
+        }
 
-        long workcationCount = inWorkcation.size();
-        long remoteCount = inRemote.size();
-        long leaveCount = inLeave.size();
-        long checkedInCount = checkedInSet.stream().filter(n -> !assigned.contains(n) && artistNos.contains(n)).count();
+        Set<Long> employeeMemberNos = members.stream().map(Member::getMemberNo).collect(Collectors.toSet());
+        int countLeave = (int) memberStatusFromRequest.entrySet().stream()
+                .filter(e -> "휴가".equals(e.getValue()) && employeeMemberNos.contains(e.getKey()))
+                .count();
+        int countRemote = (int) memberStatusFromRequest.entrySet().stream()
+                .filter(e -> "재택근무".equals(e.getValue()) && employeeMemberNos.contains(e.getKey()))
+                .count();
+        int countWorkation = (int) memberStatusFromRequest.entrySet().stream()
+                .filter(e -> "워케이션".equals(e.getValue()) && employeeMemberNos.contains(e.getKey()))
+                .count();
+        int countOffice = 0;
+        for (Long memberNo : hasAttendanceToday.keySet()) {
+            if (employeeMemberNos.contains(memberNo) && !memberStatusFromRequest.containsKey(memberNo)) {
+                countOffice++;
+            }
+        }
+        // 미출석 = 직원 중 휴가·재택·워케이션·출근이 아닌 인원만 (에이전시 관리자 제외, 휴가 중인 인원은 미출석에서 제외)
+        int absent = 0;
+        for (Member m : members) {
+            Long memberNo = m.getMemberNo();
+            if (memberStatusFromRequest.containsKey(memberNo) || hasAttendanceToday.containsKey(memberNo)) {
+                continue; // 휴가/재택/워케이션/출근 중 하나에 해당 → 미출석 아님
+            }
+            absent++;
+        }
 
-        List<AttendanceDistributionResponse.AttendanceItem> distribution = new ArrayList<>();
-        distribution.add(new AttendanceDistributionResponse.AttendanceItem("출근", checkedInCount, "#00ACC1"));
-        distribution.add(new AttendanceDistributionResponse.AttendanceItem("재택근무", remoteCount, "#FF9800"));
-        distribution.add(new AttendanceDistributionResponse.AttendanceItem("휴재", leaveCount, "#757575"));
-        distribution.add(new AttendanceDistributionResponse.AttendanceItem("워케이션", workcationCount, "#9C27B0"));
+        Map<String, String> displayColors = new LinkedHashMap<>();
+        displayColors.put("출근", "#00ACC1");
+        displayColors.put("재택근무", "#FF9800");
+        displayColors.put("휴가", "#757575");
+        displayColors.put("워케이션", "#9C27B0");
+        displayColors.put("미출석", "#EF4444");
 
-        return AttendanceDistributionResponse.builder()
-                .distribution(distribution)
-                .build();
+        List<AttendanceDistributionResponse.AttendanceItem> list = new ArrayList<>();
+        for (String displayName : List.of("출근", "재택근무", "휴가", "워케이션", "미출석")) {
+            int value;
+            switch (displayName) {
+                case "출근": value = countOffice; break;
+                case "재택근무": value = countRemote; break;
+                case "휴가": value = countLeave; break;
+                case "워케이션": value = countWorkation; break;
+                case "미출석": value = absent; break;
+                default: value = 0;
+            }
+            String color = displayColors.getOrDefault(displayName, "#94a3b8");
+            list.add(AttendanceDistributionResponse.AttendanceItem.builder()
+                    .name(displayName)
+                    .value((long) value)
+                    .color(color)
+                    .build());
+        }
+        return AttendanceDistributionResponse.builder().distribution(list).build();
     }
 
     @Override
@@ -581,9 +658,9 @@ public class AgencyServiceImpl implements AgencyService {
         }
 
         List<HealthDistributionResponse.HealthItem> distribution = new ArrayList<>();
-        distribution.add(new HealthDistributionResponse.HealthItem("위험", dangerCount, "#EF4444"));
-        distribution.add(new HealthDistributionResponse.HealthItem("주의", cautionCount, "#FF9800"));
-        distribution.add(new HealthDistributionResponse.HealthItem("정상", normalCount, "#10B981"));
+        distribution.add(HealthDistributionResponse.HealthItem.builder().name("위험").value(dangerCount).color("#EF4444").build());
+        distribution.add(HealthDistributionResponse.HealthItem.builder().name("주의").value(cautionCount).color("#FF9800").build());
+        distribution.add(HealthDistributionResponse.HealthItem.builder().name("정상").value(normalCount).color("#10B981").build());
 
         return HealthDistributionResponse.builder()
                 .distribution(distribution)

@@ -22,6 +22,7 @@ public class AttendanceDistributionResponse {
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class AttendanceItem {
         private String name;
         private Long value;

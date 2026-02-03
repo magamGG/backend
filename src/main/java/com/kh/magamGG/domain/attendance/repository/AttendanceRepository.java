@@ -9,6 +9,10 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
+
+	/** 에이전시 금일 출석 기록 조회 (금일 출석 분포용) */
+	@Query("SELECT a FROM Attendance a WHERE a.agency.agencyNo = :agencyNo AND DATE(a.attendanceTime) = :today ORDER BY a.member.memberNo, a.attendanceTime DESC")
+	List<Attendance> findByAgency_AgencyNoAndDate(@Param("agencyNo") Long agencyNo, @Param("today") LocalDate today);
 	
 	/**
 	 * 회원별 월별 근태 타입별 통계 조회

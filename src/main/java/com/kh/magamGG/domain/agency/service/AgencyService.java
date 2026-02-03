@@ -39,13 +39,11 @@ public interface AgencyService {
 
     /**
      * 에이전시 대시보드 메트릭 조회 (평균 마감 준수율, 활동 작가, 진행 프로젝트)
-     * GUIDE: AG-DS-01, AG-DS-02, AG-DS-03
      */
     AgencyDashboardMetricsResponse getDashboardMetrics(Long agencyNo);
 
     /**
      * 평균 마감 준수율 추이 (월별 + 전월 대비)
-     * GUIDE: AG-DS-04
      */
     ComplianceTrendResponse getComplianceTrend(Long agencyNo);
 
@@ -55,7 +53,7 @@ public interface AgencyService {
     ArtistDistributionResponse getArtistDistribution(Long agencyNo);
 
     /**
-     * 금일 출석 현황 (출근, 재택근무, 휴재, 워케이션)
+     * 금일 출석 현황 (출근, 재택근무, 휴가, 워케이션, 미출석)
      */
     AttendanceDistributionResponse getAttendanceDistribution(Long agencyNo);
 

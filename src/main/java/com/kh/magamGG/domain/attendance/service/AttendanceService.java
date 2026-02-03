@@ -3,6 +3,7 @@ package com.kh.magamGG.domain.attendance.service;
 import com.kh.magamGG.domain.attendance.dto.AttendanceStatisticsResponseDto;
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
 import com.kh.magamGG.domain.attendance.dto.request.LeaveBalanceAdjustRequest;
+import com.kh.magamGG.domain.attendance.dto.response.AgencyMemberLeaveResponse;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
 import com.kh.magamGG.domain.attendance.dto.response.LeaveBalanceResponse;
 import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
@@ -105,6 +106,13 @@ public interface AttendanceService {
      * @return 연차 변경 이력 목록
      */
     List<LeaveHistoryResponse> getLeaveHistoryByAgency(Long agencyNo);
+
+    /**
+     * 에이전시 소속 회원별 연차 잔액 목록 조회 (연차 관리 페이지 직원 리스트용)
+     * @param agencyNo 에이전시 번호
+     * @return 회원별 연차 정보 목록 (연차 없으면 0으로 반환)
+     */
+    List<AgencyMemberLeaveResponse> getLeaveBalancesByAgency(Long agencyNo);
 
     /**
      * 회원의 연차 잔액 조회 (당해 연도 기준, 없으면 최신 연도)

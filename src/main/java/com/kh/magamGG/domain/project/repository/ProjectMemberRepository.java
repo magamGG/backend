@@ -22,4 +22,8 @@ public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Lo
            "AND pm.member.agency.agencyNo = :agencyNo " +
            "AND (pm.member.memberRole = '웹툰 작가' OR pm.member.memberRole = '웹소설 작가')")
     long countArtistsByProjectAndAgency(@Param("projectNo") Long projectNo, @Param("agencyNo") Long agencyNo);
+
+    /** 에이전시 소속 작가 멤버 번호 목록으로 프로젝트별 아티스트 수 조회 (작품별 아티스트 분포용) */
+    @Query("SELECT pm.project.projectName, COUNT(pm) FROM ProjectMember pm WHERE pm.member.memberNo IN :memberNos GROUP BY pm.project.projectNo, pm.project.projectName")
+    List<Object[]> countArtistsByProjectForMembers(@Param("memberNos") List<Long> memberNos);
 }

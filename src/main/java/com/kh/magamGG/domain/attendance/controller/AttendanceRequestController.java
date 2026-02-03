@@ -2,6 +2,7 @@ package com.kh.magamGG.domain.attendance.controller;
 
 import com.kh.magamGG.domain.attendance.dto.request.AttendanceRequestCreateRequest;
 import com.kh.magamGG.domain.attendance.dto.request.LeaveBalanceAdjustRequest;
+import com.kh.magamGG.domain.attendance.dto.response.AgencyMemberLeaveResponse;
 import com.kh.magamGG.domain.attendance.dto.response.AttendanceRequestResponse;
 import com.kh.magamGG.domain.attendance.dto.response.LeaveBalanceResponse;
 import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
@@ -124,6 +125,20 @@ public class AttendanceRequestController {
     public ResponseEntity<List<LeaveHistoryResponse>> getLeaveHistoryByAgency(@PathVariable Long agencyNo) {
         log.info("에이전시 {} 연차 변경 이력 조회", agencyNo);
         List<LeaveHistoryResponse> responses = attendanceService.getLeaveHistoryByAgency(agencyNo);
+        return ResponseEntity.ok(responses);
+    }
+
+    /**
+     * 에이전시 소속 회원별 연차 잔액 목록 조회 (연차 관리 페이지 직원 리스트용)
+     * GET /api/leave/agency/{agencyNo}/balances
+     *
+     * @param agencyNo 에이전시 번호
+     * @return 회원별 연차 정보 목록
+     */
+    @GetMapping("/agency/{agencyNo}/balances")
+    public ResponseEntity<List<AgencyMemberLeaveResponse>> getLeaveBalancesByAgency(@PathVariable Long agencyNo) {
+        log.info("에이전시 {} 연차 리스트 조회", agencyNo);
+        List<AgencyMemberLeaveResponse> responses = attendanceService.getLeaveBalancesByAgency(agencyNo);
         return ResponseEntity.ok(responses);
     }
 

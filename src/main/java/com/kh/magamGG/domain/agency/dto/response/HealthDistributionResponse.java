@@ -22,6 +22,7 @@ public class HealthDistributionResponse {
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class HealthItem {
         private String name;
         private Long value;

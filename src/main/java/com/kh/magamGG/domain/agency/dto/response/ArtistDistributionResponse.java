@@ -25,6 +25,7 @@ public class ArtistDistributionResponse {
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
+    @Builder
     public static class ArtistDistributionItem {
         private String name;
         private Long artists;
