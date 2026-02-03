@@ -48,4 +48,11 @@ public class KanbanCard {
 	
 	@OneToMany(mappedBy = "kanbanCard", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Comment> comments = new ArrayList<>();
+
+	public void setKanbanBoard(KanbanBoard kanbanBoard) { this.kanbanBoard = kanbanBoard; }
+	public void setKanbanCardName(String kanbanCardName) { this.kanbanCardName = kanbanCardName; }
+	public void setKanbanCardStatus(String kanbanCardStatus) { this.kanbanCardStatus = kanbanCardStatus; }
+	public void setProjectMember(ProjectMember projectMember) { this.projectMember = projectMember; }
+	public void setKanbanCardStartedAt(LocalDate kanbanCardStartedAt) { this.kanbanCardStartedAt = kanbanCardStartedAt; }
+	public void setKanbanCardEndedAt(LocalDate kanbanCardEndedAt) { this.kanbanCardEndedAt = kanbanCardEndedAt; }
 }
