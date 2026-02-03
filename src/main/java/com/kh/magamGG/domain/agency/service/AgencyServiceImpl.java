@@ -304,15 +304,15 @@ public class AgencyServiceImpl implements AgencyService {
         List<Member> members = memberRepository.findByAgency_AgencyNo(agencyNo);
         for (Member member : members) {
             leaveBalanceRepository.findByMember_MemberNoAndLeaveBalanceYear(member.getMemberNo(), currentYear)
-                    .ifPresent(balance -> {
-                        balance.setLeaveBalanceTotalDays(agencyLeave);
-                        int used = balance.getLeaveBalanceUsedDays() != null ? balance.getLeaveBalanceUsedDays() : 0;
-                        double newRemain = agencyLeave - used;
-                        balance.setLeaveBalanceRemainDays(newRemain >= 0 ? newRemain : 0.0);
-                        balance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
-                        leaveBalanceRepository.save(balance);
-                        log.info("LeaveBalance 갱신: 회원번호={}, totalDays={}, remainDays={}", member.getMemberNo(), agencyLeave, balance.getLeaveBalanceRemainDays());
-                    });
+            .ifPresent(balance -> {
+                balance.setLeaveBalanceTotalDays(agencyLeave);
+                int used = balance.getLeaveBalanceUsedDays() != null ? balance.getLeaveBalanceUsedDays() : 0;
+                double newRemain = agencyLeave - used;
+                balance.setLeaveBalanceRemainDays(newRemain >= 0 ? newRemain : 0.0);
+                balance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+                leaveBalanceRepository.save(balance);
+                log.info("LeaveBalance 갱신: 회원번호={}, totalDays={}, remainDays={}", member.getMemberNo(), agencyLeave, balance.getLeaveBalanceRemainDays());
+            });
         }
     }
 }

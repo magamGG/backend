@@ -4,6 +4,7 @@ import com.kh.magamGG.domain.health.dto.response.HealthSurveyQuestionResponse;
 import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
 import com.kh.magamGG.domain.health.dto.request.HealthSurveySubmitRequest;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveySubmitResponse;
+import com.kh.magamGG.domain.health.dto.response.HealthSurveyResponseStatusResponse;
 import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.health.entity.HealthSurveyQuestion;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponseItem;
@@ -198,6 +199,118 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         } else {
             return HealthSurveyRiskLevelDto.DANGER;
         }
+    }
+
+    @Override
+    public HealthSurveyResponseStatusResponse getSurveyResponseStatus(Long memberNo, String healthSurveyQuestionType) {
+        // 1. 회원 정보 조회하여 AgencyNo 가져오기
+        Member member = memberRepository.findById(memberNo)
+            .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + memberNo));
+        
+        Long agencyNo = member.getAgency().getAgencyNo();  // AgencyNo는 항상 존재 (소속 요청 페이지 외 접근 불가)
+        
+        // 2. AgencyNo와 타입으로 해당 에이전시의 질문 조회
+        List<HealthSurveyQuestion> questions = 
+            healthSurveyQuestionRepository.findByHealthSurvey_Agency_AgencyNoAndHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(
+                agencyNo, 
+                healthSurveyQuestionType
+            );
+        
+        if (questions == null || questions.isEmpty()) {
+            return HealthSurveyResponseStatusResponse.builder()
+                .isCompleted(false)
+                .lastCheckDate(null)
+                .totalScore(null)
+                .riskLevel(null)
+                .healthSurveyPeriod(15)  // 기본값
+                .healthSurveyCycle(30)   // 기본값
+                .nextCheckupDate(null)
+                .daysRemaining(null)
+                .deadlineDate(null)
+                .build();
+        }
+        
+        HealthSurveyQuestion firstQuestion = questions.get(0);
+        HealthSurvey healthSurvey = firstQuestion.getHealthSurvey();
+        
+        // 3. INT형 필드 처리 (null 체크 및 기본값 설정)
+        Integer period = healthSurvey.getHealthSurveyPeriod() != null 
+            ? healthSurvey.getHealthSurveyPeriod() : 15;  // INT → Integer
+        Integer cycle = healthSurvey.getHealthSurveyCycle() != null 
+            ? healthSurvey.getHealthSurveyCycle() : 30;   // INT → Integer
+        
+        // 4. 회원의 해당 HEALTH_SURVEY_QUESTION_TYPE에 대한 응답 조회
+        List<HealthSurveyResponseItem> responseItems = 
+            healthSurveyResponseItemRepository.findByMemberNoAndHealthSurveyType(memberNo, healthSurveyQuestionType);
+
+        // 5. 응답이 없으면 미완료 상태 반환 (기간 계산 포함)
+        if (responseItems == null || responseItems.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime deadlineDate = now.plusDays(period);  // 검사 기간만큼 마감일 설정
+            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, deadlineDate);
+            
+            return HealthSurveyResponseStatusResponse.builder()
+                .isCompleted(false)
+                .lastCheckDate(null)
+                .totalScore(null)
+                .riskLevel(null)
+                .healthSurveyPeriod(period)
+                .healthSurveyCycle(cycle)
+                .nextCheckupDate(null)
+                .daysRemaining((int) daysRemaining)
+                .deadlineDate(deadlineDate)
+                .build();
+        }
+
+        // 6. 가장 최근 응답 찾기 (CREATED_AT 기준, CREATED_AT가 null이 아닌 것만)
+        // HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT가 존재하면 검사 완료로 간주
+        HealthSurveyResponseItem latestResponse = responseItems.stream()
+            .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)  // CREATED_AT가 null이 아닌 것만 필터링
+            .max((a, b) -> a.getHealthSurveyQuestionItemCreatedAt()
+                .compareTo(b.getHealthSurveyQuestionItemCreatedAt()))
+            .orElse(null);
+
+        // 7. CREATED_AT가 존재하는 응답이 없으면 미완료 상태 반환 (기간 계산 포함)
+        if (latestResponse == null || latestResponse.getHealthSurveyQuestionItemCreatedAt() == null) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime deadlineDate = now.plusDays(period);  // 검사 기간만큼 마감일 설정
+            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, deadlineDate);
+            
+            return HealthSurveyResponseStatusResponse.builder()
+                .isCompleted(false)
+                .lastCheckDate(null)
+                .totalScore(null)
+                .riskLevel(null)
+                .healthSurveyPeriod(period)
+                .healthSurveyCycle(cycle)
+                .nextCheckupDate(null)
+                .daysRemaining((int) daysRemaining)
+                .deadlineDate(deadlineDate)
+                .build();
+        }
+
+        // 8. 총점과 위험도 계산
+        Integer totalScore = latestResponse.getHealthSurveyQuestionItemAnswerScore();
+        String riskLevel = evaluateRiskLevel(healthSurveyQuestionType, totalScore != null ? totalScore : 0);
+        
+        // 9. 날짜 계산 (검진 완료 상태)
+        LocalDateTime lastCheckDate = latestResponse.getHealthSurveyQuestionItemCreatedAt();
+        LocalDateTime nextCheckupDate = lastCheckDate.plusDays(cycle);  // 검사 주기만큼 다음 검진일 계산
+        LocalDateTime now = LocalDateTime.now();
+        long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, nextCheckupDate);
+
+        // 10. 응답 반환 (CREATED_AT가 존재하므로 완료 상태)
+        return HealthSurveyResponseStatusResponse.builder()
+            .isCompleted(true)  // HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT가 존재하므로 완료
+            .lastCheckDate(lastCheckDate)
+            .totalScore(totalScore)
+            .riskLevel(riskLevel)
+            .healthSurveyPeriod(period)
+            .healthSurveyCycle(cycle)
+            .nextCheckupDate(nextCheckupDate)
+            .daysRemaining((int) daysRemaining)
+            .deadlineDate(null)  // 완료 상태이므로 마감일 없음
+            .build();
     }
 
     private HealthSurveyQuestionResponse toDto(HealthSurveyQuestion question) {
