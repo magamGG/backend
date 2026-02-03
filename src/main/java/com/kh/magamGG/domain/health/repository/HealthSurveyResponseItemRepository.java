@@ -49,5 +49,16 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
         @Param("memberNo") Long memberNo,
         @Param("healthSurveyNo") Long healthSurveyNo
     );
+
+    /**
+     * 에이전시 소속 회원들의 건강 설문 응답 항목 조회 (최신 응답 산출용)
+     */
+    @Query("SELECT i FROM HealthSurveyResponseItem i " +
+           "JOIN FETCH i.healthSurveyQuestion q " +
+           "JOIN FETCH q.healthSurvey s " +
+           "JOIN i.member m " +
+           "WHERE m.agency.agencyNo = :agencyNo " +
+           "ORDER BY i.healthSurveyQuestionItemCreatedAt DESC")
+    List<HealthSurveyResponseItem> findByAgencyNoWithSurvey(@Param("agencyNo") Long agencyNo);
 }
 

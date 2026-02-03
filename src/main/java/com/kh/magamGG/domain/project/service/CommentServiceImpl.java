@@ -1,17 +1,23 @@
 package com.kh.magamGG.domain.project.service;
 
+import com.kh.magamGG.domain.member.entity.Member;
+import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.project.dto.request.CommentCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.CommentUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.CommentResponse;
+import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.entity.Comment;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
 import com.kh.magamGG.domain.project.repository.CommentRepository;
 import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
+import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -22,6 +28,8 @@ public class CommentServiceImpl implements CommentService {
 
     private final CommentRepository commentRepository;
     private final KanbanCardRepository kanbanCardRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final MemberRepository memberRepository;
 
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
@@ -38,13 +46,16 @@ public class CommentServiceImpl implements CommentService {
 
     @Override
     @Transactional
-    public CommentResponse createComment(Long projectNo, Long cardId, CommentCreateRequest request) {
+    public CommentResponse createComment(Long projectNo, Long cardId, Long memberNo, CommentCreateRequest request) {
         KanbanCard card = kanbanCardRepository.findById(cardId)
             .orElseThrow(() -> new IllegalArgumentException("카드를 찾을 수 없습니다: " + cardId));
         if (!card.getKanbanBoard().getProject().getProjectNo().equals(projectNo)) {
             throw new IllegalArgumentException("해당 프로젝트의 카드가 아닙니다.");
         }
+        Member member = memberRepository.findById(memberNo)
+            .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + memberNo));
         Comment comment = new Comment();
+        comment.setMember(member);
         comment.setKanbanCard(card);
         comment.setCommentContent(request.getContent() != null ? request.getContent() : "");
         comment.setCommentStatus("ACTIVE");
@@ -72,11 +83,48 @@ public class CommentServiceImpl implements CommentService {
         return toCommentResponse(saved);
     }
 
+    @Override
+    public List<DashboardFeedbackResponse> getRecentFeedbackForMember(Long memberNo, int limit) {
+        List<Long> projectNos = projectMemberRepository.findByMember_MemberNo(memberNo).stream()
+            .map(pm -> pm.getProject().getProjectNo())
+            .distinct()
+            .collect(Collectors.toList());
+        if (projectNos.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Comment> comments = commentRepository.findRecentByProjectNos(projectNos, PageRequest.of(0, limit));
+        return comments.stream().map(this::toDashboardFeedbackResponse).collect(Collectors.toList());
+    }
+
     private CommentResponse toCommentResponse(Comment c) {
         String createdAt = c.getCommentCreatedAt() != null ? c.getCommentCreatedAt().format(DATETIME_FMT) : null;
         return CommentResponse.builder()
             .id(c.getCommentNo())
             .content(c.getCommentContent())
+            .commentCreatedAt(createdAt)
+            .build();
+    }
+
+    private DashboardFeedbackResponse toDashboardFeedbackResponse(Comment c) {
+        KanbanCard card = c.getKanbanCard();
+        String projectName = card != null && card.getKanbanBoard() != null && card.getKanbanBoard().getProject() != null
+            ? card.getKanbanBoard().getProject().getProjectName() : "";
+        String projectColor = card != null && card.getKanbanBoard() != null && card.getKanbanBoard().getProject() != null
+            ? card.getKanbanBoard().getProject().getProjectColor() : null;
+        Long projectNo = card != null && card.getKanbanBoard() != null && card.getKanbanBoard().getProject() != null
+            ? card.getKanbanBoard().getProject().getProjectNo() : null;
+        String cardTitle = card != null ? card.getKanbanCardName() : "";
+        String writerName = c.getMember() != null ? c.getMember().getMemberName() : "";
+        String createdAt = c.getCommentCreatedAt() != null ? c.getCommentCreatedAt().format(DATETIME_FMT) : null;
+        return DashboardFeedbackResponse.builder()
+            .commentId(c.getCommentNo())
+            .projectNo(projectNo)
+            .projectName(projectName)
+            .projectColor(projectColor)
+            .cardId(card != null ? card.getKanbanCardNo() : null)
+            .cardTitle(cardTitle)
+            .content(c.getCommentContent())
+            .writerName(writerName)
             .commentCreatedAt(createdAt)
             .build();
     }
