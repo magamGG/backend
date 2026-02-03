@@ -50,7 +50,9 @@ public class NotificationServiceImpl implements NotificationService {
 
         log.debug("알림 엔티티 생성 완료: notificationName={}, notificationText={}", name, text);
 
+        log.info("알림 INSERT 직전: memberNo={}, name={}", memberNo, name);
         Notification saved = notificationRepository.save(notification);
+        log.info("알림 INSERT 완료: notificationNo={}", saved.getNotificationNo());
 
         log.info("알림 저장 완료: notificationNo={}, 회원={}, 제목={}, 타입={}",
             saved.getNotificationNo(), member.getMemberName(), name, type);

@@ -58,4 +58,26 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
      */
     // @Query("SELECT m FROM Member m WHERE m.manager.memberNo = :managerNo")
     // List<Member> findArtistsByManagerNo(@Param("managerNo") Long managerNo);
+
+    /**
+     * 에이전시 소속이면서 역할이 담당자/작가가 아니고, 해당 프로젝트에 미소속인 회원 목록
+     */
+    @Query("SELECT m FROM Member m WHERE m.agency.agencyNo = :agencyNo " +
+            "AND m.memberRole NOT IN ('담당자', '웹툰 작가', '웹소설 작가', '에이전시 관리자') " +
+            "AND m.memberNo NOT IN (SELECT pm.member.memberNo FROM ProjectMember pm WHERE pm.project.projectNo = :projectNo)")
+    List<Member> findAddableMembersByAgencyAndProject(
+            @Param("agencyNo") Long agencyNo,
+            @Param("projectNo") Long projectNo
+    );
+
+    /**
+     * 프로젝트의 에이전시와 같은 에이전시 소속이면서, 역할이 담당자/작가가 아니고, 프로젝트에 미소속인 회원 목록
+     * (프로젝트 멤버의 에이전시를 서브쿼리로 직접 사용)
+     */
+    @Query("SELECT m FROM Member m WHERE m.agency IS NOT NULL " +
+            "AND m.agency.agencyNo IN (SELECT pm.member.agency.agencyNo FROM ProjectMember pm " +
+            "WHERE pm.project.projectNo = :projectNo AND pm.member.agency IS NOT NULL) " +
+            "AND m.memberRole NOT IN ('담당자', '웹툰 작가', '웹소설 작가', '에이전시 관리자') " +
+            "AND m.memberNo NOT IN (SELECT pm2.member.memberNo FROM ProjectMember pm2 WHERE pm2.project.projectNo = :projectNo)")
+    List<Member> findAddableMembersByProject(@Param("projectNo") Long projectNo);
 }

@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface KanbanBoardService {
 
+    List<KanbanBoardResponse> getBoardsByProjectNo(Long projectNo);
+
     KanbanBoardResponse createBoard(Long projectNo, KanbanBoardCreateRequest request);
 
     void updateBoardStatus(Long projectNo, Long boardId, KanbanBoardUpdateRequest request);
@@ -18,6 +20,6 @@ public interface KanbanBoardService {
     KanbanCardResponse createCard(Long projectNo, KanbanCardCreateRequest request);
 
     KanbanCardResponse updateCard(Long projectNo, Long cardId, KanbanCardUpdateRequest request);
-
-    List<KanbanBoardResponse> getBoardsByProjectNo(Long projectNo);
 }
+
+

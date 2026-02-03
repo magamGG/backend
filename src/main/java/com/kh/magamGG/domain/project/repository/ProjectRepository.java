@@ -25,5 +25,4 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
            "JOIN p.projectMembers pm " +
            "WHERE pm.member.agency.agencyNo = :agencyNo")
     List<Project> findAllProjectsByAgencyNo(@Param("agencyNo") Long agencyNo);
-
 }

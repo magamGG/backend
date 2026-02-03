@@ -1,6 +1,5 @@
 package com.kh.magamGG.domain.health.entity;
 
-import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -8,7 +7,7 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "health_survey_response_item")
+@Table(name = "HEALTH_SURVEY_RESPONSE_ITEM")
 @Getter
 @NoArgsConstructor
 public class HealthSurveyResponseItem {
@@ -19,8 +18,8 @@ public class HealthSurveyResponseItem {
 	private Long healthSurveyResponseItemNo;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "MEMBER_NO", nullable = false)
-	private Member member;
+	@JoinColumn(name = "HEALTH_SURVEY_RESPONSE_NO", nullable = false)
+	private HealthSurveyResponse healthSurveyResponse;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "HEALTH_SURVEY_QUESTION_NO", nullable = false)
@@ -33,8 +32,8 @@ public class HealthSurveyResponseItem {
 	private LocalDateTime healthSurveyQuestionItemCreatedAt;
 
 	// Setter methods
-	public void setMember(Member member) {
-		this.member = member;
+	public void setHealthSurveyResponse(HealthSurveyResponse healthSurveyResponse) {
+		this.healthSurveyResponse = healthSurveyResponse;
 	}
 
 	public void setHealthSurveyQuestion(HealthSurveyQuestion healthSurveyQuestion) {
