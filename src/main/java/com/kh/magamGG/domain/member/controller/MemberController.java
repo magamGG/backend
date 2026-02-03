@@ -33,6 +33,17 @@ public class MemberController {
     }
 
     /**
+     * 로그인 회원의 배정 작가 목록 (MANAGER·ARTIST_ASSIGNMENT 조회, 담당자만 해당)
+     */
+    @GetMapping("/me/assigned-artists")
+    public ResponseEntity<List<MemberResponse>> getMyAssignedArtists(
+        @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        List<MemberResponse> response = memberService.getAssignedArtistsByMemberNo(memberNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 담당자별 작가 목록 조회 (ARTIST_ASSIGNMENT 테이블에서 managerNo로 조회)
      * 더 구체적인 경로를 먼저 배치하여 경로 매칭 충돌 방지
      */

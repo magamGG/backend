@@ -7,7 +7,6 @@ import java.util.List;
 
 public interface CommentRepository extends JpaRepository<Comment, Long> {
 
-    List<Comment> findByKanbanCard_KanbanCardNoOrderByCommentNoAsc(Long kanbanCardNo);
+    /** KANBAN_CARD_NO 기준 해당 카드의 노출 가능한 댓글 전부 조회 (생성일 오름차순) */
+    List<Comment> findByKanbanCard_KanbanCardNoAndCommentStatusOrderByCommentCreatedAtAsc(Long kanbanCardNo, String commentStatus);
 }
-
-

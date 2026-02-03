@@ -14,6 +14,8 @@ import lombok.NoArgsConstructor;
 @Builder
 public class CommentResponse {
     private Long id;
+    private Long authorMemberNo;
+    private String authorName;
     private String content;
     private String commentCreatedAt;
 }

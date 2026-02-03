@@ -8,11 +8,9 @@ import java.util.List;
 
 public interface CommentService {
 
-    CommentResponse createComment(Long projectNo, Long cardId, CommentCreateRequest request);
-
     List<CommentResponse> getCommentsByCardId(Long projectNo, Long cardId);
+
+    CommentResponse createComment(Long projectNo, Long cardId, Long memberNo, CommentCreateRequest request);
 
     CommentResponse updateComment(Long projectNo, Long cardId, Long commentId, CommentUpdateRequest request);
 }
-
-

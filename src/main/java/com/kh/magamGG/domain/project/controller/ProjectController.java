@@ -54,6 +54,19 @@ public class ProjectController {
     }
 
     /**
+     * 에이전시 소속 전체 프로젝트 조회 (에이전시 관리자만 가능)
+     * GET /api/projects/agency/{agencyNo}
+     */
+    @GetMapping("/agency/{agencyNo}")
+    public ResponseEntity<List<ProjectListResponse>> getProjectsByAgency(
+            @PathVariable Long agencyNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        List<ProjectListResponse> list = projectService.getProjectsByAgencyNo(agencyNo, memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
      * 프로젝트 생성
      * POST /api/projects
      *
@@ -159,6 +172,21 @@ public class ProjectController {
     }
 
     /**
+     * 프로젝트에서 팀원 삭제 (PROJECT_MEMBER 테이블에서 삭제)
+     * DELETE /api/projects/{projectNo}/members/remove/{projectMemberNo}
+     */
+    @DeleteMapping("/{projectNo}/members/remove/{projectMemberNo}")
+    public ResponseEntity<Void> removeProjectMember(
+            @PathVariable Long projectNo,
+            @PathVariable Long projectMemberNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        projectService.removeProjectMember(projectNo, projectMemberNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
      * 프로젝트에 추가 가능한 회원 목록 (MEMBER_ROLE != 담당자/작가, 프로젝트 미소속)
      * GET /api/projects/{projectNo}/addable-members
      */
@@ -246,10 +274,10 @@ public class ProjectController {
             @PathVariable Long projectNo,
             @PathVariable Long cardId,
             @RequestBody CommentCreateRequest request,
-            @RequestHeader("X-Member-No") Long memberNo
+            @RequestHeader(value = "X-Member-No", required = true) Long memberNo
     ) {
         projectService.ensureProjectAccess(memberNo, projectNo);
-        CommentResponse created = commentService.createComment(projectNo, cardId, request);
+        CommentResponse created = commentService.createComment(projectNo, cardId, memberNo, request);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 

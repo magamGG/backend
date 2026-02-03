@@ -1,285 +1,320 @@
 package com.kh.magamGG.domain.project.service;
 
 import com.kh.magamGG.domain.member.entity.Member;
-import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
-import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
+import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.entity.Project;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
-import com.kh.magamGG.global.exception.MemberNotFoundException;
-import com.kh.magamGG.global.exception.ProjectAccessDeniedException;
-import com.kh.magamGG.global.exception.ProjectNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static java.util.Set.of;
-
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ProjectServiceImpl implements ProjectService {
-
-    /** 프로젝트 내 역할: 담당자 / 작가 / 어시스트 (이 역할만 프로젝트 조회 가능) */
-    private static final String ROLE_ARTIST = "작가";
-    private static final String ROLE_MANAGER = "담당자";
-    private static final String ROLE_ASSISTANT = "어시스트";
-    private static final Set<String> VIEWER_ROLES = of("작가", "담당자", "어시스트");
-    private static final String ROLE_AGENCY_ADMIN = "에이전시 관리자";
 
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final MemberRepository memberRepository;
+    private final NotificationService notificationService;
 
     @Override
     public List<ProjectListResponse> getProjectsByMemberNo(Long memberNo) {
-        Member member = memberRepository.findById(memberNo)
-                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
-
-        // 에이전시 관리자는 소속 에이전시의 모든 프로젝트 조회 가능
-        if (ROLE_AGENCY_ADMIN.equals(member.getMemberRole()) && member.getAgency() != null) {
-            return projectRepository.findAllByAgencyNo(member.getAgency().getAgencyNo()).stream()
-                    .map(this::toProjectListResponse)
-                    .collect(Collectors.toList());
+        List<ProjectMember> projectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
+        Set<Long> seen = new HashSet<>();
+        List<ProjectListResponse> result = new ArrayList<>();
+        for (ProjectMember pm : projectMembers) {
+            Long pno = pm.getProject().getProjectNo();
+            if (seen.contains(pno)) continue;
+            seen.add(pno);
+            Project p = pm.getProject();
+            List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(pno);
+            result.add(toProjectListResponse(p, members));
         }
-
-        // 그 외: PROJECT_MEMBER에서 담당자/작가/어시스트로 포함된 프로젝트만 조회
-        Set<Long> seenProjectNos = new HashSet<>();
-        return projectMemberRepository.findByMember_MemberNo(memberNo).stream()
-                .filter(pm -> VIEWER_ROLES.contains(pm.getProjectMemberRole()))
-                .map(ProjectMember::getProject)
-                .filter(p -> seenProjectNos.add(p.getProjectNo()))
-                .map(this::toProjectListResponse)
-                .collect(Collectors.toList());
+        return result;
     }
 
-    private ProjectListResponse toProjectListResponse(Project project) {
-        String artistName = project.getProjectMembers().stream()
-                .filter(pm -> ROLE_ARTIST.equals(pm.getProjectMemberRole()))
-                .map(pm -> pm.getMember().getMemberName())
-                .findFirst()
-                .orElseGet(() -> project.getProjectMembers().isEmpty()
-                        ? null
-                        : project.getProjectMembers().get(0).getMember().getMemberName());
+    @Override
+    public List<ProjectListResponse> getProjectsByAgencyNo(Long agencyNo, Long requesterMemberNo) {
+        Member requester = memberRepository.findById(requesterMemberNo)
+            .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+        if (requester.getAgency() == null || !requester.getAgency().getAgencyNo().equals(agencyNo)) {
+            throw new IllegalArgumentException("해당 에이전시에 대한 접근 권한이 없습니다.");
+        }
+        if (!"에이전시 관리자".equals(requester.getMemberRole())) {
+            throw new IllegalArgumentException("에이전시 관리자만 전체 프로젝트를 조회할 수 있습니다.");
+        }
+        List<Long> projectNos = projectMemberRepository.findDistinctProjectNosByMember_Agency_AgencyNo(agencyNo);
+        List<ProjectListResponse> result = new ArrayList<>();
+        for (Long pno : projectNos) {
+            Project project = projectRepository.findById(pno).orElse(null);
+            if (project == null) continue;
+            List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(pno);
+            result.add(toProjectListResponse(project, members));
+        }
+        return result;
+    }
 
-        Long artistMemberNo = project.getProjectMembers().stream()
-                .filter(pm -> ROLE_ARTIST.equals(pm.getProjectMemberRole()))
-                .map(pm -> pm.getMember().getMemberNo())
-                .findFirst()
-                .orElseGet(() -> project.getProjectMembers().isEmpty()
-                        ? null
-                        : project.getProjectMembers().get(0).getMember().getMemberNo());
+    @Override
+    @Transactional
+    public ProjectListResponse createProject(ProjectCreateRequest request, Long creatorNo) {
+        Project project = new Project();
+        project.setProjectName(request.getProjectName() != null ? request.getProjectName() : "제목 없음");
+        project.setProjectStatus(request.getProjectStatus() != null ? request.getProjectStatus() : "연재");
+        project.setProjectColor(request.getProjectColor() != null ? request.getProjectColor() : "기본색");
+        project.setProjectCycle(request.getProjectCycle());
+        project.setPlatform(request.getPlatform());
+        project.setThumbnailFile(request.getThumbnailFile());
+        project.setProjectStartedAt(request.getProjectStartedAt());
+        Project saved = projectRepository.save(project);
 
-        return ProjectListResponse.builder()
-                .projectNo(project.getProjectNo())
-                .projectName(project.getProjectName())
-                .projectStatus(project.getProjectStatus())
-                .projectColor(project.getProjectColor())
-                .thumbnailFile(project.getThumbnailFile())
-                .artistName(artistName)
-                .artistMemberNo(artistMemberNo)
-                .projectGenre(project.getProjectGenre())
-                .platform(project.getPlatform())
-                .projectCycle(project.getProjectCycle())
-                .projectStartedAt(project.getProjectStartedAt())
-                .build();
+        Member artist = memberRepository.findById(request.getArtistMemberNo())
+            .orElseThrow(() -> new IllegalArgumentException("작가 회원을 찾을 수 없습니다: " + request.getArtistMemberNo()));
+        ProjectMember artistPm = new ProjectMember();
+        artistPm.setMember(artist);
+        artistPm.setProject(saved);
+        artistPm.setProjectMemberRole("작가");
+        projectMemberRepository.save(artistPm);
+
+        Member creator = memberRepository.findById(creatorNo)
+            .orElseThrow(() -> new IllegalArgumentException("생성자 회원을 찾을 수 없습니다: " + creatorNo));
+        if (!creatorNo.equals(request.getArtistMemberNo())) {
+            ProjectMember creatorPm = new ProjectMember();
+            creatorPm.setMember(creator);
+            creatorPm.setProject(saved);
+            creatorPm.setProjectMemberRole("담당자");
+            projectMemberRepository.save(creatorPm);
+        }
+
+        List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(saved.getProjectNo());
+        return toProjectListResponse(saved, members);
     }
 
     @Override
     public void ensureProjectAccess(Long memberNo, Long projectNo) {
-        if (memberNo == null) {
-            throw new ProjectAccessDeniedException("접근 권한이 없습니다.");
+        if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) {
+            return;
         }
-        Member member = memberRepository.findById(memberNo)
-                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
-        if (ROLE_AGENCY_ADMIN.equals(member.getMemberRole()) && member.getAgency() != null) {
-            boolean hasAgencyProject = projectRepository.findAllByAgencyNo(member.getAgency().getAgencyNo()).stream()
-                    .anyMatch(p -> p.getProjectNo().equals(projectNo));
-            if (hasAgencyProject) return;
+        // 에이전시 관리자: 소속 에이전시의 프로젝트면 조회 허용 (PROJECT_MEMBER가 아니어도 됨)
+        Member requester = memberRepository.findById(memberNo).orElse(null);
+        if (requester != null && "에이전시 관리자".equals(requester.getMemberRole())
+            && requester.getAgency() != null) {
+            Long agencyNo = requester.getAgency().getAgencyNo();
+            List<ProjectMember> projectMembers = projectMemberRepository.findByProject_ProjectNo(projectNo);
+            boolean projectBelongsToAgency = projectMembers.stream()
+                .anyMatch(pm -> pm.getMember().getAgency() != null
+                    && agencyNo.equals(pm.getMember().getAgency().getAgencyNo()));
+            if (projectBelongsToAgency) {
+                return;
+            }
         }
-        if (!projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) {
-            throw new ProjectAccessDeniedException("이 프로젝트에 대한 접근 권한이 없습니다.");
-        }
+        throw new IllegalArgumentException("해당 프로젝트에 대한 접근 권한이 없습니다.");
     }
 
     @Override
     public ProjectListResponse getProjectByNo(Long projectNo) {
         Project project = projectRepository.findById(projectNo)
-                .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없습니다."));
-        return toProjectListResponse(project);
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(projectNo);
+        return toProjectListResponse(project, members);
     }
 
     @Override
     @Transactional
     public ProjectListResponse updateProject(Long projectNo, ProjectUpdateRequest request) {
         Project project = projectRepository.findById(projectNo)
-                .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없습니다."));
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        if (request.getProjectName() != null) project.setProjectName(request.getProjectName());
+        if (request.getProjectStatus() != null) project.setProjectStatus(request.getProjectStatus());
+        if (request.getProjectColor() != null) project.setProjectColor(request.getProjectColor());
+        if (request.getProjectCycle() != null) project.setProjectCycle(request.getProjectCycle());
+        if (request.getPlatform() != null) project.setPlatform(request.getPlatform());
+        if (request.getThumbnailFile() != null) project.setThumbnailFile(request.getThumbnailFile());
+        if (request.getProjectStartedAt() != null) project.setProjectStartedAt(request.getProjectStartedAt());
+        projectRepository.save(project);
 
-        if (request.getProjectName() != null) {
-            project.setProjectName(request.getProjectName());
-        }
-        if (request.getProjectStatus() != null) {
-            project.setProjectStatus(request.getProjectStatus());
-        }
-        if (request.getProjectColor() != null) {
-            project.setProjectColor(request.getProjectColor());
-        }
-        if (request.getProjectCycle() != null) {
-            project.setProjectCycle(request.getProjectCycle());
-        }
-        if (request.getThumbnailFile() != null) {
-            project.setThumbnailFile(request.getThumbnailFile());
-        }
-        if (request.getProjectStartedAt() != null) {
-            project.setProjectStartedAt(request.getProjectStartedAt());
-        }
-        if (request.getProjectGenre() != null) {
-            project.setProjectGenre(request.getProjectGenre());
-        }
-        if (request.getPlatform() != null) {
-            project.setPlatform(request.getPlatform());
+        if (request.getArtistMemberNo() != null) {
+            Long newArtistNo = request.getArtistMemberNo();
+            Member newArtist = memberRepository.findById(newArtistNo)
+                .orElseThrow(() -> new IllegalArgumentException("작가로 지정할 회원을 찾을 수 없습니다: " + newArtistNo));
+            var optionalArtistRow = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(projectNo, "작가");
+            if (optionalArtistRow.isPresent()) {
+                ProjectMember artistPm = optionalArtistRow.get();
+                if (!artistPm.getMember().getMemberNo().equals(newArtistNo)) {
+                    artistPm.setMember(newArtist);
+                    projectMemberRepository.save(artistPm);
+                }
+            } else {
+                if (!projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, newArtistNo)) {
+                    ProjectMember artistPm = new ProjectMember();
+                    artistPm.setProject(project);
+                    artistPm.setMember(newArtist);
+                    artistPm.setProjectMemberRole("작가");
+                    projectMemberRepository.save(artistPm);
+                } else {
+                    projectMemberRepository.findByProject_ProjectNo(projectNo).stream()
+                        .filter(pm -> pm.getMember().getMemberNo().equals(newArtistNo))
+                        .findFirst()
+                        .ifPresent(pm -> {
+                            pm.setProjectMemberRole("작가");
+                            projectMemberRepository.save(pm);
+                        });
+                }
+            }
         }
 
-        project = projectRepository.save(project);
-        return toProjectListResponse(project);
+        List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(projectNo);
+        return toProjectListResponse(project, members);
     }
 
     @Override
     @Transactional
     public void deleteProject(Long projectNo) {
-        Project project = projectRepository.findById(projectNo)
-                .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없습니다."));
-        projectRepository.delete(project);
+        projectRepository.deleteById(projectNo);
     }
 
     @Override
     public List<ProjectMemberResponse> getProjectMembers(Long projectNo) {
-        projectRepository.findById(projectNo)
-                .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없습니다."));
-
-        return projectMemberRepository.findByProject_ProjectNo(projectNo).stream()
-                .map(pm -> ProjectMemberResponse.builder()
-                        .projectMemberNo(pm.getProjectMemberNo())
-                        .memberNo(pm.getMember().getMemberNo())
-                        .memberName(pm.getMember().getMemberName())
-                        .memberEmail(pm.getMember().getMemberEmail())
-                        .memberPhone(pm.getMember().getMemberPhone())
-                        .projectMemberRole(pm.getProjectMemberRole())
-                        .memberRole(pm.getMember().getMemberRole())
-                        .memberProfileImage(pm.getMember().getMemberProfileImage())
-                        .memberStatus(pm.getMember().getMemberStatus())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<ProjectMemberResponse> getAddableMembers(Long projectNo) {
-        if (!projectRepository.existsById(projectNo)) {
-            throw new ProjectNotFoundException("프로젝트를 찾을 수 없습니다.");
-        }
-
-        return memberRepository.findAddableMembersByProject(projectNo).stream()
-                .map(m -> ProjectMemberResponse.builder()
-                        .memberNo(m.getMemberNo())
-                        .memberName(m.getMemberName())
-                        .memberEmail(m.getMemberEmail())
-                        .memberPhone(m.getMemberPhone())
-                        .projectMemberRole(m.getMemberRole())
-                        .memberRole(m.getMemberRole())
-                        .memberProfileImage(m.getMemberProfileImage())
-                        .memberStatus(m.getMemberStatus())
-                        .build())
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    @Transactional
-    public ProjectListResponse createProject(ProjectCreateRequest request, Long creatorMemberNo) {
-        // 작가 존재 여부 검증
-        Member artist = memberRepository.findById(request.getArtistMemberNo())
-                .orElseThrow(() -> new MemberNotFoundException("선택한 작가를 찾을 수 없습니다."));
-
-        // 생성자 존재 여부 검증
-        Member creator = memberRepository.findById(creatorMemberNo)
-                .orElseThrow(() -> new MemberNotFoundException("생성자 정보를 찾을 수 없습니다."));
-
-        // 1. PROJECT 생성 및 저장
-        Project project = Project.builder()
-                .projectName(request.getProjectName())
-                .projectStatus(request.getProjectStatus() != null ? request.getProjectStatus() : "연재")
-                .projectColor(request.getProjectColor() != null ? request.getProjectColor() : "기본색")
-                .projectCycle(request.getProjectCycle())
-                .thumbnailFile(request.getThumbnailFile())
-                .projectStartedAt(request.getProjectStartedAt())
-                .projectGenre(request.getProjectGenre())
-                .platform(request.getPlatform())
-                .build();
-
-        project = projectRepository.save(project);
-
-        // 2. PROJECT_MEMBER: 작가 등록 (역할: 작가)
-        ProjectMember artistMember = ProjectMember.builder()
-                .member(artist)
-                .project(project)
-                .projectMemberRole(ROLE_ARTIST)
-                .build();
-        projectMemberRepository.save(artistMember);
-
-        // 3. 생성자 != 작가인 경우, 생성자를 담당자로 추가
-        if (!creatorMemberNo.equals(request.getArtistMemberNo())) {
-            ProjectMember creatorMember = ProjectMember.builder()
-                    .member(creator)
-                    .project(project)
-                    .projectMemberRole(ROLE_MANAGER)
-                    .build();
-            projectMemberRepository.save(creatorMember);
-        }
-
-        return ProjectListResponse.builder()
-                .projectNo(project.getProjectNo())
-                .projectName(project.getProjectName())
-                .projectStatus(project.getProjectStatus())
-                .projectColor(project.getProjectColor())
-                .thumbnailFile(project.getThumbnailFile())
-                .artistName(artist.getMemberName())
-                .artistMemberNo(artist.getMemberNo())
-                .projectGenre(project.getProjectGenre())
-                .platform(project.getPlatform())
-                .projectCycle(project.getProjectCycle())
-                .projectStartedAt(project.getProjectStartedAt())
-                .build();
+        List<ProjectMember> list = projectMemberRepository.findByProject_ProjectNo(projectNo);
+        return list.stream().map(this::toProjectMemberResponse).collect(Collectors.toList());
     }
 
     @Override
     @Transactional
     public void addProjectMembers(Long projectNo, List<Long> memberNos) {
-        if (memberNos == null || memberNos.isEmpty()) {
-            return;
-        }
         Project project = projectRepository.findById(projectNo)
-                .orElseThrow(() -> new ProjectNotFoundException("프로젝트를 찾을 수 없습니다."));
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        String projectName = project.getProjectName() != null ? project.getProjectName() : "프로젝트";
         for (Long memberNo : memberNos) {
-            if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) {
-                continue;
-            }
+            if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) continue;
             Member member = memberRepository.findById(memberNo)
-                    .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다. memberNo=" + memberNo));
-            ProjectMember pm = ProjectMember.builder()
-                    .project(project)
-                    .member(member)
-                    .projectMemberRole(ROLE_ASSISTANT)
-                    .build();
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + memberNo));
+            ProjectMember pm = new ProjectMember();
+            pm.setMember(member);
+            pm.setProject(project);
+            pm.setProjectMemberRole("어시스트");
             projectMemberRepository.save(pm);
+            // 추가된 멤버에게만 알림 저장 (NOTIFICATION_TYPE은 VARCHAR(10))
+            try {
+                notificationService.createNotification(
+                    memberNo,
+                    "프로젝트 추가",
+                    projectName + " 프로젝트에 추가되었습니다.",
+                    "PROJ_ADD"
+                );
+            } catch (Exception e) {
+                log.error("팀원 추가 알림 저장 실패 memberNo={}, projectName={} - 원인: {}", memberNo, projectName, e.getMessage(), e);
+            }
         }
+    }
+
+    @Override
+    @Transactional
+    public void removeProjectMember(Long projectNo, Long projectMemberNo) {
+        ProjectMember pm = projectMemberRepository.findById(projectMemberNo)
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트 멤버를 찾을 수 없습니다: " + projectMemberNo));
+        if (!pm.getProject().getProjectNo().equals(projectNo)) {
+            throw new IllegalArgumentException("해당 프로젝트의 멤버가 아닙니다.");
+        }
+        Long memberNo = pm.getMember().getMemberNo();
+        String projectName = pm.getProject().getProjectName() != null ? pm.getProject().getProjectName() : "프로젝트";
+        projectMemberRepository.delete(pm);
+        // 제외된 멤버에게만 알림 저장 (NOTIFICATION_TYPE VARCHAR(10) 이하로)
+        try {
+            notificationService.createNotification(
+                memberNo,
+                "프로젝트 제외",
+                projectName + " 프로젝트에서 제외되었습니다.",
+                "PROJ_REM"
+            );
+        } catch (Exception e) {
+            log.error("팀원 제외 알림 저장 실패 memberNo={}, projectName={} - 원인: {}", memberNo, projectName, e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<ProjectMemberResponse> getAddableMembers(Long projectNo) {
+        Project project = projectRepository.findById(projectNo)
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        List<ProjectMember> existing = projectMemberRepository.findByProject_ProjectNo(projectNo);
+        if (existing.isEmpty()) return List.of();
+        Long agencyNo = existing.get(0).getMember().getAgency().getAgencyNo();
+        Set<Long> existingMemberNos = existing.stream().map(pm -> pm.getMember().getMemberNo()).collect(Collectors.toSet());
+        List<String> excludeRoles = List.of("담당자", "웹툰 작가", "웹소설 작가", "에이전시 관리자");
+        return memberRepository.findByAgency_AgencyNo(agencyNo).stream()
+            .filter(m -> !existingMemberNos.contains(m.getMemberNo()))
+            .filter(m -> !excludeRoles.contains(m.getMemberRole()))
+            .map(m -> ProjectMemberResponse.builder()
+                .memberNo(m.getMemberNo())
+                .memberName(m.getMemberName())
+                .memberEmail(m.getMemberEmail())
+                .memberPhone(m.getMemberPhone())
+                .memberRole(m.getMemberRole())
+                .memberProfileImage(m.getMemberProfileImage())
+                .memberStatus(m.getMemberStatus())
+                .projectMemberRole(null)
+                .build())
+            .collect(Collectors.toList());
+    }
+
+    private ProjectListResponse toProjectListResponse(Project project, List<ProjectMember> members) {
+        String artistName = null;
+        Long artistMemberNo = null;
+        String managerName = null;
+        Long managerMemberNo = null;
+        for (ProjectMember pm : members) {
+            if ("작가".equals(pm.getProjectMemberRole())) {
+                artistName = pm.getMember().getMemberName();
+                artistMemberNo = pm.getMember().getMemberNo();
+            } else if ("담당자".equals(pm.getProjectMemberRole()) && managerName == null) {
+                managerName = pm.getMember().getMemberName();
+                managerMemberNo = pm.getMember().getMemberNo();
+            }
+        }
+        return ProjectListResponse.builder()
+            .projectNo(project.getProjectNo())
+            .projectName(project.getProjectName())
+            .projectStatus(project.getProjectStatus())
+            .projectColor(project.getProjectColor())
+            .thumbnailFile(project.getThumbnailFile())
+            .artistName(artistName)
+            .artistMemberNo(artistMemberNo)
+            .projectGenre(null)
+            .platform(project.getPlatform())
+            .projectCycle(project.getProjectCycle())
+            .projectStartedAt(project.getProjectStartedAt())
+            .managerName(managerName)
+            .managerMemberNo(managerMemberNo)
+            .build();
+    }
+
+    private ProjectMemberResponse toProjectMemberResponse(ProjectMember pm) {
+        Member m = pm.getMember();
+        return ProjectMemberResponse.builder()
+            .projectMemberNo(pm.getProjectMemberNo())
+            .memberNo(m.getMemberNo())
+            .memberName(m.getMemberName())
+            .memberEmail(m.getMemberEmail())
+            .memberPhone(m.getMemberPhone())
+            .projectMemberRole(pm.getProjectMemberRole())
+            .memberRole(m.getMemberRole())
+            .memberProfileImage(m.getMemberProfileImage())
+            .memberStatus(m.getMemberStatus())
+            .build();
     }
 }

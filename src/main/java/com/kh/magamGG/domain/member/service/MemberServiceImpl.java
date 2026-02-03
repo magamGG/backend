@@ -608,6 +608,14 @@ public class MemberServiceImpl implements MemberService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<MemberResponse> getAssignedArtistsByMemberNo(Long memberNo) {
+        return managerRepository.findByMember_MemberNo(memberNo)
+            .map(manager -> getArtistsByManagerNo(manager.getManagerNo()))
+            .orElse(List.of());
+    }
+
     /**
      * 담당자(manager_no)에게 배정된 작가(ARTIST_ASSIGNMENT.ARTIST_MEMBER_NO) 중,
      * 오늘 ATTENDANCE 마지막 이력이 '출근'인 사람만 반환. (로그인한 담당자 본인 출근 여부는 조회하지 않음)
