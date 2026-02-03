@@ -3,6 +3,13 @@ package com.kh.magamGG.domain.agency.controller;
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.RejectJoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.UpdateAgencyLeaveRequest;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
+
+import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
+import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
