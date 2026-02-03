@@ -1,7 +1,7 @@
 package com.kh.magamGG.domain.agency.service;
 
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
-import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
+import com.kh.magamGG.domain.agency.dto.response.*;
 import com.kh.magamGG.domain.agency.entity.Agency;
 
 import java.util.List;
@@ -31,4 +31,10 @@ public interface AgencyService {
      * 에이전시 기본 연차(agencyLeave) 수정
      */
     void updateAgencyLeave(Long agencyNo, Integer agencyLeave);
+
+    DashboardMetricsResponse getDashboardMetrics(Long agencyNo);
+    ComplianceTrendResponse getComplianceTrend(Long agencyNo);
+    ArtistDistributionResponse getArtistDistribution(Long agencyNo);
+    AttendanceDistributionResponse getAttendanceDistribution(Long agencyNo);
+    HealthDistributionResponse getHealthDistribution(Long agencyNo);
 }

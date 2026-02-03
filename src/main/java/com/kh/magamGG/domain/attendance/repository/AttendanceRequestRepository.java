@@ -12,6 +12,22 @@ import java.util.List;
 public interface AttendanceRequestRepository extends JpaRepository<AttendanceRequest, Long> {
 
     /**
+     * 에이전시 소속 회원 중 오늘 날짜가 포함된 승인된 근태 신청 조회 (금일 출석 분포용)
+     * startDate~endDate 사이에 today가 포함된 APPROVED 건
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "WHERE m.agency.agencyNo = :agencyNo " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "AND ar.attendanceRequestStartDate <= :todayEnd " +
+           "AND ar.attendanceRequestEndDate >= :todayStart " +
+           "ORDER BY ar.attendanceRequestStartDate DESC")
+    List<AttendanceRequest> findApprovedByAgencyNoAndDateBetween(
+            @Param("agencyNo") Long agencyNo,
+            @Param("todayStart") java.time.LocalDateTime todayStart,
+            @Param("todayEnd") java.time.LocalDateTime todayEnd);
+
+    /**
      * 특정 회원의 근태 신청 목록을 최신순으로 조회 (N+1 방지를 위한 JOIN FETCH)
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
