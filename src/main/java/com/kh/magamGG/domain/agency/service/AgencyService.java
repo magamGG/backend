@@ -1,7 +1,12 @@
 package com.kh.magamGG.domain.agency.service;
 
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
-import com.kh.magamGG.domain.agency.dto.response.*;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
+import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
+import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 
 import java.util.List;
@@ -32,9 +37,28 @@ public interface AgencyService {
      */
     void updateAgencyLeave(Long agencyNo, Integer agencyLeave);
 
-    DashboardMetricsResponse getDashboardMetrics(Long agencyNo);
+    /**
+     * 에이전시 대시보드 메트릭 조회 (평균 마감 준수율, 활동 작가, 진행 프로젝트)
+     */
+    AgencyDashboardMetricsResponse getDashboardMetrics(Long agencyNo);
+
+    /**
+     * 평균 마감 준수율 추이 (월별 + 전월 대비)
+     */
     ComplianceTrendResponse getComplianceTrend(Long agencyNo);
+
+    /**
+     * 작품별 아티스트 분포도
+     */
     ArtistDistributionResponse getArtistDistribution(Long agencyNo);
+
+    /**
+     * 금일 출석 현황 (출근, 재택근무, 휴가, 워케이션, 미출석)
+     */
     AttendanceDistributionResponse getAttendanceDistribution(Long agencyNo);
+
+    /**
+     * 건강 인원 분포 (위험, 주의, 정상)
+     */
     HealthDistributionResponse getHealthDistribution(Long agencyNo);
 }

@@ -7,20 +7,25 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * 에이전시 대시보드 - 건강 인원 분포 응답
+ */
 @Getter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class HealthDistributionResponse {
-    private List<DistributionItem> distribution;
+
+    /** 건강 등급별 인원 [{ name, value, color }, ...] */
+    private List<HealthItem> distribution;
 
     @Getter
-    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class DistributionItem {
+    @Builder
+    public static class HealthItem {
         private String name;
-        private Integer value;
+        private Long value;
         private String color;
     }
 }

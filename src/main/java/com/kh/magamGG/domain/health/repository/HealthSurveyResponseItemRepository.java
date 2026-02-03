@@ -24,7 +24,19 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
         @Param("memberNo") Long memberNo,
         @Param("healthSurveyNo") Long healthSurveyNo
     );
-
+    
+    /**
+     * 특정 회원이 특정 HEALTH_SURVEY_QUESTION_TYPE에 대해 응답했는지 확인
+     * (설문 타입은 HEALTH_SURVEY_QUESTION_TYPE 기준)
+     */
+    @Query("SELECT i FROM HealthSurveyResponseItem i " +
+           "WHERE i.member.memberNo = :memberNo " +
+           "AND i.healthSurveyQuestion.healthSurveyQuestionType = :healthSurveyQuestionType")
+    List<HealthSurveyResponseItem> findByMemberNoAndHealthSurveyType(
+        @Param("memberNo") Long memberNo,
+        @Param("healthSurveyQuestionType") String healthSurveyQuestionType
+    );
+    
     /**
      * 특정 회원의 특정 설문 응답 생성일 조회 (가장 최근 것)
      * CREATED_AT의 유무로 검진 완료 여부 판단
@@ -37,5 +49,16 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
         @Param("memberNo") Long memberNo,
         @Param("healthSurveyNo") Long healthSurveyNo
     );
+
+    /**
+     * 에이전시 소속 회원들의 건강 설문 응답 항목 조회 (최신 응답 산출용)
+     */
+    @Query("SELECT i FROM HealthSurveyResponseItem i " +
+           "JOIN FETCH i.healthSurveyQuestion q " +
+           "JOIN FETCH q.healthSurvey s " +
+           "JOIN i.member m " +
+           "WHERE m.agency.agencyNo = :agencyNo " +
+           "ORDER BY i.healthSurveyQuestionItemCreatedAt DESC")
+    List<HealthSurveyResponseItem> findByAgencyNoWithSurvey(@Param("agencyNo") Long agencyNo);
 }
 

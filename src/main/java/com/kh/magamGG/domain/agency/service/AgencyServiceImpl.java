@@ -1,7 +1,12 @@
 package com.kh.magamGG.domain.agency.service;
 
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
-import com.kh.magamGG.domain.agency.dto.response.*;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
+import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
+import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.mapper.AgencyMapper;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
@@ -20,6 +25,12 @@ import com.kh.magamGG.domain.member.repository.NewRequestRepository;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
+import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
+import com.kh.magamGG.domain.health.entity.HealthSurveyResponseItem;
+import com.kh.magamGG.domain.health.repository.HealthSurveyResponseItemRepository;
+import com.kh.magamGG.domain.health.service.HealthSurveyService;
+import com.kh.magamGG.domain.project.entity.KanbanCard;
+import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import com.kh.magamGG.global.exception.NewRequestNotFoundException;
@@ -31,8 +42,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -53,9 +66,12 @@ public class AgencyServiceImpl implements AgencyService {
     private final ManagerRepository managerRepository;
     private final LeaveBalanceRepository leaveBalanceRepository;
     private final ProjectRepository projectRepository;
+    private final KanbanCardRepository kanbanCardRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final AttendanceRepository attendanceRepository;
     private final AttendanceRequestRepository attendanceRequestRepository;
+    private final HealthSurveyResponseItemRepository healthSurveyResponseItemRepository;
+    private final HealthSurveyService healthSurveyService;
 
     @Override
     @Transactional
@@ -321,45 +337,115 @@ public class AgencyServiceImpl implements AgencyService {
         List<Member> members = memberRepository.findByAgency_AgencyNo(agencyNo);
         for (Member member : members) {
             leaveBalanceRepository.findByMember_MemberNoAndLeaveBalanceYear(member.getMemberNo(), currentYear)
-                    .ifPresent(balance -> {
-                        balance.setLeaveBalanceTotalDays(agencyLeave);
-                        int used = balance.getLeaveBalanceUsedDays() != null ? balance.getLeaveBalanceUsedDays() : 0;
-                        double newRemain = agencyLeave - used;
-                        balance.setLeaveBalanceRemainDays(newRemain >= 0 ? newRemain : 0.0);
-                        balance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
-                        leaveBalanceRepository.save(balance);
-                        log.info("LeaveBalance 갱신: 회원번호={}, totalDays={}, remainDays={}", member.getMemberNo(), agencyLeave, balance.getLeaveBalanceRemainDays());
-                    });
+            .ifPresent(balance -> {
+                balance.setLeaveBalanceTotalDays(agencyLeave);
+                int used = balance.getLeaveBalanceUsedDays() != null ? balance.getLeaveBalanceUsedDays() : 0;
+                double newRemain = agencyLeave - used;
+                balance.setLeaveBalanceRemainDays(newRemain >= 0 ? newRemain : 0.0);
+                balance.setLeaveBalanceUpdatedAt(LocalDateTime.now());
+                leaveBalanceRepository.save(balance);
+                log.info("LeaveBalance 갱신: 회원번호={}, totalDays={}, remainDays={}", member.getMemberNo(), agencyLeave, balance.getLeaveBalanceRemainDays());
+            });
         }
     }
 
     @Override
-    public DashboardMetricsResponse getDashboardMetrics(Long agencyNo) {
+    public AgencyDashboardMetricsResponse getDashboardMetrics(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
-        int artistCount = 0;
-        int projectCount = 0;
-        try {
-            artistCount = memberRepository.findArtistsByAgencyNo(agencyNo).size();
-            projectCount = (int) projectRepository.count();
-        } catch (Exception e) {
-            log.warn("대시보드 메트릭 조회 중 일부 데이터 누락: {}", e.getMessage());
+
+        // 활동 작가: 에이전시 소속 웹툰/웹소설 작가 (ACTIVE 또는 status 미설정)
+        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
+        long activeArtistCount = artists.stream()
+                .filter(m -> m.getMemberStatus() == null || "ACTIVE".equals(m.getMemberStatus()))
+                .count();
+
+        // 진행 프로젝트: 에이전시 소속 회원이 참여한 연재 중 프로젝트
+        long activeProjectCount = projectRepository.findActiveProjectsByAgencyNo(agencyNo).size();
+
+        // 평균 마감 준수율: 에이전시 프로젝트의 KANBAN_CARD 기준
+        List<com.kh.magamGG.domain.project.entity.Project> allAgencyProjects =
+                projectRepository.findAllProjectsByAgencyNo(agencyNo);
+
+        LocalDate today = LocalDate.now();
+        long totalPastDeadline = 0;
+        long completedOnTime = 0;
+        for (var project : allAgencyProjects) {
+            List<KanbanCard> cards = kanbanCardRepository.findByProjectNo(project.getProjectNo());
+            for (KanbanCard card : cards) {
+                if (card.getKanbanCardEndedAt() == null) continue;
+                if (card.getKanbanCardEndedAt().isAfter(today)) continue;
+                totalPastDeadline++;
+                if ("Y".equals(card.getKanbanCardStatus())) {
+                    completedOnTime++;
+                }
+            }
         }
-        return DashboardMetricsResponse.builder()
-                .averageDeadlineComplianceRate(0)
-                .activeArtistCount(artistCount)
-                .activeProjectCount(projectCount)
-                .complianceRateChange("-")
-                .activeArtistChange("-")
-                .activeProjectChange("-")
+        double complianceRate = totalPastDeadline > 0
+                ? (completedOnTime * 100.0 / totalPastDeadline)
+                : 100.0;
+
+        return AgencyDashboardMetricsResponse.builder()
+                .averageDeadlineComplianceRate(Math.round(complianceRate * 10) / 10.0)
+                .activeArtistCount(activeArtistCount)
+                .activeProjectCount(activeProjectCount)
+                .complianceRateChange(null)
+                .activeArtistChange(null)
+                .activeProjectChange(null)
                 .build();
     }
 
     @Override
     public ComplianceTrendResponse getComplianceTrend(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
+
+        List<com.kh.magamGG.domain.project.entity.Project> projects =
+                projectRepository.findAllProjectsByAgencyNo(agencyNo);
+
+        LocalDate today = LocalDate.now();
+        YearMonth now = YearMonth.from(today);
+        int monthsCount = 6;
+
+        Map<YearMonth, long[]> monthStats = new LinkedHashMap<>();
+        for (int i = monthsCount - 1; i >= 0; i--) {
+            monthStats.put(now.minusMonths(i), new long[]{0, 0});
+        }
+
+        for (var project : projects) {
+            List<KanbanCard> cards = kanbanCardRepository.findByProjectNo(project.getProjectNo());
+            for (KanbanCard card : cards) {
+                if (card.getKanbanCardEndedAt() == null) continue;
+                YearMonth cardMonth = YearMonth.from(card.getKanbanCardEndedAt());
+                if (!monthStats.containsKey(cardMonth)) continue;
+                if (card.getKanbanCardEndedAt().isAfter(today)) continue;
+
+                long[] stats = monthStats.get(cardMonth);
+                stats[0]++;
+                if ("Y".equals(card.getKanbanCardStatus())) {
+                    stats[1]++;
+                }
+            }
+        }
+
+        List<ComplianceTrendResponse.ComplianceMonthItem> trend = new ArrayList<>();
+        Double monthOverMonthChange = null;
+        Double prevRate = null;
+
+        for (Map.Entry<YearMonth, long[]> e : monthStats.entrySet()) {
+            long total = e.getValue()[0];
+            long completed = e.getValue()[1];
+            double rate = total > 0 ? Math.round((completed * 100.0 / total) * 10) / 10.0 : 100.0;
+            String monthLabel = e.getKey().getMonthValue() + "월";
+            trend.add(new ComplianceTrendResponse.ComplianceMonthItem(monthLabel, rate));
+
+            if (prevRate != null) {
+                monthOverMonthChange = Math.round((rate - prevRate) * 10) / 10.0;
+            }
+            prevRate = rate;
+        }
+
         return ComplianceTrendResponse.builder()
-                .trend(Collections.emptyList())
-                .monthOverMonthChange(null)
+                .trend(trend)
+                .monthOverMonthChange(monthOverMonthChange)
                 .build();
     }
 
@@ -384,14 +470,14 @@ public class AgencyServiceImpl implements AgencyService {
                     .maxArtistProjectName(null)
                     .build();
         }
-        List<ArtistDistributionResponse.DistributionItem> distribution = new ArrayList<>();
+        List<ArtistDistributionResponse.ArtistDistributionItem> distribution = new ArrayList<>();
         String maxArtistProjectName = null;
-        int maxArtists = 0;
+        long maxArtists = 0;
         for (Object[] row : rows) {
             String projectName = row[0] != null ? String.valueOf(row[0]) : "-";
             Number count = row[1] instanceof Number ? (Number) row[1] : null;
-            int artistsCount = count != null ? count.intValue() : 0;
-            distribution.add(ArtistDistributionResponse.DistributionItem.builder()
+            long artistsCount = count != null ? count.longValue() : 0L;
+            distribution.add(ArtistDistributionResponse.ArtistDistributionItem.builder()
                     .name(projectName)
                     .artists(artistsCount)
                     .build());
@@ -515,9 +601,9 @@ public class AgencyServiceImpl implements AgencyService {
         displayColors.put("워케이션", "#9C27B0");
         displayColors.put("미출석", "#EF4444");
 
-        List<AttendanceDistributionResponse.DistributionItem> list = new ArrayList<>();
+        List<AttendanceDistributionResponse.AttendanceItem> list = new ArrayList<>();
         for (String displayName : List.of("출근", "재택근무", "휴가", "워케이션", "미출석")) {
-            int value;  
+            int value;
             switch (displayName) {
                 case "출근": value = countOffice; break;
                 case "재택근무": value = countRemote; break;
@@ -527,9 +613,9 @@ public class AgencyServiceImpl implements AgencyService {
                 default: value = 0;
             }
             String color = displayColors.getOrDefault(displayName, "#94a3b8");
-            list.add(AttendanceDistributionResponse.DistributionItem.builder()
+            list.add(AttendanceDistributionResponse.AttendanceItem.builder()
                     .name(displayName)
-                    .value(value)
+                    .value((long) value)
                     .color(color)
                     .build());
         }
@@ -539,10 +625,45 @@ public class AgencyServiceImpl implements AgencyService {
     @Override
     public HealthDistributionResponse getHealthDistribution(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
-        List<HealthDistributionResponse.DistributionItem> list = new ArrayList<>();
-        list.add(HealthDistributionResponse.DistributionItem.builder().name("위험").value(0).color("#EF4444").build());
-        list.add(HealthDistributionResponse.DistributionItem.builder().name("주의").value(0).color("#FF9800").build());
-        list.add(HealthDistributionResponse.DistributionItem.builder().name("정상").value(0).color("#10B981").build());
-        return HealthDistributionResponse.builder().distribution(list).build();
+
+        List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository.findByAgencyNoWithSurvey(agencyNo);
+        Map<Long, HealthSurveyResponseItem> latestByMember = new LinkedHashMap<>();
+        for (HealthSurveyResponseItem item : items) {
+            Long memberNo = item.getMember().getMemberNo();
+            if (!latestByMember.containsKey(memberNo)) {
+                latestByMember.put(memberNo, item);
+            }
+        }
+
+        long dangerCount = 0;
+        long cautionCount = 0;
+        long normalCount = 0;
+
+        for (HealthSurveyResponseItem item : latestByMember.values()) {
+            String surveyType = item.getHealthSurveyQuestion().getHealthSurveyQuestionType();
+            int score = item.getHealthSurveyQuestionItemAnswerScore();
+            String level;
+            try {
+                level = healthSurveyService.evaluateRiskLevel(surveyType, score);
+            } catch (Exception e) {
+                level = HealthSurveyRiskLevelDto.NORMAL;
+            }
+            if (HealthSurveyRiskLevelDto.DANGER.equals(level)) {
+                dangerCount++;
+            } else if (HealthSurveyRiskLevelDto.WARNING.equals(level) || HealthSurveyRiskLevelDto.CAUTION.equals(level)) {
+                cautionCount++;
+            } else {
+                normalCount++;
+            }
+        }
+
+        List<HealthDistributionResponse.HealthItem> distribution = new ArrayList<>();
+        distribution.add(HealthDistributionResponse.HealthItem.builder().name("위험").value(dangerCount).color("#EF4444").build());
+        distribution.add(HealthDistributionResponse.HealthItem.builder().name("주의").value(cautionCount).color("#FF9800").build());
+        distribution.add(HealthDistributionResponse.HealthItem.builder().name("정상").value(normalCount).color("#10B981").build());
+
+        return HealthDistributionResponse.builder()
+                .distribution(distribution)
+                .build();
     }
 }

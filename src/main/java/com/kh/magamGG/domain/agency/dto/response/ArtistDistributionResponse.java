@@ -7,20 +7,27 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 
+/**
+ * 에이전시 대시보드 - 작품별 아티스트 분포 응답
+ */
 @Getter
-@Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class ArtistDistributionResponse {
-    private List<DistributionItem> distribution;
+
+    /** 작품(프로젝트)별 아티스트 수 [{ name: "로맨스 판타지", artists: 5 }, ...] */
+    private List<ArtistDistributionItem> distribution;
+
+    /** 가장 많은 아티스트가 배정된 작품명 (하단 안내 문구용) */
     private String maxArtistProjectName;
 
     @Getter
-    @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class DistributionItem {
+    @Builder
+    public static class ArtistDistributionItem {
         private String name;
-        private Integer artists;
+        private Long artists;
     }
 }

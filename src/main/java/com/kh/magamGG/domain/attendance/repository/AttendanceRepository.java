@@ -42,6 +42,18 @@ public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 		@Param("memberNo") Long memberNo,
 		@Param("today") java.time.LocalDate today
 	);
+
+	/**
+	 * 에이전시별 특정 날짜 출근(체크인)한 회원 번호 목록 조회
+	 */
+	@Query("SELECT DISTINCT a.member.memberNo FROM Attendance a " +
+		   "WHERE a.agency.agencyNo = :agencyNo " +
+		   "AND DATE(a.attendanceTime) = :date " +
+		   "AND a.attendanceType = '출근'")
+	List<Long> findMemberNosCheckedInByAgencyAndDate(
+		@Param("agencyNo") Long agencyNo,
+		@Param("date") LocalDate date
+	);
 }
 
 

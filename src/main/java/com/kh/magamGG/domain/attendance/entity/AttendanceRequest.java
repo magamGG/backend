@@ -76,4 +76,27 @@ public class AttendanceRequest {
 		this.attendanceRequestRejectReason = rejectReason;
 		this.attendanceRequestUpdatedAt = LocalDateTime.now();
 	}
+
+	/**
+	 * 근태 신청 취소 처리 (신청자가 대기/반려 상태에서 취소)
+	 */
+	public void cancel() {
+		this.attendanceRequestStatus = "CANCELLED";
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
+
+	/**
+	 * 근태 신청 수정 (PENDING 상태에서만)
+	 */
+	public void update(String requestType, LocalDateTime startDate, LocalDateTime endDate, Integer usingDays,
+			String reason, String workcationLocation, String medicalFileUrl) {
+		this.attendanceRequestType = requestType != null ? requestType : this.attendanceRequestType;
+		this.attendanceRequestStartDate = startDate;
+		this.attendanceRequestEndDate = endDate;
+		this.attendanceRequestUsingDays = usingDays;
+		this.attendanceRequestReason = reason;
+		this.workcationLocation = workcationLocation != null ? workcationLocation : "";
+		this.medicalFileUrl = medicalFileUrl != null ? medicalFileUrl : "";
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
 }

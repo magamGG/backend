@@ -84,6 +84,23 @@ public interface AttendanceService {
     AttendanceRequestResponse rejectAttendanceRequest(Long attendanceRequestNo, String rejectReason);
 
     /**
+     * 근태 신청 취소 (신청자 본인만, PENDING/REJECTED 상태에서만)
+     * @param attendanceRequestNo 근태 신청 번호
+     * @param memberNo 회원 번호 (본인 확인)
+     * @return 취소된 근태 신청 정보
+     */
+    AttendanceRequestResponse cancelAttendanceRequest(Long attendanceRequestNo, Long memberNo);
+
+    /**
+     * 근태 신청 수정 (신청자 본인만, PENDING 상태에서만)
+     * @param attendanceRequestNo 근태 신청 번호
+     * @param request 수정할 근태 신청 정보
+     * @param memberNo 회원 번호 (본인 확인)
+     * @return 수정된 근태 신청 정보
+     */
+    AttendanceRequestResponse updateAttendanceRequest(Long attendanceRequestNo, AttendanceRequestCreateRequest request, Long memberNo);
+
+    /**
      * 에이전시 소속 회원들의 연차 변경 이력(leaveHistory) 조회
      * @param agencyNo 에이전시 번호
      * @return 연차 변경 이력 목록
@@ -133,6 +150,13 @@ public interface AttendanceService {
      * @return 퇴근 기록 생성 여부
      */
     boolean endAttendance(Long memberNo);
+
+    /**
+     * 담당자의 담당 작가들 금주 근태 예정 (이번 주 월~일과 겹치는 근태 신청)
+     * @param memberNo 로그인한 담당자 회원 번호
+     * @return 담당 작가별 근태 신청 목록 (PENDING/APPROVED/REJECTED, CANCELLED 제외)
+     */
+    List<AttendanceRequestResponse> getWeeklyAttendanceByManager(Long memberNo);
 }
 
 
