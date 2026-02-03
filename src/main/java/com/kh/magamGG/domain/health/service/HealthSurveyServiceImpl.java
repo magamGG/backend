@@ -41,9 +41,20 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
     }
 
     @Override
-    public List<HealthSurveyQuestionResponse> getQuestionsByAgencyNo(Long agencyNo) {
-        HealthSurvey survey = healthSurveyRepository.findByAgency_AgencyNo(agencyNo)
-            .orElseThrow(() -> new IllegalArgumentException("해당 에이전시의 설문을 찾을 수 없습니다: agencyNo=" + agencyNo));
+    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(String healthSurveyType) {
+        List<HealthSurveyQuestion> questions =
+            healthSurveyQuestionRepository.findByHealthSurvey_HealthSurveyTypeOrderByHealthSurveyOrderAsc(healthSurveyType);
+
+        return questions.stream()
+            .map(this::toDto)
+            .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyName(String healthSurveyName) {
+        HealthSurvey survey = healthSurveyRepository.findByHealthSurveyName(healthSurveyName)
+            .orElseThrow(() -> new IllegalArgumentException("설문을 찾을 수 없습니다: " + healthSurveyName));
+
         return getQuestionsBySurveyNo(survey.getHealthSurveyNo());
     }
 
