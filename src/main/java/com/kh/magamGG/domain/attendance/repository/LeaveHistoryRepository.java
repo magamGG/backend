@@ -19,4 +19,13 @@ public interface LeaveHistoryRepository extends JpaRepository<LeaveHistory, Long
            "WHERE m.agency.agencyNo = :agencyNo " +
            "ORDER BY lh.leaveHistoryDate DESC")
     List<LeaveHistory> findByAgencyNoWithMember(@Param("agencyNo") Long agencyNo);
+
+    /**
+     * 에이전시·연도별 회원 연차 조정 합계 (leave_history.leaveHistoryAmount 합계)
+     * 직원 연차 관리 '조정' 컬럼용
+     */
+    @Query("SELECT lh.member.memberNo, COALESCE(SUM(lh.leaveHistoryAmount), 0) FROM LeaveHistory lh " +
+           "WHERE lh.member.agency.agencyNo = :agencyNo AND FUNCTION('YEAR', lh.leaveHistoryDate) = :year " +
+           "GROUP BY lh.member.memberNo")
+    List<Object[]> sumAdjustmentByAgencyNoAndYear(@Param("agencyNo") Long agencyNo, @Param("year") int year);
 }
