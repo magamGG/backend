@@ -56,4 +56,12 @@ public class Project {
 	@OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
 	@Builder.Default
 	private List<KanbanBoard> kanbanBoards = new ArrayList<>();
+
+	public void setProjectName(String projectName) { this.projectName = projectName; }
+	public void setProjectStatus(String projectStatus) { this.projectStatus = projectStatus; }
+	public void setProjectColor(String projectColor) { this.projectColor = projectColor; }
+	public void setProjectCycle(Integer projectCycle) { this.projectCycle = projectCycle; }
+	public void setPlatform(String platform) { this.platform = platform; }
+	public void setThumbnailFile(String thumbnailFile) { this.thumbnailFile = thumbnailFile; }
+	public void setProjectStartedAt(java.time.LocalDateTime projectStartedAt) { this.projectStartedAt = projectStartedAt; }
 }

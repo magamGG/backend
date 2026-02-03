@@ -20,7 +20,9 @@ import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
 import com.kh.magamGG.domain.attendance.entity.Attendance;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
+import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.health.repository.DailyHealthCheckRepository;
+import com.kh.magamGG.domain.health.repository.HealthSurveyRepository;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
@@ -64,6 +66,7 @@ public class MemberServiceImpl implements MemberService {
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final NotificationService notificationService;
     private final AttendanceRepository attendanceRepository;
+    private final HealthSurveyRepository healthSurveyRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -93,6 +96,9 @@ public class MemberServiceImpl implements MemberService {
                 .agencyLeave(15) // 기본 연차 15일
                 .build();
             agency = agencyRepository.save(agency);
+
+            // 에이전시 생성 시 해당 에이전시용 HEALTH_SURVEY 4종 생성 (설문기간·주기 디폴트: 15일, 30일)
+            createDefaultHealthSurveysForAgency(agency);
         } else if (request.getAgencyCode() != null && !request.getAgencyCode().trim().isEmpty()) {
             // 담당자인 경우: 에이전시 코드로 기존 에이전시 찾기
             agency = agencyService.getAgencyByCode(request.getAgencyCode());
@@ -673,6 +679,27 @@ public class MemberServiceImpl implements MemberService {
 
     private MemberResponse convertToResponse(Member member) {
         return convertToResponseWithManagerNo(member, null, null);
+    }
+
+    /**
+     * 에이전시 생성 시 해당 에이전시에 연결된 HEALTH_SURVEY 1건 생성.
+     * HEALTH_SURVEY_PERIOD 15일, HEALTH_SURVEY_CYCLE 30일 디폴트 적용.
+     */
+    private void createDefaultHealthSurveysForAgency(Agency agency) {
+        int defaultPeriod = 15;
+        int defaultCycle = 30;
+
+        LocalDateTime now = LocalDateTime.now();
+        HealthSurvey survey = HealthSurvey.builder()
+            .agency(agency)
+            .healthSurveyPeriod(defaultPeriod)
+            .healthSurveyCycle(defaultCycle)
+            .healthSurveyCreatedAt(now)
+            .healthSurveyUpdatedAt(now)
+            .build();
+        healthSurveyRepository.save(survey);
+        log.info("에이전시 HEALTH_SURVEY 생성 완료: agencyNo={}, healthSurveyNo={}, period={}, cycle={}",
+            agency.getAgencyNo(), survey.getHealthSurveyNo(), defaultPeriod, defaultCycle);
     }
 
     /**

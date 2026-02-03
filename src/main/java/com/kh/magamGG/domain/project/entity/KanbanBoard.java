@@ -40,4 +40,9 @@ public class KanbanBoard {
 	@Builder.Default
 	@OneToMany(mappedBy = "kanbanBoard", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<KanbanCard> kanbanCards = new ArrayList<>();
+
+	public void setProject(Project project) { this.project = project; }
+	public void setKanbanBoardName(String kanbanBoardName) { this.kanbanBoardName = kanbanBoardName; }
+	public void setKanbanBoardOrder(Integer kanbanBoardOrder) { this.kanbanBoardOrder = kanbanBoardOrder; }
+	public void setKanbanBoardStatus(String kanbanBoardStatus) { this.kanbanBoardStatus = kanbanBoardStatus; }
 }

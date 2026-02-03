@@ -2,7 +2,10 @@ package com.kh.magamGG.domain.project.service;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+<<<<<<< HEAD
 import com.kh.magamGG.domain.notification.service.NotificationService;
+=======
+>>>>>>> origin/develop/0202
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
@@ -12,7 +15,10 @@ import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
+<<<<<<< HEAD
 import lombok.extern.slf4j.Slf4j;
+=======
+>>>>>>> origin/develop/0202
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,13 +31,19 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+<<<<<<< HEAD
 @Slf4j
+=======
+>>>>>>> origin/develop/0202
 public class ProjectServiceImpl implements ProjectService {
 
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final MemberRepository memberRepository;
+<<<<<<< HEAD
     private final NotificationService notificationService;
+=======
+>>>>>>> origin/develop/0202
 
     @Override
     public List<ProjectListResponse> getProjectsByMemberNo(Long memberNo) {
@@ -50,6 +62,7 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+<<<<<<< HEAD
     public List<ProjectListResponse> getProjectsByAgencyNo(Long agencyNo, Long requesterMemberNo) {
         Member requester = memberRepository.findById(requesterMemberNo)
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
@@ -71,6 +84,8 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+=======
+>>>>>>> origin/develop/0202
     @Transactional
     public ProjectListResponse createProject(ProjectCreateRequest request, Long creatorNo) {
         Project project = new Project();
@@ -107,6 +122,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public void ensureProjectAccess(Long memberNo, Long projectNo) {
+<<<<<<< HEAD
         if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) {
             return;
         }
@@ -124,6 +140,12 @@ public class ProjectServiceImpl implements ProjectService {
             }
         }
         throw new IllegalArgumentException("해당 프로젝트에 대한 접근 권한이 없습니다.");
+=======
+        boolean exists = projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo);
+        if (!exists) {
+            throw new IllegalArgumentException("해당 프로젝트에 대한 접근 권한이 없습니다.");
+        }
+>>>>>>> origin/develop/0202
     }
 
     @Override
@@ -147,6 +169,7 @@ public class ProjectServiceImpl implements ProjectService {
         if (request.getThumbnailFile() != null) project.setThumbnailFile(request.getThumbnailFile());
         if (request.getProjectStartedAt() != null) project.setProjectStartedAt(request.getProjectStartedAt());
         projectRepository.save(project);
+<<<<<<< HEAD
 
         if (request.getArtistMemberNo() != null) {
             Long newArtistNo = request.getArtistMemberNo();
@@ -178,6 +201,8 @@ public class ProjectServiceImpl implements ProjectService {
             }
         }
 
+=======
+>>>>>>> origin/develop/0202
         List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(projectNo);
         return toProjectListResponse(project, members);
     }
@@ -199,7 +224,10 @@ public class ProjectServiceImpl implements ProjectService {
     public void addProjectMembers(Long projectNo, List<Long> memberNos) {
         Project project = projectRepository.findById(projectNo)
             .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+<<<<<<< HEAD
         String projectName = project.getProjectName() != null ? project.getProjectName() : "프로젝트";
+=======
+>>>>>>> origin/develop/0202
         for (Long memberNo : memberNos) {
             if (projectMemberRepository.existsByProject_ProjectNoAndMember_MemberNo(projectNo, memberNo)) continue;
             Member member = memberRepository.findById(memberNo)
@@ -209,6 +237,7 @@ public class ProjectServiceImpl implements ProjectService {
             pm.setProject(project);
             pm.setProjectMemberRole("어시스트");
             projectMemberRepository.save(pm);
+<<<<<<< HEAD
             // 추가된 멤버에게만 알림 저장 (NOTIFICATION_TYPE은 VARCHAR(10))
             try {
                 notificationService.createNotification(
@@ -244,6 +273,8 @@ public class ProjectServiceImpl implements ProjectService {
             );
         } catch (Exception e) {
             log.error("팀원 제외 알림 저장 실패 memberNo={}, projectName={} - 원인: {}", memberNo, projectName, e.getMessage(), e);
+=======
+>>>>>>> origin/develop/0202
         }
     }
 
@@ -255,7 +286,11 @@ public class ProjectServiceImpl implements ProjectService {
         if (existing.isEmpty()) return List.of();
         Long agencyNo = existing.get(0).getMember().getAgency().getAgencyNo();
         Set<Long> existingMemberNos = existing.stream().map(pm -> pm.getMember().getMemberNo()).collect(Collectors.toSet());
+<<<<<<< HEAD
         List<String> excludeRoles = List.of("담당자", "웹툰 작가", "웹소설 작가", "에이전시 관리자");
+=======
+        List<String> excludeRoles = List.of("담당자", "웹툰 작가", "웹소설 작가");
+>>>>>>> origin/develop/0202
         return memberRepository.findByAgency_AgencyNo(agencyNo).stream()
             .filter(m -> !existingMemberNos.contains(m.getMemberNo()))
             .filter(m -> !excludeRoles.contains(m.getMemberRole()))
@@ -275,15 +310,22 @@ public class ProjectServiceImpl implements ProjectService {
     private ProjectListResponse toProjectListResponse(Project project, List<ProjectMember> members) {
         String artistName = null;
         Long artistMemberNo = null;
+<<<<<<< HEAD
         String managerName = null;
         Long managerMemberNo = null;
+=======
+>>>>>>> origin/develop/0202
         for (ProjectMember pm : members) {
             if ("작가".equals(pm.getProjectMemberRole())) {
                 artistName = pm.getMember().getMemberName();
                 artistMemberNo = pm.getMember().getMemberNo();
+<<<<<<< HEAD
             } else if ("담당자".equals(pm.getProjectMemberRole()) && managerName == null) {
                 managerName = pm.getMember().getMemberName();
                 managerMemberNo = pm.getMember().getMemberNo();
+=======
+                break;
+>>>>>>> origin/develop/0202
             }
         }
         return ProjectListResponse.builder()
@@ -298,8 +340,11 @@ public class ProjectServiceImpl implements ProjectService {
             .platform(project.getPlatform())
             .projectCycle(project.getProjectCycle())
             .projectStartedAt(project.getProjectStartedAt())
+<<<<<<< HEAD
             .managerName(managerName)
             .managerMemberNo(managerMemberNo)
+=======
+>>>>>>> origin/develop/0202
             .build();
     }
 

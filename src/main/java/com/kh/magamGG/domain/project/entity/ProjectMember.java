@@ -39,4 +39,8 @@ public class ProjectMember {
 	@OneToMany(mappedBy = "projectMember", cascade = CascadeType.ALL, orphanRemoval = true)
 	@Builder.Default
 	private List<KanbanCard> kanbanCards = new ArrayList<>();
+
+	public void setMember(Member member) { this.member = member; }
+	public void setProject(Project project) { this.project = project; }
+	public void setProjectMemberRole(String projectMemberRole) { this.projectMemberRole = projectMemberRole; }
 }

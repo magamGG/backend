@@ -4,14 +4,12 @@ import com.kh.magamGG.domain.health.dto.response.HealthSurveyQuestionResponse;
 import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
 import com.kh.magamGG.domain.health.dto.request.HealthSurveySubmitRequest;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveySubmitResponse;
-import com.kh.magamGG.domain.health.dto.request.HealthSurveyAnswerRequest;
+import com.kh.magamGG.domain.health.dto.response.HealthSurveyResponseStatusResponse;
 import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.health.entity.HealthSurveyQuestion;
-import com.kh.magamGG.domain.health.entity.HealthSurveyResponse;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponseItem;
 import com.kh.magamGG.domain.health.repository.HealthSurveyQuestionRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyRepository;
-import com.kh.magamGG.domain.health.repository.HealthSurveyResponseRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyResponseItemRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
@@ -30,7 +28,6 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
 
     private final HealthSurveyQuestionRepository healthSurveyQuestionRepository;
     private final HealthSurveyRepository healthSurveyRepository;
-    private final HealthSurveyResponseRepository healthSurveyResponseRepository;
     private final HealthSurveyResponseItemRepository healthSurveyResponseItemRepository;
     private final MemberRepository memberRepository;
 
@@ -45,23 +42,25 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
     }
 
     @Override
-    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(String healthSurveyType) {
+    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(Long agencyNo, String healthSurveyType) {
+        // AgencyNo와 타입으로 해당 에이전시의 설문 질문만 조회
         List<HealthSurveyQuestion> questions =
-            healthSurveyQuestionRepository.findByHealthSurvey_HealthSurveyTypeOrderByHealthSurveyOrderAsc(healthSurveyType);
+            healthSurveyQuestionRepository.findByHealthSurvey_Agency_AgencyNoAndHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(
+                agencyNo, 
+                healthSurveyType
+            );
 
         return questions.stream()
             .map(this::toDto)
             .collect(Collectors.toList());
     }
 
-    @Override
-    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyName(String healthSurveyName) {
-        HealthSurvey survey = healthSurveyRepository.findByHealthSurveyName(healthSurveyName)
-            .orElseThrow(() -> new IllegalArgumentException("설문을 찾을 수 없습니다: " + healthSurveyName));
-
-        return getQuestionsBySurveyNo(survey.getHealthSurveyNo());
-    }
-
+    /**
+     * 건강 설문 응답 제출
+     * - 프론트엔드에서 각 문항별 점수의 총합을 계산하여 전송
+     * - 백엔드에서는 총점만 받아서 HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE에 저장
+     * - HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT의 유무로 검진 완료 여부 판단
+     */
     @Override
     @Transactional
     public HealthSurveySubmitResponse submitSurveyResponse(Long healthSurveyNo, HealthSurveySubmitRequest request) {
@@ -73,66 +72,46 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         Member member = memberRepository.findById(request.getMemberNo())
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + request.getMemberNo()));
 
-        // 2. 문항/점수 검증 + 총점 계산
-        int totalScore = 0;
-
-        // 응답 엔티티 생성
-        HealthSurveyResponse response = new HealthSurveyResponse();
-        response.setHealthSurvey(survey);
-        response.setMember(member);
-        response.setHealthSurveyResponseStatus("Y");
-        response.setHealthSurveyResponseCreatedAt(LocalDateTime.now());
-
-        // 일단 응답 헤더 저장 (PK 생성)
-        healthSurveyResponseRepository.save(response);
-
-        for (HealthSurveyAnswerRequest answer : request.getAnswers()) {
-            HealthSurveyQuestion question = healthSurveyQuestionRepository.findById(answer.getQuestionId())
-                .orElseThrow(() -> new IllegalArgumentException("문항을 찾을 수 없습니다: " + answer.getQuestionId()));
-
-            // 설문에 속한 문항인지 검증
-            if (!question.getHealthSurvey().getHealthSurveyNo().equals(healthSurveyNo)) {
-                throw new IllegalArgumentException("설문에 속하지 않은 문항입니다: " + answer.getQuestionId());
-            }
-
-            int score = answer.getScore();
-
-            // 최소/최대 점수 범위 검증
-            Integer min = question.getHealthSurveyQuestionMinScore();
-            Integer max = question.getHealthSurveyQuestionMaxScore();
-            if (min != null && score < min) {
-                throw new IllegalArgumentException("점수가 최소값보다 작습니다. questionId=" + answer.getQuestionId());
-            }
-            if (max != null && score > max) {
-                throw new IllegalArgumentException("점수가 최대값보다 큽니다. questionId=" + answer.getQuestionId());
-            }
-
-            totalScore += score;
-
-            // 개별 문항 응답 저장
-            HealthSurveyResponseItem item = new HealthSurveyResponseItem();
-            item.setHealthSurveyResponse(response);
-            item.setHealthSurveyQuestion(question);
-            item.setHealthSurveyQuestionItemAnswerScore(score);
-            item.setHealthSurveyQuestionItemCreatedAt(LocalDateTime.now());
-
-            healthSurveyResponseItemRepository.save(item);
+        // 2. 총점 검증 (프론트엔드에서 계산된 각 문항별 점수의 총합)
+        Integer totalScore = request.getTotalScore();
+        if (totalScore == null || totalScore < 0) {
+            throw new IllegalArgumentException("총점이 유효하지 않습니다: " + totalScore);
         }
 
-        // 3. 총점/위험도 등급 계산
-        String surveyType = survey.getHealthSurveyType(); // "데일리 정신" / "데일리 신체" / "월간 정신" / "월간 신체"
-        String riskLevel = evaluateRiskLevel(surveyType, totalScore);
+        // 3. 설문의 첫 번째 문항 조회 (HEALTH_SURVEY_QUESTION_NO FK 제약조건 만족용)
+        List<HealthSurveyQuestion> questions = 
+            healthSurveyQuestionRepository.findByHealthSurvey_HealthSurveyNoOrderByHealthSurveyOrderAsc(healthSurveyNo);
+        
+        if (questions.isEmpty()) {
+            throw new IllegalArgumentException("설문에 문항이 없습니다: " + healthSurveyNo);
+        }
+        
+        HealthSurveyQuestion firstQuestion = questions.get(0);
 
-        // 응답 엔티티에 총점 반영
-        response.setHealthSurveyResponseTotalScore(totalScore);
-        healthSurveyResponseRepository.save(response);
+        // 4. 건강 설문 응답 저장
+        // - HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE: 각 문항별 점수의 총합 저장
+        // - HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT: 생성일 유무로 검진 완료 여부 판단
+        LocalDateTime responseCreatedAt = LocalDateTime.now();
+        
+        HealthSurveyResponseItem item = new HealthSurveyResponseItem();
+        item.setMember(member);
+        item.setHealthSurveyQuestion(firstQuestion);  // FK 제약조건 만족 (어떤 문항이든 참조 가능)
+        item.setHealthSurveyQuestionItemAnswerScore(totalScore);  // 각 문항별 점수의 총합 저장
+        item.setHealthSurveyQuestionItemCreatedAt(responseCreatedAt);  // 검진 완료 여부 판단용
 
-        // 4. 클라이언트로 반환
+        healthSurveyResponseItemRepository.save(item);
+
+        // 5. 총점/위험도 등급 계산
+        // HEALTH_SURVEY 테이블의 HEALTH_SURVEY_TYPE 컬럼이 제거되었으므로,
+        // HEALTH_SURVEY_QUESTION 테이블의 HEALTH_SURVEY_QUESTION_TYPE 컬럼 기준으로 위험도 계산
+        String surveyType = firstQuestion.getHealthSurveyQuestionType(); // "데일리 정신" / "데일리 신체" / "월간 정신" / "월간 신체"
+
+        // 6. 클라이언트로 반환
         return HealthSurveySubmitResponse.builder()
             .healthSurveyNo(healthSurveyNo)
             .memberNo(member.getMemberNo())
             .totalScore(totalScore)
-            .riskLevel(riskLevel)
+            .riskLevel(evaluateRiskLevel(surveyType, totalScore))
             .build();
     }
 
@@ -222,6 +201,118 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         }
     }
 
+    @Override
+    public HealthSurveyResponseStatusResponse getSurveyResponseStatus(Long memberNo, String healthSurveyQuestionType) {
+        // 1. 회원 정보 조회하여 AgencyNo 가져오기
+        Member member = memberRepository.findById(memberNo)
+            .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + memberNo));
+        
+        Long agencyNo = member.getAgency().getAgencyNo();  // AgencyNo는 항상 존재 (소속 요청 페이지 외 접근 불가)
+        
+        // 2. AgencyNo와 타입으로 해당 에이전시의 질문 조회
+        List<HealthSurveyQuestion> questions = 
+            healthSurveyQuestionRepository.findByHealthSurvey_Agency_AgencyNoAndHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(
+                agencyNo, 
+                healthSurveyQuestionType
+            );
+        
+        if (questions == null || questions.isEmpty()) {
+            return HealthSurveyResponseStatusResponse.builder()
+                .isCompleted(false)
+                .lastCheckDate(null)
+                .totalScore(null)
+                .riskLevel(null)
+                .healthSurveyPeriod(15)  // 기본값
+                .healthSurveyCycle(30)   // 기본값
+                .nextCheckupDate(null)
+                .daysRemaining(null)
+                .deadlineDate(null)
+                .build();
+        }
+        
+        HealthSurveyQuestion firstQuestion = questions.get(0);
+        HealthSurvey healthSurvey = firstQuestion.getHealthSurvey();
+        
+        // 3. INT형 필드 처리 (null 체크 및 기본값 설정)
+        Integer period = healthSurvey.getHealthSurveyPeriod() != null 
+            ? healthSurvey.getHealthSurveyPeriod() : 15;  // INT → Integer
+        Integer cycle = healthSurvey.getHealthSurveyCycle() != null 
+            ? healthSurvey.getHealthSurveyCycle() : 30;   // INT → Integer
+        
+        // 4. 회원의 해당 HEALTH_SURVEY_QUESTION_TYPE에 대한 응답 조회
+        List<HealthSurveyResponseItem> responseItems = 
+            healthSurveyResponseItemRepository.findByMemberNoAndHealthSurveyType(memberNo, healthSurveyQuestionType);
+
+        // 5. 응답이 없으면 미완료 상태 반환 (기간 계산 포함)
+        if (responseItems == null || responseItems.isEmpty()) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime deadlineDate = now.plusDays(period);  // 검사 기간만큼 마감일 설정
+            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, deadlineDate);
+            
+            return HealthSurveyResponseStatusResponse.builder()
+                .isCompleted(false)
+                .lastCheckDate(null)
+                .totalScore(null)
+                .riskLevel(null)
+                .healthSurveyPeriod(period)
+                .healthSurveyCycle(cycle)
+                .nextCheckupDate(null)
+                .daysRemaining((int) daysRemaining)
+                .deadlineDate(deadlineDate)
+                .build();
+        }
+
+        // 6. 가장 최근 응답 찾기 (CREATED_AT 기준, CREATED_AT가 null이 아닌 것만)
+        // HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT가 존재하면 검사 완료로 간주
+        HealthSurveyResponseItem latestResponse = responseItems.stream()
+            .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)  // CREATED_AT가 null이 아닌 것만 필터링
+            .max((a, b) -> a.getHealthSurveyQuestionItemCreatedAt()
+                .compareTo(b.getHealthSurveyQuestionItemCreatedAt()))
+            .orElse(null);
+
+        // 7. CREATED_AT가 존재하는 응답이 없으면 미완료 상태 반환 (기간 계산 포함)
+        if (latestResponse == null || latestResponse.getHealthSurveyQuestionItemCreatedAt() == null) {
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime deadlineDate = now.plusDays(period);  // 검사 기간만큼 마감일 설정
+            long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, deadlineDate);
+            
+            return HealthSurveyResponseStatusResponse.builder()
+                .isCompleted(false)
+                .lastCheckDate(null)
+                .totalScore(null)
+                .riskLevel(null)
+                .healthSurveyPeriod(period)
+                .healthSurveyCycle(cycle)
+                .nextCheckupDate(null)
+                .daysRemaining((int) daysRemaining)
+                .deadlineDate(deadlineDate)
+                .build();
+        }
+
+        // 8. 총점과 위험도 계산
+        Integer totalScore = latestResponse.getHealthSurveyQuestionItemAnswerScore();
+        String riskLevel = evaluateRiskLevel(healthSurveyQuestionType, totalScore != null ? totalScore : 0);
+        
+        // 9. 날짜 계산 (검진 완료 상태)
+        LocalDateTime lastCheckDate = latestResponse.getHealthSurveyQuestionItemCreatedAt();
+        LocalDateTime nextCheckupDate = lastCheckDate.plusDays(cycle);  // 검사 주기만큼 다음 검진일 계산
+        LocalDateTime now = LocalDateTime.now();
+        long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, nextCheckupDate);
+
+        // 10. 응답 반환 (CREATED_AT가 존재하므로 완료 상태)
+        return HealthSurveyResponseStatusResponse.builder()
+            .isCompleted(true)  // HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT가 존재하므로 완료
+            .lastCheckDate(lastCheckDate)
+            .totalScore(totalScore)
+            .riskLevel(riskLevel)
+            .healthSurveyPeriod(period)
+            .healthSurveyCycle(cycle)
+            .nextCheckupDate(nextCheckupDate)
+            .daysRemaining((int) daysRemaining)
+            .deadlineDate(null)  // 완료 상태이므로 마감일 없음
+            .build();
+    }
+
     private HealthSurveyQuestionResponse toDto(HealthSurveyQuestion question) {
         return HealthSurveyQuestionResponse.builder()
             .healthSurveyQuestionNo(question.getHealthSurveyQuestionNo())
@@ -232,6 +323,7 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
             )
             .healthSurveyOrder(question.getHealthSurveyOrder())
             .healthSurveyQuestionContent(question.getHealthSurveyQuestionContent())
+            .healthSurveyQuestionType(question.getHealthSurveyQuestionType())
             .healthSurveyQuestionMinScore(question.getHealthSurveyQuestionMinScore())
             .healthSurveyQuestionMaxScore(question.getHealthSurveyQuestionMaxScore())
             .build();

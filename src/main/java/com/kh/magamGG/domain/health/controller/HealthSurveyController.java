@@ -3,6 +3,7 @@ package com.kh.magamGG.domain.health.controller;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveyQuestionResponse;
 import com.kh.magamGG.domain.health.dto.request.HealthSurveySubmitRequest;
 import com.kh.magamGG.domain.health.dto.response.HealthSurveySubmitResponse;
+import com.kh.magamGG.domain.health.dto.response.HealthSurveyResponseStatusResponse;
 import com.kh.magamGG.domain.health.service.HealthSurveyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -31,28 +32,17 @@ public class HealthSurveyController {
     }
 
     /**
-     * HEALTH_SURVEY_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
-     * 예: GET /api/health-surveys/type/월간 정신/questions
+     * AgencyNo와 HEALTH_SURVEY_QUESTION_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
+     * 해당 에이전시의 설문만 조회
+     * 예: GET /api/health-surveys/type/월간 정신/questions?agencyNo=1
      */
     @GetMapping("/type/{healthSurveyType}/questions")
     public ResponseEntity<List<HealthSurveyQuestionResponse>> getQuestionsBySurveyType(
-        @PathVariable String healthSurveyType
+        @PathVariable String healthSurveyType,
+        @RequestParam Long agencyNo
     ) {
         List<HealthSurveyQuestionResponse> questions =
-            healthSurveyService.getQuestionsBySurveyType(healthSurveyType);
-        return ResponseEntity.ok(questions);
-    }
-
-    /**
-     * 설문 이름(PHQ-9, GAD, QuickDASH 등)으로 질문 목록 조회
-     * 예: GET /api/health-surveys/name/PHQ-9/questions
-     */
-    @GetMapping("/name/{healthSurveyName}/questions")
-    public ResponseEntity<List<HealthSurveyQuestionResponse>> getQuestionsBySurveyName(
-        @PathVariable String healthSurveyName
-    ) {
-        List<HealthSurveyQuestionResponse> questions =
-            healthSurveyService.getQuestionsBySurveyName(healthSurveyName);
+            healthSurveyService.getQuestionsBySurveyType(agencyNo, healthSurveyType);
         return ResponseEntity.ok(questions);
     }
 
@@ -76,6 +66,22 @@ public class HealthSurveyController {
     ) {
         HealthSurveySubmitResponse response =
             healthSurveyService.submitSurveyResponse(healthSurveyNo, request);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 회원의 특정 HEALTH_SURVEY_QUESTION_TYPE에 대한 응답 상태 조회
+     * GET /api/health-surveys/member/{memberNo}/responses?type={healthSurveyQuestionType}
+     * 
+     * 예: GET /api/health-surveys/member/123/responses?type=월간 정신
+     */
+    @GetMapping("/member/{memberNo}/responses")
+    public ResponseEntity<HealthSurveyResponseStatusResponse> getSurveyResponseStatus(
+        @PathVariable Long memberNo,
+        @RequestParam String type
+    ) {
+        HealthSurveyResponseStatusResponse response =
+            healthSurveyService.getSurveyResponseStatus(memberNo, type);
         return ResponseEntity.ok(response);
     }
 }
