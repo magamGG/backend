@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 public class HealthSurveyQuestionResponse {
 
     private Long healthSurveyQuestionNo;
-    private Long healthSurveyNo;
+    // healthSurveyNo 제거 (소속 상관없이 모든 문항 공통 사용)
     private Integer healthSurveyOrder;
     private String healthSurveyQuestionContent;
     private String healthSurveyQuestionType;
