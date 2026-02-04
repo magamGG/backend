@@ -1,21 +1,21 @@
 package com.kh.magamGG.domain.calendar.service;
 
-import com.kh.magamGG.domain.calendar.dto.response.CalendarEventResponse;
 import com.kh.magamGG.domain.calendar.dto.response.DeadlineCountResponse;
-import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
-import com.kh.magamGG.domain.calendar.repository.CalendarEventRepository;
 import com.kh.magamGG.domain.member.entity.ArtistAssignment;
+import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
 import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+import com.kh.magamGG.domain.project.entity.KanbanCard;
+import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -23,38 +23,14 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 @Slf4j
-public class CalendarEventServiceImpl implements CalendarEventService {
+public class CalendarServiceImpl implements CalendarService {
 
-    private final CalendarEventRepository calendarEventRepository;
+    private final KanbanCardRepository kanbanCardRepository;
     private final ManagerRepository managerRepository;
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final MemberRepository memberRepository;
 
     private static final String[] DAY_LABELS = {"오늘", "내일", "2일 후", "3일 후", "4일 후"};
-
-    @Override
-    public List<CalendarEventResponse> getEventsByMonth(Long memberNo, int year, int month) {
-        LocalDate monthStart = LocalDate.of(year, month, 1);
-        LocalDate monthEnd = monthStart.withDayOfMonth(monthStart.lengthOfMonth());
-
-        List<CalendarEvent> events = calendarEventRepository.findByMemberNoAndDateRange(
-                memberNo, monthStart, monthEnd);
-
-        return events.stream()
-                .map(CalendarEventResponse::fromEntity)
-                .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<CalendarEventResponse> getUpcomingEvents(Long memberNo, int limit) {
-        LocalDate today = LocalDate.now();
-        List<CalendarEvent> events = calendarEventRepository.findUpcomingByMemberNo(
-                memberNo, today, PageRequest.of(0, limit));
-
-        return events.stream()
-                .map(CalendarEventResponse::fromEntity)
-                .collect(Collectors.toList());
-    }
 
     @Override
     public List<DeadlineCountResponse> getDeadlineCountsForManager(Long memberNo) {
@@ -80,20 +56,23 @@ public class CalendarEventServiceImpl implements CalendarEventService {
         LocalDate today = LocalDate.now();
         LocalDate toDate = today.plusDays(4);
 
-        List<CalendarEvent> events = calendarEventRepository.findByMemberNosAndDateRange(
+        // 3. 담당 작가들의 칸반 카드 조회 (마감일이 오늘~4일 후인 것만)
+        List<KanbanCard> cards = kanbanCardRepository.findByMemberNosAndDateRange(
                 artistMemberNos, today, toDate);
 
-        // 3. 날짜별 카운트 (오늘=0, 내일=1, 2일후=2, 3일후=3, 4일후=4)
+        // 4. 날짜별 카운트 (오늘=0, 내일=1, 2일후=2, 3일후=3, 4일후=4)
         int[] counts = new int[5];
-        for (CalendarEvent event : events) {
-            LocalDate endedAt = event.getCalendarEventEndedAt();
-            long daysDiff = java.time.temporal.ChronoUnit.DAYS.between(today, endedAt);
-            if (daysDiff >= 0 && daysDiff <= 4) {
-                counts[(int) daysDiff]++;
+        for (KanbanCard card : cards) {
+            LocalDate endedAt = card.getKanbanCardEndedAt();
+            if (endedAt != null) {
+                long daysDiff = ChronoUnit.DAYS.between(today, endedAt);
+                if (daysDiff >= 0 && daysDiff <= 4) {
+                    counts[(int) daysDiff]++;
+                }
             }
         }
 
-        // 4. 응답 생성
+        // 5. 응답 생성
         List<DeadlineCountResponse> result = new ArrayList<>();
         for (int i = 0; i < DAY_LABELS.length; i++) {
             result.add(DeadlineCountResponse.builder()
@@ -106,10 +85,10 @@ public class CalendarEventServiceImpl implements CalendarEventService {
 
     @Override
     public List<DeadlineCountResponse> getDeadlineCountsForAgency(Long agencyNo) {
-        List<com.kh.magamGG.domain.member.entity.Member> artists =
-                memberRepository.findArtistsByAgencyNo(agencyNo);
+        // 1. 에이전시 소속 작가 목록 조회
+        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
         List<Long> artistMemberNos = artists.stream()
-                .map(com.kh.magamGG.domain.member.entity.Member::getMemberNo)
+                .map(Member::getMemberNo)
                 .distinct()
                 .collect(Collectors.toList());
 
@@ -117,21 +96,27 @@ public class CalendarEventServiceImpl implements CalendarEventService {
             return buildEmptyDeadlineCounts();
         }
 
+        // 2. 오늘 ~ 4일 후 기간
         LocalDate today = LocalDate.now();
         LocalDate toDate = today.plusDays(4);
 
-        List<CalendarEvent> events = calendarEventRepository.findByMemberNosAndDateRange(
+        // 3. 에이전시 소속 작가들의 칸반 카드 조회 (마감일이 오늘~4일 후인 것만)
+        List<KanbanCard> cards = kanbanCardRepository.findByMemberNosAndDateRange(
                 artistMemberNos, today, toDate);
 
+        // 4. 날짜별 카운트
         int[] counts = new int[5];
-        for (CalendarEvent event : events) {
-            LocalDate endedAt = event.getCalendarEventEndedAt();
-            long daysDiff = java.time.temporal.ChronoUnit.DAYS.between(today, endedAt);
-            if (daysDiff >= 0 && daysDiff <= 4) {
-                counts[(int) daysDiff]++;
+        for (KanbanCard card : cards) {
+            LocalDate endedAt = card.getKanbanCardEndedAt();
+            if (endedAt != null) {
+                long daysDiff = ChronoUnit.DAYS.between(today, endedAt);
+                if (daysDiff >= 0 && daysDiff <= 4) {
+                    counts[(int) daysDiff]++;
+                }
             }
         }
 
+        // 5. 응답 생성
         List<DeadlineCountResponse> result = new ArrayList<>();
         for (int i = 0; i < DAY_LABELS.length; i++) {
             result.add(DeadlineCountResponse.builder()
@@ -151,3 +136,4 @@ public class CalendarEventServiceImpl implements CalendarEventService {
                 .collect(Collectors.toList());
     }
 }
+
