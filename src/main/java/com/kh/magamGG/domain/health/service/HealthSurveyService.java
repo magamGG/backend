@@ -10,20 +10,15 @@ import java.util.List;
 public interface HealthSurveyService {
 
     /**
-     * 설문 번호로 질문 목록 조회
+     * HEALTH_SURVEY_QUESTION_TYPE으로 질문 목록 조회
+     * 소속 상관없이 모든 문항 조회
      */
-    List<HealthSurveyQuestionResponse> getQuestionsBySurveyNo(Long healthSurveyNo);
-
-    /**
-     * AgencyNo와 HEALTH_SURVEY_QUESTION_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
-     * 해당 에이전시의 설문만 조회
-     */
-    List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(Long agencyNo, String healthSurveyType);
+    List<HealthSurveyQuestionResponse> getQuestionsByType(String healthSurveyType);
 
     /**
      * 설문 응답 제출 (문항별 점수 → 총점 계산 + 등급 산정 + DB 저장)
      */
-    HealthSurveySubmitResponse submitSurveyResponse(Long healthSurveyNo, HealthSurveySubmitRequest request);
+    HealthSurveySubmitResponse submitSurveyResponse(HealthSurveySubmitRequest request);
 
     /**
      * 설문 타입과 총점을 받아 위험도 등급 계산

@@ -33,23 +33,10 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
     private final MemberRepository memberRepository;
 
     @Override
-    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyNo(Long healthSurveyNo) {
+    public List<HealthSurveyQuestionResponse> getQuestionsByType(String healthSurveyType) {
+        // 소속 상관없이 타입으로만 질문 조회
         List<HealthSurveyQuestion> questions =
-            healthSurveyQuestionRepository.findByHealthSurvey_HealthSurveyNoOrderByHealthSurveyOrderAsc(healthSurveyNo);
-
-        return questions.stream()
-            .map(this::toDto)
-            .collect(Collectors.toList());
-    }
-
-    @Override
-    public List<HealthSurveyQuestionResponse> getQuestionsBySurveyType(Long agencyNo, String healthSurveyType) {
-        // AgencyNo와 타입으로 해당 에이전시의 설문 질문만 조회
-        List<HealthSurveyQuestion> questions =
-            healthSurveyQuestionRepository.findByHealthSurvey_Agency_AgencyNoAndHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(
-                agencyNo, 
-                healthSurveyType
-            );
+            healthSurveyQuestionRepository.findByHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(healthSurveyType);
 
         return questions.stream()
             .map(this::toDto)
@@ -64,12 +51,9 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
      */
     @Override
     @Transactional
-    public HealthSurveySubmitResponse submitSurveyResponse(Long healthSurveyNo, HealthSurveySubmitRequest request) {
+    public HealthSurveySubmitResponse submitSurveyResponse(HealthSurveySubmitRequest request) {
 
-        // 1. 설문, 회원 조회
-        HealthSurvey survey = healthSurveyRepository.findById(healthSurveyNo)
-            .orElseThrow(() -> new IllegalArgumentException("설문을 찾을 수 없습니다: " + healthSurveyNo));
-
+        // 1. 회원 조회
         Member member = memberRepository.findById(request.getMemberNo())
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + request.getMemberNo()));
 
@@ -85,15 +69,12 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
             throw new IllegalArgumentException("총점이 유효하지 않습니다: " + totalScore);
         }
 
-        // 3. 설문의 첫 번째 문항 조회 (HEALTH_SURVEY_QUESTION_NO FK 제약조건 만족용)
-        List<HealthSurveyQuestion> questions = 
-            healthSurveyQuestionRepository.findByHealthSurvey_HealthSurveyNoOrderByHealthSurveyOrderAsc(healthSurveyNo);
+        // 3. 첫 번째 답변의 questionId로 질문 조회하여 타입 확인
+        Long firstQuestionId = answers.get(0).getQuestionId();
+        HealthSurveyQuestion firstQuestion = healthSurveyQuestionRepository.findById(firstQuestionId)
+            .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + firstQuestionId));
         
-        if (questions.isEmpty()) {
-            throw new IllegalArgumentException("설문에 문항이 없습니다: " + healthSurveyNo);
-        }
-        
-        HealthSurveyQuestion firstQuestion = questions.get(0);
+        String surveyType = firstQuestion.getHealthSurveyQuestionType();
 
         // 4. 건강 설문 응답 저장
         // - HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE: 각 문항별 점수의 총합 저장
@@ -108,14 +89,8 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
 
         healthSurveyResponseItemRepository.save(item);
 
-        // 5. 총점/위험도 등급 계산
-        // HEALTH_SURVEY 테이블의 HEALTH_SURVEY_TYPE 컬럼이 제거되었으므로,
-        // HEALTH_SURVEY_QUESTION 테이블의 HEALTH_SURVEY_QUESTION_TYPE 컬럼 기준으로 위험도 계산
-        String surveyType = firstQuestion.getHealthSurveyQuestionType(); // "데일리 정신" / "데일리 신체" / "월간 정신" / "월간 신체"
-
-        // 6. 클라이언트로 반환
+        // 5. 클라이언트로 반환
         return HealthSurveySubmitResponse.builder()
-            .healthSurveyNo(healthSurveyNo)
             .memberNo(member.getMemberNo())
             .totalScore(totalScore)
             .riskLevel(evaluateRiskLevel(surveyType, totalScore))
@@ -210,18 +185,15 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
 
     @Override
     public HealthSurveyResponseStatusResponse getSurveyResponseStatus(Long memberNo, String healthSurveyQuestionType) {
-        // 1. 회원 정보 조회하여 AgencyNo 가져오기
+        // 1. 회원 정보 조회하여 AgencyNo 가져오기 (HealthSurvey 조회용)
         Member member = memberRepository.findById(memberNo)
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + memberNo));
         
-        Long agencyNo = member.getAgency().getAgencyNo();  // AgencyNo는 항상 존재 (소속 요청 페이지 외 접근 불가)
+        Long agencyNo = member.getAgency().getAgencyNo();
         
-        // 2. AgencyNo와 타입으로 해당 에이전시의 질문 조회
+        // 2. 타입으로 질문 조회 (소속 상관없이)
         List<HealthSurveyQuestion> questions = 
-            healthSurveyQuestionRepository.findByHealthSurvey_Agency_AgencyNoAndHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(
-                agencyNo, 
-                healthSurveyQuestionType
-            );
+            healthSurveyQuestionRepository.findByHealthSurveyQuestionTypeOrderByHealthSurveyOrderAsc(healthSurveyQuestionType);
         
         if (questions == null || questions.isEmpty()) {
             return HealthSurveyResponseStatusResponse.builder()
@@ -237,13 +209,14 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
                 .build();
         }
         
-        HealthSurveyQuestion firstQuestion = questions.get(0);
-        HealthSurvey healthSurvey = firstQuestion.getHealthSurvey();
+        // 3. HealthSurvey를 AgencyNo로 직접 조회 (period, cycle 정보용)
+        HealthSurvey healthSurvey = healthSurveyRepository.findByAgency_AgencyNo(agencyNo)
+            .orElse(null);
         
-        // 3. INT형 필드 처리 (null 체크 및 기본값 설정)
-        Integer period = healthSurvey.getHealthSurveyPeriod() != null 
+        // 4. INT형 필드 처리 (null 체크 및 기본값 설정)
+        Integer period = healthSurvey != null && healthSurvey.getHealthSurveyPeriod() != null 
             ? healthSurvey.getHealthSurveyPeriod() : 15;  // INT → Integer
-        Integer cycle = healthSurvey.getHealthSurveyCycle() != null 
+        Integer cycle = healthSurvey != null && healthSurvey.getHealthSurveyCycle() != null 
             ? healthSurvey.getHealthSurveyCycle() : 30;   // INT → Integer
         
         // 4. 회원의 해당 HEALTH_SURVEY_QUESTION_TYPE에 대한 응답 조회
@@ -323,11 +296,6 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
     private HealthSurveyQuestionResponse toDto(HealthSurveyQuestion question) {
         return HealthSurveyQuestionResponse.builder()
             .healthSurveyQuestionNo(question.getHealthSurveyQuestionNo())
-            .healthSurveyNo(
-                question.getHealthSurvey() != null
-                    ? question.getHealthSurvey().getHealthSurveyNo()
-                    : null
-            )
             .healthSurveyOrder(question.getHealthSurveyOrder())
             .healthSurveyQuestionContent(question.getHealthSurveyQuestionContent())
             .healthSurveyQuestionType(question.getHealthSurveyQuestionType())
