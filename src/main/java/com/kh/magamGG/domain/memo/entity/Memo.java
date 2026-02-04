@@ -4,12 +4,14 @@ import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "MEMO")
 @Getter
+@Setter
 @NoArgsConstructor
 public class Memo {
 	

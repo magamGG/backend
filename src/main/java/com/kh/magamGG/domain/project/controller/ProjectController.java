@@ -18,6 +18,7 @@ import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
+import com.kh.magamGG.domain.project.dto.response.CalendarCardResponse;
 import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.service.CommentService;
@@ -89,6 +90,19 @@ public class ProjectController {
     @GetMapping("/my-today-tasks")
     public ResponseEntity<List<TodayTaskResponse>> getMyTodayTasks(@RequestHeader("X-Member-No") Long memberNo) {
         List<TodayTaskResponse> list = kanbanBoardService.getTodayTasksForMember(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 아티스트 캘린더: 담당자 배정 칸반 카드 중 해당 월과 기간 겹치는 카드 (PROJECT_COLOR, STARTED_AT, ENDED_AT)
+     * GET /api/projects/my-calendar-cards?year=2026&month=1
+     */
+    @GetMapping("/my-calendar-cards")
+    public ResponseEntity<List<CalendarCardResponse>> getMyCalendarCards(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam int year,
+            @RequestParam int month) {
+        List<CalendarCardResponse> list = kanbanBoardService.getCalendarCardsForMember(memberNo, year, month);
         return ResponseEntity.ok(list);
     }
 

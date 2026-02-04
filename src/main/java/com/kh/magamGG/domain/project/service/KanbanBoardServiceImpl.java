@@ -5,6 +5,7 @@ import com.kh.magamGG.domain.project.dto.request.KanbanBoardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardUpdateRequest;
+import com.kh.magamGG.domain.project.dto.response.CalendarCardResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
@@ -22,6 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -62,6 +64,38 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             .filter(card -> card.getKanbanCardEndedAt() == null || !card.getKanbanCardEndedAt().isBefore(today))
             .map(this::toTodayTaskResponse)
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CalendarCardResponse> getCalendarCardsForMember(Long memberNo, int year, int month) {
+        YearMonth ym = YearMonth.of(year, month);
+        LocalDate rangeStart = ym.atDay(1);
+        LocalDate rangeEnd = ym.atEndOfMonth();
+        List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_Member_MemberNoAndDateRangeOverlap(
+            memberNo, rangeStart, rangeEnd);
+        return cards.stream()
+            .map(c -> toCalendarCardResponse(c, rangeStart, rangeEnd))
+            .collect(Collectors.toList());
+    }
+
+    private CalendarCardResponse toCalendarCardResponse(KanbanCard card, LocalDate rangeStart, LocalDate rangeEnd) {
+        Project project = card.getKanbanBoard() != null ? card.getKanbanBoard().getProject() : null;
+        String projectName = project != null ? project.getProjectName() : "";
+        String projectColor = project != null ? project.getProjectColor() : null;
+        Long projectNo = project != null ? project.getProjectNo() : null;
+        LocalDate start = card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt() : rangeStart;
+        LocalDate end = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt() : rangeEnd;
+        if (start.isBefore(rangeStart)) start = rangeStart;
+        if (end.isAfter(rangeEnd)) end = rangeEnd;
+        return CalendarCardResponse.builder()
+            .id(card.getKanbanCardNo())
+            .title(card.getKanbanCardName())
+            .startDate(start.format(DATE_FMT))
+            .endDate(end.format(DATE_FMT))
+            .projectColor(projectColor)
+            .projectName(projectName)
+            .projectNo(projectNo)
+            .build();
     }
 
     private TodayTaskResponse toTodayTaskResponse(KanbanCard card) {

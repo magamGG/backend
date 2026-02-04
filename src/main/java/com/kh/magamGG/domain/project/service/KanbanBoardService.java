@@ -7,6 +7,7 @@ import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
+import com.kh.magamGG.domain.project.dto.response.CalendarCardResponse;
 import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 
 import java.util.List;
@@ -18,6 +19,9 @@ public interface KanbanBoardService {
 
     /** 아티스트 대시보드 오늘 할 일: 담당자 배정 + 마감일 오늘 + 미완료(N) 카드만 */
     List<TodayTaskResponse> getTodayTasksForMember(Long memberNo);
+
+    /** 아티스트 캘린더: 담당자 배정 카드 중 해당 월과 기간 겹치는 카드 (PROJECT_COLOR, STARTED_AT, ENDED_AT) */
+    List<CalendarCardResponse> getCalendarCardsForMember(Long memberNo, int year, int month);
 
     List<KanbanBoardResponse> getBoardsByProjectNo(Long projectNo);
 
