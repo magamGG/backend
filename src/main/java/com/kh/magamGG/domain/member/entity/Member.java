@@ -11,7 +11,6 @@ import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
-import com.kh.magamGG.domain.project.entity.TaskHistory;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

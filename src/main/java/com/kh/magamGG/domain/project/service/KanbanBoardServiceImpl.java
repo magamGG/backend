@@ -40,7 +40,12 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     public List<TodayTaskResponse> getTodayTasksForMember(Long memberNo) {
         List<KanbanCard> cards = kanbanCardRepository
             .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
-        return cards.stream().map(this::toTodayTaskResponse).collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
+        // 기간 지난 업무(마감일이 오늘 이전인 카드) 제외 - 대시보드 오늘 할 일에만 미래/오늘 마감만 노출
+        return cards.stream()
+            .filter(card -> card.getKanbanCardEndedAt() == null || !card.getKanbanCardEndedAt().isBefore(today))
+            .map(this::toTodayTaskResponse)
+            .collect(Collectors.toList());
     }
 
     private TodayTaskResponse toTodayTaskResponse(KanbanCard card) {
