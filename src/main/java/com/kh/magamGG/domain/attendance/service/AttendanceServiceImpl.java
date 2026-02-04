@@ -46,6 +46,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.TreeMap;
 
 /**
  * 근태 관리 서비스 구현체
@@ -183,17 +184,37 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month) {
-        // 출근만 표시, 날짜별 1회 집계 (같은 날 여러 출근/퇴근 있어도 그 날은 1일로만 카운트)
-        long distinctCheckInDays = attendanceRepository.countDistinctCheckInDaysByMemberNoAndMonth(memberNo, year, month);
-        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = List.of(
-            AttendanceStatisticsResponseDto.TypeCount.builder()
-                .type("출근")
-                .count(distinctCheckInDays)
-                .build()
-        );
+        // member_no 기준 attendance에서 출근한 날짜 목록 조회
+        List<LocalDate> checkInDates = attendanceRepository
+            .findDistinctCheckInDatesByMemberNoAndMonth(memberNo, year, month)
+            .stream()
+            .map(java.sql.Date::toLocalDate)
+            .collect(Collectors.toList());
+        // 해당 회원의 승인된 근태 신청 목록
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository.findApprovedByMemberNo(memberNo);
+        // 출근일별: 승인된 신청에 포함되면 그 타입(워케이션/재택 등), 없으면 "출근"
+        Map<String, Long> typeToCount = new TreeMap<>();
+        for (LocalDate date : checkInDates) {
+            String type = "출근";
+            for (AttendanceRequest req : approvedRequests) {
+                LocalDate start = req.getAttendanceRequestStartDate().toLocalDate();
+                LocalDate end = req.getAttendanceRequestEndDate().toLocalDate();
+                if (!date.isBefore(start) && !date.isAfter(end)) {
+                    type = req.getAttendanceRequestType() != null ? req.getAttendanceRequestType() : "출근";
+                    break;
+                }
+            }
+            typeToCount.merge(type, 1L, Long::sum);
+        }
+        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = typeToCount.entrySet().stream()
+            .map(e -> AttendanceStatisticsResponseDto.TypeCount.builder()
+                .type(e.getKey())
+                .count(e.getValue())
+                .build())
+            .collect(Collectors.toList());
         return AttendanceStatisticsResponseDto.builder()
             .typeCounts(typeCounts)
-            .totalCount((int) distinctCheckInDays)
+            .totalCount(checkInDates.size())
             .build();
     }
     
