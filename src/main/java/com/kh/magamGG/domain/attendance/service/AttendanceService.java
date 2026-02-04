@@ -157,6 +157,17 @@ public interface AttendanceService {
      * @return 담당 작가별 근태 신청 목록 (PENDING/APPROVED/REJECTED, CANCELLED 제외)
      */
     List<AttendanceRequestResponse> getWeeklyAttendanceByManager(Long memberNo);
+
+    /**
+     * 담당자의 담당 작가들 근태 신청 현황 전체 목록
+     * - MANAGER → ARTIST_ASSIGNMENT → 담당 작가 MEMBER_NO 기준
+     * - ATTENDANCE_REQUEST JOIN 후 신청일 최신순 정렬
+     * - CANCELLED 상태는 제외
+     *
+     * @param memberNo 로그인한 담당자 회원 번호
+     * @return 담당 작가들의 근태 신청 목록
+     */
+    List<AttendanceRequestResponse> getAttendanceRequestsByManager(Long memberNo);
 }
 
 
