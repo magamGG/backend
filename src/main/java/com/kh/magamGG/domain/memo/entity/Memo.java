@@ -24,7 +24,7 @@ public class Memo {
 	private Member member;
 	
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "CALENDAR_EVENT_NO", nullable = false)
+	@JoinColumn(name = "CALENDAR_EVENT_NO", nullable = true)
 	private CalendarEvent calendarEvent;
 	
 	@Column(name = "MEMO_NAME", nullable = false, length = 30)
