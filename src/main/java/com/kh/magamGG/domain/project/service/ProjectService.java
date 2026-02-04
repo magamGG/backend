@@ -2,6 +2,7 @@ package com.kh.magamGG.domain.project.service;
 
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
+import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
@@ -22,7 +23,17 @@ public interface ProjectService {
      */
     List<NextSerialProjectItemResponse> getNextSerialProjectsForMember(Long memberNo, int limit);
 
+    /**
+     * 담당자 대시보드 마감 임박 현황 (주기 기준: 오늘~4일 후별 다음 연재일 건수)
+     */
+    List<DeadlineCountResponse> getDeadlineCountsForManager(Long memberNo);
+
     List<ProjectListResponse> getProjectsByMemberNo(Long memberNo);
+
+    /**
+     * 로그인 회원이 PROJECT_MEMBER에 등록된 프로젝트 수
+     */
+    long getMyProjectCount(Long memberNo);
 
     /**
      * 에이전시 소속 모든 프로젝트 조회 (에이전시 관리자만 호출 가능)
