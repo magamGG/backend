@@ -25,4 +25,15 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
            "JOIN p.projectMembers pm " +
            "WHERE pm.member.agency.agencyNo = :agencyNo")
     List<Project> findAllProjectsByAgencyNo(@Param("agencyNo") Long agencyNo);
+
+    /**
+     * 해당 에이전시에 동일한 프로젝트명을 가진 프로젝트 수 (대소문자·앞뒤 공백 무시)
+     */
+    @Query("SELECT COUNT(p) FROM Project p " +
+           "JOIN p.projectMembers pm " +
+           "WHERE pm.member.agency.agencyNo = :agencyNo " +
+           "AND LOWER(TRIM(p.projectName)) = LOWER(TRIM(:projectName))")
+    long countByProjectNameAndAgencyNo(
+            @Param("projectName") String projectName,
+            @Param("agencyNo") Long agencyNo);
 }

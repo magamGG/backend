@@ -10,6 +10,15 @@ import java.util.List;
 
 public interface AttendanceRepository extends JpaRepository<Attendance, Long> {
 
+	/** 회원·연·월 기준 출근(체크인)한 날짜 목록 (날짜별 1건, 같은 날 여러 번 출근해도 1일) */
+	@Query(value = "SELECT DISTINCT DATE(a.attendance_time) FROM attendance a " +
+			"WHERE a.member_no = :memberNo AND YEAR(a.attendance_time) = :year AND MONTH(a.attendance_time) = :month " +
+			"AND a.attendance_type = '출근'", nativeQuery = true)
+	List<java.sql.Date> findDistinctCheckInDatesByMemberNoAndMonth(
+			@Param("memberNo") Long memberNo,
+			@Param("year") int year,
+			@Param("month") int month);
+
 	/** 에이전시 금일 출석 기록 조회 (금일 출석 분포용) */
 	@Query("SELECT a FROM Attendance a WHERE a.agency.agencyNo = :agencyNo AND DATE(a.attendanceTime) = :today ORDER BY a.member.memberNo, a.attendanceTime DESC")
 	List<Attendance> findByAgency_AgencyNoAndDate(@Param("agencyNo") Long agencyNo, @Param("today") LocalDate today);
