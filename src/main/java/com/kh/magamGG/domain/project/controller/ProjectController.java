@@ -19,6 +19,7 @@ import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
+import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.service.CommentService;
 import com.kh.magamGG.domain.project.service.KanbanBoardService;
 import com.kh.magamGG.domain.project.service.ProjectService;
@@ -69,6 +70,16 @@ public class ProjectController {
             @RequestParam(value = "limit", defaultValue = "50") int limit) {
         List<DashboardFeedbackResponse> list = commentService.getRecentFeedbackForMember(memberNo, Math.min(limit, 100));
         return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 회원별 칸반 카드 통계 (진행중/완료 작업 개수) - 워케이션 등 원격 관리용
+     * GET /api/projects/member/{memberNo}/kanban-stats
+     */
+    @GetMapping("/member/{memberNo}/kanban-stats")
+    public ResponseEntity<MemberKanbanStatsResponseDto> getKanbanStatsForMember(@PathVariable Long memberNo) {
+        MemberKanbanStatsResponseDto response = kanbanBoardService.getKanbanStatsForMember(memberNo);
+        return ResponseEntity.ok(response);
     }
 
     /**
