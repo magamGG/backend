@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.project.service;
 
+import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
@@ -37,10 +38,30 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
 
     @Override
+    public MemberKanbanStatsResponseDto getKanbanStatsForMember(Long memberNo) {
+        List<KanbanCard> inProgress = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
+        List<KanbanCard> completed = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "Y");
+        int inProgressCount = inProgress.size();
+        int completedCount = completed.size();
+        return MemberKanbanStatsResponseDto.builder()
+            .totalCount(inProgressCount + completedCount)
+            .inProgressCount(inProgressCount)
+            .completedCount(completedCount)
+            .build();
+    }
+
+    @Override
     public List<TodayTaskResponse> getTodayTasksForMember(Long memberNo) {
         List<KanbanCard> cards = kanbanCardRepository
             .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
-        return cards.stream().map(this::toTodayTaskResponse).collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
+        // 기간 지난 업무(마감일이 오늘 이전인 카드) 제외 - 대시보드 오늘 할 일에만 미래/오늘 마감만 노출
+        return cards.stream()
+            .filter(card -> card.getKanbanCardEndedAt() == null || !card.getKanbanCardEndedAt().isBefore(today))
+            .map(this::toTodayTaskResponse)
+            .collect(Collectors.toList());
     }
 
     private TodayTaskResponse toTodayTaskResponse(KanbanCard card) {

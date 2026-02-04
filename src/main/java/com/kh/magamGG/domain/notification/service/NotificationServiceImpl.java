@@ -65,13 +65,13 @@ public class NotificationServiceImpl implements NotificationService {
     public void notifyAgencyManagers(Long agencyNo, String name, String text, String type) {
         List<Member> managers;
 
-        // JOIN_REQ 타입일 때는 에이전시 관리자만 알림 발송
-        if ("JOIN_REQ".equals(type)) {
+        // JOIN_REQ, LEAVE_REQ 타입일 때는 에이전시 관리자만 알림 발송
+        if ("JOIN_REQ".equals(type) || "LEAVE_REQ".equals(type)) {
             managers = memberRepository.findByAgency_AgencyNoAndMemberRoleIn(
                     agencyNo,
                     List.of("에이전시 관리자")
             );
-            log.info("가입 요청 알림: 에이전시 {}의 에이전시 관리자에게만 알림 발송", agencyNo);
+            log.info("{} 알림: 에이전시 {}의 에이전시 관리자에게만 알림 발송", type, agencyNo);
         } else {
             // 다른 타입은 기존대로 담당자(매니저/관리자) 목록 조회
             managers = memberRepository.findByAgency_AgencyNoAndMemberRoleIn(

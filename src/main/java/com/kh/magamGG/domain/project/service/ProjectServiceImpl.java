@@ -8,6 +8,7 @@ import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
+import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
@@ -71,6 +72,19 @@ public class ProjectServiceImpl implements ProjectService {
         Set<Long> seenProjectNos = new HashSet<>();
         List<ManagedProjectResponse> result = new ArrayList<>();
         LocalDate today = LocalDate.now();
+        
+        // 정렬을 위해 nextSerialDate를 함께 저장할 임시 클래스
+        class ProjectWithDeadline {
+            ManagedProjectResponse response;
+            LocalDate nextSerialDate;
+            
+            ProjectWithDeadline(ManagedProjectResponse response, LocalDate nextSerialDate) {
+                this.response = response;
+                this.nextSerialDate = nextSerialDate;
+            }
+        }
+        
+        List<ProjectWithDeadline> tempList = new ArrayList<>();
 
         for (ProjectMember pm : allProjectMembers) {
             var project = pm.getProject();
@@ -86,41 +100,54 @@ public class ProjectServiceImpl implements ProjectService {
                     .count();
             int progress = total > 0 ? (completed * 100 / total) : 0;
 
-            Optional<LocalDate> nearestDeadline = cards.stream()
-                    .map(KanbanCard::getKanbanCardEndedAt)
-                    .filter(Objects::nonNull)
-                    .filter(d -> !d.isBefore(today))
-                    .min(LocalDate::compareTo);
-            if (nearestDeadline.isEmpty()) {
-                nearestDeadline = cards.stream()
-                        .map(KanbanCard::getKanbanCardEndedAt)
-                        .filter(Objects::nonNull)
-                        .max(LocalDate::compareTo);
-            }
-
-            String deadlineStr = nearestDeadline
-                    .map(d -> d.getMonthValue() + "월 " + d.getDayOfMonth() + "일")
-                    .orElse("-");
-
-            long daysUntilDeadline = nearestDeadline
-                    .map(d -> ChronoUnit.DAYS.between(today, d))
-                    .orElse(999L);
+            // 주기 기준 다음 연재일 사용 (projectStartedAt + n * projectCycle)
+            LocalDate nextSerialDate = computeNextSerialDate(project, today);
+            String deadlineStr = nextSerialDate != null
+                    ? (nextSerialDate.getMonthValue() + "월 " + nextSerialDate.getDayOfMonth() + "일")
+                    : "-";
+            long daysUntilDeadline = nextSerialDate != null
+                    ? ChronoUnit.DAYS.between(today, nextSerialDate)
+                    : 999L;
             boolean isDeadlineSoon = daysUntilDeadline >= 0 && daysUntilDeadline <= DEADLINE_WARNING_DAYS;
             String status = (isDeadlineSoon && progress < PROGRESS_WARNING_THRESHOLD) ? "주의" : "정상";
 
             String artistName = pm.getMember().getMemberName();
 
-            result.add(ManagedProjectResponse.builder()
+            ManagedProjectResponse response = ManagedProjectResponse.builder()
                     .projectNo(project.getProjectNo())
                     .projectName(project.getProjectName())
                     .artist(artistName)
                     .status(status)
                     .progress(progress)
                     .deadline(deadlineStr)
-                    .build());
+                    .build();
+            
+            tempList.add(new ProjectWithDeadline(response, nextSerialDate));
         }
 
-        result.sort(Comparator.comparing(ManagedProjectResponse::getProjectNo));
+        // 마감일(다음 연재일) 기준으로 정렬: 오늘이 연재일인 항목이 제일 위, 그 다음 가까운 순서대로
+        tempList.sort((a, b) -> {
+            if (a.nextSerialDate == null && b.nextSerialDate == null) {
+                return Long.compare(a.response.getProjectNo(), b.response.getProjectNo());
+            }
+            if (a.nextSerialDate == null) return 1;  // null은 뒤로
+            if (b.nextSerialDate == null) return -1; // null은 뒤로
+            
+            // 오늘이 연재일인 항목을 최우선으로
+            boolean aIsToday = a.nextSerialDate.equals(today);
+            boolean bIsToday = b.nextSerialDate.equals(today);
+            if (aIsToday && !bIsToday) return -1;  // a가 오늘이면 앞으로
+            if (!aIsToday && bIsToday) return 1;   // b가 오늘이면 앞으로
+            
+            // 둘 다 오늘이거나 둘 다 오늘이 아니면 날짜 오름차순
+            return a.nextSerialDate.compareTo(b.nextSerialDate);
+        });
+        
+        // 정렬된 결과를 result에 추가
+        for (ProjectWithDeadline item : tempList) {
+            result.add(item.response);
+        }
+        
         return result;
     }
 
@@ -157,6 +184,69 @@ public class ProjectServiceImpl implements ProjectService {
         return list.size() <= limit ? list : list.subList(0, limit);
     }
 
+    private static final String[] DAY_LABELS = {"오늘", "내일", "2일 후", "3일 후", "4일 후"};
+
+    @Override
+    public List<DeadlineCountResponse> getDeadlineCountsForManager(Long memberNo) {
+        Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            return buildEmptyDeadlineCounts();
+        }
+        Set<Long> artistMemberNos = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo())
+                .stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+        if (artistMemberNos.isEmpty()) {
+            return buildEmptyDeadlineCounts();
+        }
+        List<ProjectMember> allProjectMembers = new ArrayList<>();
+        for (Long artistNo : artistMemberNos) {
+            allProjectMembers.addAll(projectMemberRepository.findByMember_MemberNo(artistNo));
+        }
+        Set<Long> seenProjectNos = new HashSet<>();
+        LocalDate today = LocalDate.now();
+        int[] counts = new int[5];
+        for (ProjectMember pm : allProjectMembers) {
+            Project p = pm.getProject();
+            if (seenProjectNos.contains(p.getProjectNo())) continue;
+            seenProjectNos.add(p.getProjectNo());
+            LocalDate nextDate = computeNextSerialDate(p, today);
+            if (nextDate == null) continue;
+            long daysDiff = ChronoUnit.DAYS.between(today, nextDate);
+            if (daysDiff >= 0 && daysDiff <= 4) {
+                counts[(int) daysDiff]++;
+            }
+        }
+        return buildDeadlineCounts(counts);
+    }
+
+    /** 프로젝트 주기 기준 다음 연재일 (시작일 + n*주기) */
+    private LocalDate computeNextSerialDate(Project p, LocalDate today) {
+        if (p.getProjectStartedAt() == null) return null;
+        LocalDate startDate = p.getProjectStartedAt().toLocalDate();
+        int cycleDays = (p.getProjectCycle() != null && p.getProjectCycle() > 0) ? p.getProjectCycle() : 7;
+        long daysBetween = ChronoUnit.DAYS.between(startDate, today);
+        int n = daysBetween <= 0 ? 0 : (int) Math.ceil((double) daysBetween / cycleDays);
+        return startDate.plusDays((long) n * cycleDays);
+    }
+
+    private List<DeadlineCountResponse> buildEmptyDeadlineCounts() {
+        return Arrays.stream(DAY_LABELS)
+                .map(label -> DeadlineCountResponse.builder().name(label).count(0).build())
+                .collect(Collectors.toList());
+    }
+
+    private List<DeadlineCountResponse> buildDeadlineCounts(int[] counts) {
+        List<DeadlineCountResponse> result = new ArrayList<>();
+        for (int i = 0; i < DAY_LABELS.length; i++) {
+            result.add(DeadlineCountResponse.builder()
+                    .name(DAY_LABELS[i])
+                    .count(counts[i])
+                    .build());
+        }
+        return result;
+    }
+
     @Override
     public List<ProjectListResponse> getProjectsByMemberNo(Long memberNo) {
         List<ProjectMember> projectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
@@ -171,6 +261,26 @@ public class ProjectServiceImpl implements ProjectService {
             result.add(toProjectListResponse(p, members));
         }
         return result;
+    }
+
+    @Override
+    public long getMyProjectCount(Long memberNo) {
+        return projectMemberRepository.countDistinctProjectsByMemberNo(memberNo);
+    }
+
+    @Override
+    public long getTaskCountByMemberNo(Long memberNo) {
+        return kanbanCardRepository.countByProjectMember_Member_MemberNo(memberNo);
+    }
+
+    @Override
+    public long getCompletedTaskCountByMemberNo(Long memberNo) {
+        return kanbanCardRepository.countByProjectMember_Member_MemberNoAndKanbanCardStatus(memberNo, "Y");
+    }
+
+    @Override
+    public long getActiveTaskCountByMemberNo(Long memberNo) {
+        return kanbanCardRepository.countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(memberNo);
     }
 
     @Override
@@ -197,8 +307,20 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     @Transactional
     public ProjectListResponse createProject(ProjectCreateRequest request, Long creatorNo) {
+        String projectName = request.getProjectName() != null ? request.getProjectName().trim() : "";
+        if (projectName.isEmpty()) {
+            throw new IllegalArgumentException("프로젝트명을 입력해주세요.");
+        }
+
+        Member artist = memberRepository.findById(request.getArtistMemberNo())
+                .orElseThrow(() -> new IllegalArgumentException("작가 회원을 찾을 수 없습니다: " + request.getArtistMemberNo()));
+        Long agencyNo = artist.getAgency() != null ? artist.getAgency().getAgencyNo() : null;
+        if (agencyNo != null && projectRepository.countByProjectNameAndAgencyNo(projectName, agencyNo) > 0) {
+            throw new IllegalArgumentException("이미 같은 이름의 프로젝트가 있습니다.");
+        }
+
         Project project = new Project();
-        project.setProjectName(request.getProjectName() != null ? request.getProjectName() : "제목 없음");
+        project.setProjectName(projectName);
         project.setProjectStatus(request.getProjectStatus() != null ? request.getProjectStatus() : "연재");
         project.setProjectColor(request.getProjectColor() != null ? request.getProjectColor() : "기본색");
         project.setProjectCycle(request.getProjectCycle());
@@ -206,9 +328,6 @@ public class ProjectServiceImpl implements ProjectService {
         project.setThumbnailFile(request.getThumbnailFile());
         project.setProjectStartedAt(request.getProjectStartedAt());
         Project saved = projectRepository.save(project);
-
-        Member artist = memberRepository.findById(request.getArtistMemberNo())
-            .orElseThrow(() -> new IllegalArgumentException("작가 회원을 찾을 수 없습니다: " + request.getArtistMemberNo()));
         ProjectMember artistPm = new ProjectMember();
         artistPm.setMember(artist);
         artistPm.setProject(saved);
@@ -373,7 +492,7 @@ public class ProjectServiceImpl implements ProjectService {
 
     @Override
     public List<ProjectMemberResponse> getAddableMembers(Long projectNo) {
-        Project project = projectRepository.findById(projectNo)
+        projectRepository.findById(projectNo)
             .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
         List<ProjectMember> existing = projectMemberRepository.findByProject_ProjectNo(projectNo);
         if (existing.isEmpty()) return List.of();

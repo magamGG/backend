@@ -45,7 +45,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
+import java.util.TreeMap;
 
 /**
  * 근태 관리 서비스 구현체
@@ -183,17 +185,64 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month) {
-        // 출근만 표시, 날짜별 1회 집계 (같은 날 여러 출근/퇴근 있어도 그 날은 1일로만 카운트)
-        long distinctCheckInDays = attendanceRepository.countDistinctCheckInDaysByMemberNoAndMonth(memberNo, year, month);
-        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = List.of(
-            AttendanceStatisticsResponseDto.TypeCount.builder()
-                .type("출근")
-                .count(distinctCheckInDays)
-                .build()
-        );
+        // member_no 기준 attendance에서 출근한 날짜 목록 조회
+        List<LocalDate> checkInDates = attendanceRepository
+            .findDistinctCheckInDatesByMemberNoAndMonth(memberNo, year, month)
+            .stream()
+            .map(java.sql.Date::toLocalDate)
+            .collect(Collectors.toList());
+        Set<LocalDate> checkInSet = new HashSet<>(checkInDates);
+        
+        // 해당 회원의 승인된 근태 신청 목록
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository.findApprovedByMemberNo(memberNo);
+        
+        // 이번 달 1일부터 오늘까지의 모든 날짜 확인
+        LocalDate firstDayOfMonth = LocalDate.of(year, month, 1);
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.isBefore(firstDayOfMonth.plusMonths(1)) ? today : firstDayOfMonth.plusMonths(1).minusDays(1);
+        
+        Map<String, Long> typeToCount = new TreeMap<>();
+        
+        // 이번 달 1일부터 오늘까지 순회
+        LocalDate currentDate = firstDayOfMonth;
+        while (!currentDate.isAfter(endDate)) {
+            boolean hasCheckIn = checkInSet.contains(currentDate);
+            String type = null;
+            
+            // 승인된 근태 신청 확인
+            for (AttendanceRequest req : approvedRequests) {
+                LocalDate start = req.getAttendanceRequestStartDate().toLocalDate();
+                LocalDate end = req.getAttendanceRequestEndDate().toLocalDate();
+                if (!currentDate.isBefore(start) && !currentDate.isAfter(end)) {
+                    type = req.getAttendanceRequestType() != null ? req.getAttendanceRequestType() : "출근";
+                    break;
+                }
+            }
+            
+            if (hasCheckIn) {
+                // 출근한 날: 승인된 신청이 있으면 그 타입, 없으면 "출근"
+                String finalType = (type != null) ? type : "출근";
+                typeToCount.merge(finalType, 1L, Long::sum);
+            } else if (type != null) {
+                // 출근하지 않았지만 승인된 근태 신청이 있는 날 (연차, 휴가 등)
+                typeToCount.merge(type, 1L, Long::sum);
+            }
+            // 출근하지 않고 승인된 신청도 없으면 집계하지 않음 (미출근은 프론트에서 계산)
+            
+            currentDate = currentDate.plusDays(1);
+        }
+        
+        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = typeToCount.entrySet().stream()
+            .map(e -> AttendanceStatisticsResponseDto.TypeCount.builder()
+                .type(e.getKey())
+                .count(e.getValue())
+                .build())
+            .collect(Collectors.toList());
+        
+        // totalCount는 출근한 날짜 수 (기존 로직 유지)
         return AttendanceStatisticsResponseDto.builder()
             .typeCounts(typeCounts)
-            .totalCount((int) distinctCheckInDays)
+            .totalCount(checkInDates.size())
             .build();
     }
     
@@ -623,6 +672,54 @@ public class AttendanceServiceImpl implements AttendanceService {
                     return !reqStart.isAfter(sunday) && !reqEnd.isBefore(monday);
                 })
                 .sorted((a, b) -> a.getAttendanceRequestStartDate().compareTo(b.getAttendanceRequestStartDate()))
+                .map(AttendanceRequestResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<AttendanceRequestResponse> getAttendanceRequestsByManager(Long memberNo) {
+        Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            log.debug("담당자 아님: memberNo={}", memberNo);
+            return List.of();
+        }
+
+        // 담당자에게 배정된 작가들의 memberNo 집합
+        Set<Long> artistMemberNos = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo())
+                .stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+
+        if (artistMemberNos.isEmpty()) {
+            return List.of();
+        }
+
+        // 담당자의 에이전시 번호 추론 (없으면 담당 작가 중 한 명의 에이전시 사용)
+        Long agencyNo = Optional.ofNullable(managerOpt.get().getMember().getAgency())
+                .map(a -> a.getAgencyNo())
+                .orElse(null);
+        if (agencyNo == null) {
+            agencyNo = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo()).stream()
+                    .map(a -> a.getArtist().getAgency())
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .map(a -> a.getAgencyNo())
+                    .orElse(null);
+        }
+        if (agencyNo == null) {
+            return List.of();
+        }
+
+        // 에이전시 기준으로 조회한 뒤, 담당 작가들만 필터링
+        List<AttendanceRequest> agencyRequests = attendanceRequestRepository.findByAgencyNoWithMember(agencyNo);
+        if (agencyRequests == null || agencyRequests.isEmpty()) {
+            return List.of();
+        }
+
+        return agencyRequests.stream()
+                .filter(req -> !"CANCELLED".equals(req.getAttendanceRequestStatus()))
+                .filter(req -> artistMemberNos.contains(req.getMember().getMemberNo()))
+                .sorted((a, b) -> b.getAttendanceRequestCreatedAt().compareTo(a.getAttendanceRequestCreatedAt()))
                 .map(AttendanceRequestResponse::fromEntity)
                 .collect(Collectors.toList());
     }

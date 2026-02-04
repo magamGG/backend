@@ -1,6 +1,5 @@
 package com.kh.magamGG.domain.memo.entity;
 
-import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -22,10 +21,6 @@ public class Memo {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "MEMBER_NO", nullable = false)
 	private Member member;
-	
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "CALENDAR_EVENT_NO", nullable = true)
-	private CalendarEvent calendarEvent;
 	
 	@Column(name = "MEMO_NAME", nullable = false, length = 30)
 	private String memoName;

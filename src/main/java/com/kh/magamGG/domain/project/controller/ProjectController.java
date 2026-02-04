@@ -12,12 +12,14 @@ import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.KanbanBoardResponse;
 import com.kh.magamGG.domain.project.dto.response.CommentResponse;
 import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
+import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
+import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.service.CommentService;
 import com.kh.magamGG.domain.project.service.KanbanBoardService;
 import com.kh.magamGG.domain.project.service.ProjectService;
@@ -71,6 +73,16 @@ public class ProjectController {
     }
 
     /**
+     * 회원별 칸반 카드 통계 (진행중/완료 작업 개수) - 워케이션 등 원격 관리용
+     * GET /api/projects/member/{memberNo}/kanban-stats
+     */
+    @GetMapping("/member/{memberNo}/kanban-stats")
+    public ResponseEntity<MemberKanbanStatsResponseDto> getKanbanStatsForMember(@PathVariable Long memberNo) {
+        MemberKanbanStatsResponseDto response = kanbanBoardService.getKanbanStatsForMember(memberNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 아티스트 대시보드 오늘 할 일 - 담당자 배정 + 마감일 오늘 + 미완료(N) 칸반 카드만
      * GET /api/projects/my-today-tasks
      */
@@ -78,6 +90,17 @@ public class ProjectController {
     public ResponseEntity<List<TodayTaskResponse>> getMyTodayTasks(@RequestHeader("X-Member-No") Long memberNo) {
         List<TodayTaskResponse> list = kanbanBoardService.getTodayTasksForMember(memberNo);
         return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 담당자 대시보드 마감 임박 현황 (주기 기준: 오늘~4일 후별 다음 연재일 건수)
+     * GET /api/projects/deadline-counts
+     */
+    @GetMapping("/deadline-counts")
+    public ResponseEntity<List<DeadlineCountResponse>> getDeadlineCounts(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        List<DeadlineCountResponse> counts = projectService.getDeadlineCountsForManager(memberNo);
+        return ResponseEntity.ok(counts);
     }
 
     /**
@@ -104,6 +127,48 @@ public class ProjectController {
     ) {
         List<ProjectListResponse> list = projectService.getProjectsByMemberNo(memberNo);
         return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 로그인 회원이 소속된 프로젝트 수 (PROJECT_MEMBER 기준)
+     * GET /api/projects/my-count
+     */
+    @GetMapping("/my-count")
+    public ResponseEntity<java.util.Map<String, Long>> getMyProjectCount(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        long count = projectService.getMyProjectCount(memberNo);
+        log.debug("my-count: memberNo={}, count={}", memberNo, count);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    /**
+     * 회원에게 배정된 칸반 카드(작업) 수 - KANBAN_CARD_STATUS = 'N'(미완료)만 (상단 "진행 중인 작업" 통계용)
+     * GET /api/projects/members/{memberNo}/task-count
+     */
+    @GetMapping("/members/{memberNo}/task-count")
+    public ResponseEntity<java.util.Map<String, Long>> getTaskCountByMemberNo(@PathVariable Long memberNo) {
+        long count = projectService.getTaskCountByMemberNo(memberNo);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - STATUS가 'D'가 아닌 것만 (카드 "작업 N개" 표시용)
+     * GET /api/projects/members/{memberNo}/active-task-count
+     */
+    @GetMapping("/members/{memberNo}/active-task-count")
+    public ResponseEntity<java.util.Map<String, Long>> getActiveTaskCountByMemberNo(@PathVariable Long memberNo) {
+        long count = projectService.getActiveTaskCountByMemberNo(memberNo);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    /**
+     * 회원에게 배정된 완료 칸반 카드 수 - KANBAN_CARD_STATUS = 'Y'만 (워케이션 "완료된 작업" 표시용)
+     * GET /api/projects/members/{memberNo}/completed-task-count
+     */
+    @GetMapping("/members/{memberNo}/completed-task-count")
+    public ResponseEntity<java.util.Map<String, Long>> getCompletedTaskCountByMemberNo(@PathVariable Long memberNo) {
+        long count = projectService.getCompletedTaskCountByMemberNo(memberNo);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
     }
 
     /**
