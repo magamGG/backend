@@ -131,6 +131,36 @@ public class ProjectController {
     }
 
     /**
+     * 회원에게 배정된 칸반 카드(작업) 수 - KANBAN_CARD_STATUS = 'N'(미완료)만 (상단 "진행 중인 작업" 통계용)
+     * GET /api/projects/members/{memberNo}/task-count
+     */
+    @GetMapping("/members/{memberNo}/task-count")
+    public ResponseEntity<java.util.Map<String, Long>> getTaskCountByMemberNo(@PathVariable Long memberNo) {
+        long count = projectService.getTaskCountByMemberNo(memberNo);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - STATUS가 'D'가 아닌 것만 (카드 "작업 N개" 표시용)
+     * GET /api/projects/members/{memberNo}/active-task-count
+     */
+    @GetMapping("/members/{memberNo}/active-task-count")
+    public ResponseEntity<java.util.Map<String, Long>> getActiveTaskCountByMemberNo(@PathVariable Long memberNo) {
+        long count = projectService.getActiveTaskCountByMemberNo(memberNo);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    /**
+     * 회원에게 배정된 완료 칸반 카드 수 - KANBAN_CARD_STATUS = 'Y'만 (워케이션 "완료된 작업" 표시용)
+     * GET /api/projects/members/{memberNo}/completed-task-count
+     */
+    @GetMapping("/members/{memberNo}/completed-task-count")
+    public ResponseEntity<java.util.Map<String, Long>> getCompletedTaskCountByMemberNo(@PathVariable Long memberNo) {
+        long count = projectService.getCompletedTaskCountByMemberNo(memberNo);
+        return ResponseEntity.ok(java.util.Map.of("count", count));
+    }
+
+    /**
      * 에이전시 소속 전체 프로젝트 조회 (에이전시 관리자만 가능)
      * GET /api/projects/agency/{agencyNo}
      */

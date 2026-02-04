@@ -25,5 +25,27 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
            "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
     List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(
             @Param("memberNo") Long memberNo, @Param("status") String status);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 (PROJECT_MEMBER 경유, 상태 N=미완료만)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = 'N'")
+    long countByProjectMember_Member_MemberNo(@Param("memberNo") Long memberNo);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - 지정 상태만 (PROJECT_MEMBER 경유, status='Y' 완료 등)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = :status")
+    long countByProjectMember_Member_MemberNoAndKanbanCardStatus(
+            @Param("memberNo") Long memberNo, @Param("status") String status);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - STATUS가 'D'(삭제)가 아닌 것만 (카드 "작업 N개" 표시용)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D')")
+    long countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(@Param("memberNo") Long memberNo);
 }
 

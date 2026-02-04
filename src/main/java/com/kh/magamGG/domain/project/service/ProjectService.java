@@ -36,6 +36,21 @@ public interface ProjectService {
     long getMyProjectCount(Long memberNo);
 
     /**
+     * 회원에게 배정된 칸반 카드(작업) 수 (PROJECT_MEMBER 경유, KANBAN_CARD_STATUS = 'N'만)
+     */
+    long getTaskCountByMemberNo(Long memberNo);
+
+    /**
+     * 회원에게 배정된 완료 칸반 카드 수 (PROJECT_MEMBER 경유, KANBAN_CARD_STATUS = 'Y'만)
+     */
+    long getCompletedTaskCountByMemberNo(Long memberNo);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - STATUS가 'D'가 아닌 것만 (카드 "작업 N개" 표시용)
+     */
+    long getActiveTaskCountByMemberNo(Long memberNo);
+
+    /**
      * 에이전시 소속 모든 프로젝트 조회 (에이전시 관리자만 호출 가능)
      */
     List<ProjectListResponse> getProjectsByAgencyNo(Long agencyNo, Long requesterMemberNo);

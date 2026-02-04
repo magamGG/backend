@@ -232,6 +232,21 @@ public class ProjectServiceImpl implements ProjectService {
     }
 
     @Override
+    public long getTaskCountByMemberNo(Long memberNo) {
+        return kanbanCardRepository.countByProjectMember_Member_MemberNo(memberNo);
+    }
+
+    @Override
+    public long getCompletedTaskCountByMemberNo(Long memberNo) {
+        return kanbanCardRepository.countByProjectMember_Member_MemberNoAndKanbanCardStatus(memberNo, "Y");
+    }
+
+    @Override
+    public long getActiveTaskCountByMemberNo(Long memberNo) {
+        return kanbanCardRepository.countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(memberNo);
+    }
+
+    @Override
     public List<ProjectListResponse> getProjectsByAgencyNo(Long agencyNo, Long requesterMemberNo) {
         Member requester = memberRepository.findById(requesterMemberNo)
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
