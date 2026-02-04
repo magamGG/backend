@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,9 +46,9 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
 
     /**
      * 건강 설문 응답 제출
-     * - 프론트엔드에서 각 문항별 점수의 총합을 계산하여 전송
-     * - 백엔드에서는 총점만 받아서 HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE에 저장
-     * - HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT의 유무로 검진 완료 여부 판단
+     * - 문항별 점수를 각각 HEALTH_SURVEY_RESPONSE_ITEM에 저장 (항목별 체크, 상세보기 확장용)
+     * - 같은 제출은 HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT로 묶음
+     * - 총점은 저장하지 않고 조회 시 합산하여 사용
      */
     @Override
     @Transactional
@@ -57,39 +58,41 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         Member member = memberRepository.findById(request.getMemberNo())
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + request.getMemberNo()));
 
-        // 2. 총점 계산 (answers의 각 문항 점수 합산)
         List<HealthSurveyAnswerRequest> answers = request.getAnswers();
         if (answers == null || answers.isEmpty()) {
             throw new IllegalArgumentException("응답 항목이 없습니다.");
         }
-        int totalScore = answers.stream()
-            .mapToInt(a -> a.getScore() != null ? a.getScore() : 0)
-            .sum();
-        if (totalScore < 0) {
-            throw new IllegalArgumentException("총점이 유효하지 않습니다: " + totalScore);
+
+        // 2. 동일 설문 타입 검증 및 문항별 저장
+        LocalDateTime responseCreatedAt = LocalDateTime.now();
+        String surveyType = null;
+        int totalScore = 0;
+
+        for (HealthSurveyAnswerRequest answer : answers) {
+            if (answer.getQuestionId() == null) {
+                throw new IllegalArgumentException("질문 ID가 없습니다.");
+            }
+            HealthSurveyQuestion question = healthSurveyQuestionRepository.findById(answer.getQuestionId())
+                .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + answer.getQuestionId()));
+            if (surveyType == null) {
+                surveyType = question.getHealthSurveyQuestionType();
+            } else if (!surveyType.equals(question.getHealthSurveyQuestionType())) {
+                throw new IllegalArgumentException("서로 다른 설문 타입의 문항을 함께 제출할 수 없습니다.");
+            }
+            int score = answer.getScore() != null ? answer.getScore() : 0;
+            if (score < 0) {
+                throw new IllegalArgumentException("문항 점수는 0 이상이어야 합니다.");
+            }
+            totalScore += score;
+
+            HealthSurveyResponseItem item = new HealthSurveyResponseItem();
+            item.setMember(member);
+            item.setHealthSurveyQuestion(question);
+            item.setHealthSurveyQuestionItemAnswerScore(score);
+            item.setHealthSurveyQuestionItemCreatedAt(responseCreatedAt);
+            healthSurveyResponseItemRepository.save(item);
         }
 
-        // 3. 첫 번째 답변의 questionId로 질문 조회하여 타입 확인
-        Long firstQuestionId = answers.get(0).getQuestionId();
-        HealthSurveyQuestion firstQuestion = healthSurveyQuestionRepository.findById(firstQuestionId)
-            .orElseThrow(() -> new IllegalArgumentException("질문을 찾을 수 없습니다: " + firstQuestionId));
-        
-        String surveyType = firstQuestion.getHealthSurveyQuestionType();
-
-        // 4. 건강 설문 응답 저장
-        // - HEALTH_SURVEY_QUESTION_ITEM_ANSWER_SCORE: 각 문항별 점수의 총합 저장
-        // - HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT: 생성일 유무로 검진 완료 여부 판단
-        LocalDateTime responseCreatedAt = LocalDateTime.now();
-        
-        HealthSurveyResponseItem item = new HealthSurveyResponseItem();
-        item.setMember(member);
-        item.setHealthSurveyQuestion(firstQuestion);  // FK 제약조건 만족 (어떤 문항이든 참조 가능)
-        item.setHealthSurveyQuestionItemAnswerScore(totalScore);  // 각 문항별 점수의 총합 저장
-        item.setHealthSurveyQuestionItemCreatedAt(responseCreatedAt);  // 검진 완료 여부 판단용
-
-        healthSurveyResponseItemRepository.save(item);
-
-        // 5. 클라이언트로 반환
         return HealthSurveySubmitResponse.builder()
             .memberNo(member.getMemberNo())
             .totalScore(totalScore)
@@ -219,16 +222,15 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
         Integer cycle = healthSurvey != null && healthSurvey.getHealthSurveyCycle() != null 
             ? healthSurvey.getHealthSurveyCycle() : 30;   // INT → Integer
         
-        // 4. 회원의 해당 HEALTH_SURVEY_QUESTION_TYPE에 대한 응답 조회
-        List<HealthSurveyResponseItem> responseItems = 
+        // 4. 회원의 해당 타입에 대한 응답 조회 (문항별 row)
+        List<HealthSurveyResponseItem> responseItems =
             healthSurveyResponseItemRepository.findByMemberNoAndHealthSurveyType(memberNo, healthSurveyQuestionType);
 
-        // 5. 응답이 없으면 미완료 상태 반환 (기간 계산 포함)
+        // 5. 응답이 없으면 미완료 상태 반환
         if (responseItems == null || responseItems.isEmpty()) {
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime deadlineDate = now.plusDays(period);  // 검사 기간만큼 마감일 설정
+            LocalDateTime deadlineDate = now.plusDays(period);
             long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, deadlineDate);
-            
             return HealthSurveyResponseStatusResponse.builder()
                 .isCompleted(false)
                 .lastCheckDate(null)
@@ -242,20 +244,18 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
                 .build();
         }
 
-        // 6. 가장 최근 응답 찾기 (CREATED_AT 기준, CREATED_AT가 null이 아닌 것만)
-        // HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT가 존재하면 검사 완료로 간주
-        HealthSurveyResponseItem latestResponse = responseItems.stream()
-            .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)  // CREATED_AT가 null이 아닌 것만 필터링
-            .max((a, b) -> a.getHealthSurveyQuestionItemCreatedAt()
-                .compareTo(b.getHealthSurveyQuestionItemCreatedAt()))
+        // 6. CREATED_AT 기준으로 제출 그룹 묶기, 그 중 최신 제출만 사용
+        Map<LocalDateTime, List<HealthSurveyResponseItem>> byCreatedAt = responseItems.stream()
+            .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)
+            .collect(Collectors.groupingBy(HealthSurveyResponseItem::getHealthSurveyQuestionItemCreatedAt));
+
+        LocalDateTime latestCreatedAt = byCreatedAt.keySet().stream()
+            .max(LocalDateTime::compareTo)
             .orElse(null);
-
-        // 7. CREATED_AT가 존재하는 응답이 없으면 미완료 상태 반환 (기간 계산 포함)
-        if (latestResponse == null || latestResponse.getHealthSurveyQuestionItemCreatedAt() == null) {
+        if (latestCreatedAt == null) {
             LocalDateTime now = LocalDateTime.now();
-            LocalDateTime deadlineDate = now.plusDays(period);  // 검사 기간만큼 마감일 설정
+            LocalDateTime deadlineDate = now.plusDays(period);
             long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, deadlineDate);
-            
             return HealthSurveyResponseStatusResponse.builder()
                 .isCompleted(false)
                 .lastCheckDate(null)
@@ -269,19 +269,20 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
                 .build();
         }
 
-        // 8. 총점과 위험도 계산
-        Integer totalScore = latestResponse.getHealthSurveyQuestionItemAnswerScore();
-        String riskLevel = evaluateRiskLevel(healthSurveyQuestionType, totalScore != null ? totalScore : 0);
-        
-        // 9. 날짜 계산 (검진 완료 상태)
-        LocalDateTime lastCheckDate = latestResponse.getHealthSurveyQuestionItemCreatedAt();
-        LocalDateTime nextCheckupDate = lastCheckDate.plusDays(cycle);  // 검사 주기만큼 다음 검진일 계산
+        // 7. 최신 제출의 문항별 점수 합산 → 총점, 위험도 계산
+        List<HealthSurveyResponseItem> latestSubmission = byCreatedAt.get(latestCreatedAt);
+        int totalScore = latestSubmission.stream()
+            .mapToInt(item -> item.getHealthSurveyQuestionItemAnswerScore() != null ? item.getHealthSurveyQuestionItemAnswerScore() : 0)
+            .sum();
+        String riskLevel = evaluateRiskLevel(healthSurveyQuestionType, totalScore);
+
+        LocalDateTime lastCheckDate = latestCreatedAt;
+        LocalDateTime nextCheckupDate = lastCheckDate.plusDays(cycle);
         LocalDateTime now = LocalDateTime.now();
         long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(now, nextCheckupDate);
 
-        // 10. 응답 반환 (CREATED_AT가 존재하므로 완료 상태)
         return HealthSurveyResponseStatusResponse.builder()
-            .isCompleted(true)  // HEALTH_SURVEY_QUESTION_ITEM_CREATED_AT가 존재하므로 완료
+            .isCompleted(true)
             .lastCheckDate(lastCheckDate)
             .totalScore(totalScore)
             .riskLevel(riskLevel)
@@ -289,7 +290,7 @@ public class HealthSurveyServiceImpl implements HealthSurveyService {
             .healthSurveyCycle(cycle)
             .nextCheckupDate(nextCheckupDate)
             .daysRemaining((int) daysRemaining)
-            .deadlineDate(null)  // 완료 상태이므로 마감일 없음
+            .deadlineDate(null)
             .build();
     }
 

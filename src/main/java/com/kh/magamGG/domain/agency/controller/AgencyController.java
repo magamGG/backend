@@ -3,12 +3,17 @@ package com.kh.magamGG.domain.agency.controller;
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.RejectJoinRequestRequest;
 import com.kh.magamGG.domain.agency.dto.request.UpdateAgencyLeaveRequest;
+import com.kh.magamGG.domain.agency.dto.request.UpdateHealthScheduleRequest;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDeadlineCountResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyHealthScheduleResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyUnscreenedListResponse;
 import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.HealthMonitoringDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.service.AgencyService;
@@ -81,6 +86,60 @@ public class AgencyController {
     public ResponseEntity<HealthDistributionResponse> getHealthDistribution(@PathVariable Long agencyNo) {
         HealthDistributionResponse response = agencyService.getHealthDistribution(agencyNo);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 검진 모니터링 상세 목록 (정신/신체 타입별)
+     * GET /api/agency/{agencyNo}/health-monitoring-detail?type=mental|physical
+     */
+    @GetMapping("/{agencyNo}/health-monitoring-detail")
+    public ResponseEntity<HealthMonitoringDetailResponse> getHealthMonitoringDetail(
+            @PathVariable Long agencyNo,
+            @RequestParam(defaultValue = "mental") String type) {
+        HealthMonitoringDetailResponse response = agencyService.getHealthMonitoringDetail(agencyNo, type);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 에이전시 건강 검진 일정 (HEALTH_SURVEY 생성일·주기 기반 다음 검진 예정일)
+     * GET /api/agency/{agencyNo}/health-schedule
+     */
+    @GetMapping("/{agencyNo}/health-schedule")
+    public ResponseEntity<AgencyHealthScheduleResponse> getAgencyHealthSchedule(@PathVariable Long agencyNo) {
+        AgencyHealthScheduleResponse response = agencyService.getAgencyHealthSchedule(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 에이전시 건강 검진 설정 수정 (HEALTH_SURVEY period, cycle)
+     * PUT /api/agency/{agencyNo}/health-schedule
+     */
+    @PutMapping("/{agencyNo}/health-schedule")
+    public ResponseEntity<Void> updateAgencyHealthSchedule(
+            @PathVariable Long agencyNo,
+            @RequestBody UpdateHealthScheduleRequest request) {
+        agencyService.updateAgencyHealthSchedule(agencyNo, request);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 에이전시 미검진 인원 목록 (정신/신체 중 하나라도 미검진이면 포함)
+     * GET /api/agency/{agencyNo}/unscreened-list
+     */
+    @GetMapping("/{agencyNo}/unscreened-list")
+    public ResponseEntity<AgencyUnscreenedListResponse> getAgencyUnscreenedList(@PathVariable Long agencyNo) {
+        AgencyUnscreenedListResponse response = agencyService.getAgencyUnscreenedList(agencyNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 에이전시 마감 임박 현황 (담당자 관리 프로젝트 업무 기준, 오늘~4일 후 5개 집계)
+     * GET /api/agency/{agencyNo}/deadline-counts
+     */
+    @GetMapping("/{agencyNo}/deadline-counts")
+    public ResponseEntity<List<AgencyDeadlineCountResponse.DeadlineItem>> getAgencyDeadlineCounts(@PathVariable Long agencyNo) {
+        List<AgencyDeadlineCountResponse.DeadlineItem> counts = agencyService.getAgencyDeadlineCounts(agencyNo);
+        return ResponseEntity.ok(counts);
     }
 
     /**

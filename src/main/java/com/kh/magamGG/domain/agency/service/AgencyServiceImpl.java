@@ -1,11 +1,16 @@
 package com.kh.magamGG.domain.agency.service;
 
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
+import com.kh.magamGG.domain.agency.dto.request.UpdateHealthScheduleRequest;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDeadlineCountResponse;
 import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyHealthScheduleResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyUnscreenedListResponse;
 import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.HealthMonitoringDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
@@ -25,7 +30,9 @@ import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.health.dto.HealthSurveyRiskLevelDto;
+import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.health.entity.HealthSurveyResponseItem;
+import com.kh.magamGG.domain.health.repository.HealthSurveyRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyResponseItemRepository;
 import com.kh.magamGG.domain.health.service.HealthSurveyService;
 import com.kh.magamGG.domain.project.entity.KanbanCard;
@@ -42,6 +49,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -70,6 +79,7 @@ public class AgencyServiceImpl implements AgencyService {
     private final AttendanceRequestRepository attendanceRequestRepository;
     private final HealthSurveyResponseItemRepository healthSurveyResponseItemRepository;
     private final HealthSurveyService healthSurveyService;
+    private final HealthSurveyRepository healthSurveyRepository;
 
     @Override
     @Transactional
@@ -171,17 +181,14 @@ public class AgencyServiceImpl implements AgencyService {
         String memberName = newRequest.getMember().getMemberName();
         String agencyName = newRequest.getAgency().getAgencyName();
 
-        // 1. NEW_REQUEST 상태를 "승인"으로 변경 (JPA)
+        // 1. NEW_REQUEST 상태를 "승인"으로 변경
         newRequest.setNewRequestStatus("승인");
         newRequestRepository.save(newRequest);
         log.info("NEW_REQUEST 상태 업데이트 완료: {} -> 승인", newRequestNo);
 
-        // 2. MEMBER의 AGENCY_NO를 업데이트 (JPA)
-        Member memberToUpdate = memberRepository.findById(memberNo)
-                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
-        Agency agencyToAssign = agencyRepository.findById(agencyNo)
-                .orElseThrow(() -> new AgencyNotFoundException("에이전시를 찾을 수 없습니다."));
-        memberToUpdate.setAgency(agencyToAssign);
+        // 2. MEMBER의 AGENCY_NO 업데이트
+        Member memberToUpdate = newRequest.getMember();
+        memberToUpdate.setAgency(newRequest.getAgency());
         memberRepository.save(memberToUpdate);
         log.info("MEMBER AGENCY_NO 업데이트 완료: 회원 {} -> 에이전시 {}", memberNo, agencyNo);
 
@@ -267,10 +274,10 @@ public class AgencyServiceImpl implements AgencyService {
 
         String memberName = newRequest.getMember().getMemberName();
 
-        // 가입 요청 상태를 "거절"로 변경 (JPA)
+        // 가입 요청 상태를 "거절"로 변경
         newRequest.setNewRequestStatus("거절");
         newRequestRepository.save(newRequest);
-        
+
         log.info("에이전시 가입 요청 거절: 요청번호 {}, 회원 {}, 사유: {}",
                 newRequestNo, memberName, rejectionReason);
 
@@ -448,19 +455,17 @@ public class AgencyServiceImpl implements AgencyService {
     @Override
     public ArtistDistributionResponse getArtistDistribution(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
-        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
-        if (artists.isEmpty()) {
+        List<Object[]> rows;
+        try {
+            rows = projectMemberRepository.countNonManagerMembersByProjectAndAgency(agencyNo);
+        } catch (Exception e) {
+            log.warn("작품별 아티스트 분포 조회 중 오류: {}", e.getMessage());
             return ArtistDistributionResponse.builder()
                     .distribution(Collections.emptyList())
                     .maxArtistProjectName(null)
                     .build();
         }
-        List<Long> memberNos = artists.stream().map(Member::getMemberNo).collect(Collectors.toList());
-        List<Object[]> rows;
-        try {
-            rows = projectMemberRepository.countArtistsByProjectForMembers(memberNos);
-        } catch (Exception e) {
-            log.warn("작품별 아티스트 분포 조회 중 오류: {}", e.getMessage());
+        if (rows == null || rows.isEmpty()) {
             return ArtistDistributionResponse.builder()
                     .distribution(Collections.emptyList())
                     .maxArtistProjectName(null)
@@ -502,6 +507,8 @@ public class AgencyServiceImpl implements AgencyService {
 
     /** 금일 출석 분포에서 제외할 역할 (에이전시 관리자·관리자는 직원 현황에 포함하지 않음) */
     private static final List<String> EXCLUDED_ROLES_FOR_ATTENDANCE = List.of("에이전시 관리자", "관리자");
+    /** 건강 인원 분포에서 제외할 역할 (에이전시 관리자만 제외) */
+    private static final String EXCLUDED_ROLE_FOR_HEALTH = "에이전시 관리자";
 
     @Override
     public AttendanceDistributionResponse getAttendanceDistribution(Long agencyNo) {
@@ -622,44 +629,360 @@ public class AgencyServiceImpl implements AgencyService {
     public HealthDistributionResponse getHealthDistribution(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
 
+        // 집계 대상: 에이전시 소속 회원 중 에이전시 관리자 제외
+        List<Member> allMembers = memberRepository.findByAgency_AgencyNo(agencyNo);
+        List<Member> targetMembers = allMembers.stream()
+                .filter(m -> m.getMemberRole() == null || !EXCLUDED_ROLE_FOR_HEALTH.equals(m.getMemberRole().trim()))
+                .collect(Collectors.toList());
+        Set<Long> targetMemberNos = targetMembers.stream().map(Member::getMemberNo).collect(Collectors.toSet());
+        int totalTarget = targetMemberNos.size();
+
         List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository.findByAgencyNoWithSurvey(agencyNo);
-        Map<Long, HealthSurveyResponseItem> latestByMember = new LinkedHashMap<>();
-        for (HealthSurveyResponseItem item : items) {
-            Long memberNo = item.getMember().getMemberNo();
-            if (!latestByMember.containsKey(memberNo)) {
-                latestByMember.put(memberNo, item);
-            }
-        }
+
+        // 설문 타입별로 필터 후 회원별 최신 제출만 사용하여 등급 집계
+        List<HealthDistributionResponse.HealthItem> mentalDistribution = buildHealthDistributionForType(
+                items, "월간 정신", targetMemberNos, totalTarget);
+        List<HealthDistributionResponse.HealthItem> physicalDistribution = buildHealthDistributionForType(
+                items, "월간 신체", targetMemberNos, totalTarget);
+
+        return HealthDistributionResponse.builder()
+                .mentalDistribution(mentalDistribution)
+                .physicalDistribution(physicalDistribution)
+                .build();
+    }
+
+    /**
+     * 특정 설문 타입(월간 정신 / 월간 신체)에 대해 위험·경고·주의·정상·미검진 집계 (에이전시 관리자 제외 대상 기준)
+     */
+    private List<HealthDistributionResponse.HealthItem> buildHealthDistributionForType(
+            List<HealthSurveyResponseItem> items,
+            String surveyType,
+            Set<Long> targetMemberNos,
+            int totalTarget) {
+
+        List<HealthSurveyResponseItem> typeItems = items.stream()
+                .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)
+                .filter(item -> surveyType.equals(item.getHealthSurveyQuestion().getHealthSurveyQuestionType()))
+                .filter(item -> targetMemberNos.contains(item.getMember().getMemberNo()))
+                .collect(Collectors.toList());
+
+        Map<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> byMemberThenByTime = typeItems.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getMember().getMemberNo(),
+                        LinkedHashMap::new,
+                        Collectors.groupingBy(HealthSurveyResponseItem::getHealthSurveyQuestionItemCreatedAt)));
 
         long dangerCount = 0;
+        long warningCount = 0;
         long cautionCount = 0;
         long normalCount = 0;
 
-        for (HealthSurveyResponseItem item : latestByMember.values()) {
-            String surveyType = item.getHealthSurveyQuestion().getHealthSurveyQuestionType();
-            int score = item.getHealthSurveyQuestionItemAnswerScore();
+        for (Map<LocalDateTime, List<HealthSurveyResponseItem>> byTime : byMemberThenByTime.values()) {
+            LocalDateTime latestCreatedAt = byTime.keySet().stream().max(LocalDateTime::compareTo).orElse(null);
+            if (latestCreatedAt == null) continue;
+            List<HealthSurveyResponseItem> latestSubmission = byTime.get(latestCreatedAt);
+            if (latestSubmission == null || latestSubmission.isEmpty()) continue;
+
+            int totalScore = latestSubmission.stream()
+                    .mapToInt(item -> item.getHealthSurveyQuestionItemAnswerScore() != null ? item.getHealthSurveyQuestionItemAnswerScore() : 0)
+                    .sum();
             String level;
             try {
-                level = healthSurveyService.evaluateRiskLevel(surveyType, score);
+                level = healthSurveyService.evaluateRiskLevel(surveyType, totalScore);
             } catch (Exception e) {
                 level = HealthSurveyRiskLevelDto.NORMAL;
             }
             if (HealthSurveyRiskLevelDto.DANGER.equals(level)) {
                 dangerCount++;
-            } else if (HealthSurveyRiskLevelDto.WARNING.equals(level) || HealthSurveyRiskLevelDto.CAUTION.equals(level)) {
+            } else if (HealthSurveyRiskLevelDto.WARNING.equals(level)) {
+                warningCount++;
+            } else if (HealthSurveyRiskLevelDto.CAUTION.equals(level)) {
                 cautionCount++;
             } else {
                 normalCount++;
             }
         }
 
-        List<HealthDistributionResponse.HealthItem> distribution = new ArrayList<>();
-        distribution.add(HealthDistributionResponse.HealthItem.builder().name("위험").value(dangerCount).color("#EF4444").build());
-        distribution.add(HealthDistributionResponse.HealthItem.builder().name("주의").value(cautionCount).color("#FF9800").build());
-        distribution.add(HealthDistributionResponse.HealthItem.builder().name("정상").value(normalCount).color("#10B981").build());
+        long screenedCount = dangerCount + warningCount + cautionCount + normalCount;
+        long unscreenedCount = Math.max(0, totalTarget - screenedCount);
 
-        return HealthDistributionResponse.builder()
-                .distribution(distribution)
+        List<HealthDistributionResponse.HealthItem> list = new ArrayList<>();
+        list.add(HealthDistributionResponse.HealthItem.builder().name("위험").value(dangerCount).color("#EF4444").build());
+        list.add(HealthDistributionResponse.HealthItem.builder().name("경고").value(warningCount).color("#CA8A04").build());
+        list.add(HealthDistributionResponse.HealthItem.builder().name("주의").value(cautionCount).color("#FF9800").build());
+        list.add(HealthDistributionResponse.HealthItem.builder().name("정상").value(normalCount).color("#10B981").build());
+        list.add(HealthDistributionResponse.HealthItem.builder().name("미검진").value(unscreenedCount).color("#94A3B8").build());
+        return list;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HealthMonitoringDetailResponse getHealthMonitoringDetail(Long agencyNo, String type) {
+        findAgencyOrThrow(agencyNo);
+        String surveyType = "mental".equalsIgnoreCase(type) ? "월간 정신" : "월간 신체";
+        String responseType = "mental".equalsIgnoreCase(type) ? "mental" : "physical";
+
+        List<Member> allMembers = memberRepository.findByAgency_AgencyNo(agencyNo);
+        List<Member> targetMembers = allMembers.stream()
+                .filter(m -> m.getMemberRole() == null || !EXCLUDED_ROLE_FOR_HEALTH.equals(m.getMemberRole().trim()))
+                .collect(Collectors.toList());
+        Set<Long> targetMemberNos = targetMembers.stream().map(Member::getMemberNo).collect(Collectors.toSet());
+
+        List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository.findByAgencyNoWithSurvey(agencyNo);
+        List<HealthSurveyResponseItem> typeItems = items.stream()
+                .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)
+                .filter(item -> surveyType.equals(item.getHealthSurveyQuestion().getHealthSurveyQuestionType()))
+                .filter(item -> targetMemberNos.contains(item.getMember().getMemberNo()))
+                .collect(Collectors.toList());
+
+        Map<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> byMemberThenByTime = typeItems.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getMember().getMemberNo(),
+                        LinkedHashMap::new,
+                        Collectors.groupingBy(HealthSurveyResponseItem::getHealthSurveyQuestionItemCreatedAt)));
+
+        List<HealthMonitoringDetailResponse.HealthMonitoringDetailItem> result = new ArrayList<>();
+        Set<Long> screenedMemberNos = new HashSet<>();
+
+        for (Map.Entry<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> entry : byMemberThenByTime.entrySet()) {
+            Long memberNo = entry.getKey();
+            Map<LocalDateTime, List<HealthSurveyResponseItem>> byTime = entry.getValue();
+            LocalDateTime latestCreatedAt = byTime.keySet().stream().max(LocalDateTime::compareTo).orElse(null);
+            if (latestCreatedAt == null) continue;
+            List<HealthSurveyResponseItem> latestSubmission = byTime.get(latestCreatedAt);
+            if (latestSubmission == null || latestSubmission.isEmpty()) continue;
+
+            Member member = latestSubmission.get(0).getMember();
+            int totalScore = latestSubmission.stream()
+                    .mapToInt(item -> item.getHealthSurveyQuestionItemAnswerScore() != null ? item.getHealthSurveyQuestionItemAnswerScore() : 0)
+                    .sum();
+            String level;
+            try {
+                level = healthSurveyService.evaluateRiskLevel(surveyType, totalScore);
+            } catch (Exception e) {
+                level = HealthSurveyRiskLevelDto.NORMAL;
+            }
+            screenedMemberNos.add(memberNo);
+            String lastCheckDate = latestCreatedAt.toLocalDate().toString();
+            String position = member.getMemberRole() != null ? member.getMemberRole() : "";
+            result.add(HealthMonitoringDetailResponse.HealthMonitoringDetailItem.builder()
+                    .memberNo(memberNo)
+                    .memberName(member.getMemberName() != null ? member.getMemberName() : "")
+                    .position(position)
+                    .totalScore(totalScore)
+                    .status(level)
+                    .lastCheckDate(lastCheckDate)
+                    .build());
+        }
+
+        for (Member m : targetMembers) {
+            if (screenedMemberNos.contains(m.getMemberNo())) continue;
+            result.add(HealthMonitoringDetailResponse.HealthMonitoringDetailItem.builder()
+                    .memberNo(m.getMemberNo())
+                    .memberName(m.getMemberName() != null ? m.getMemberName() : "")
+                    .position(m.getMemberRole() != null ? m.getMemberRole() : "")
+                    .totalScore(null)
+                    .status("미검진")
+                    .lastCheckDate(null)
+                    .build());
+        }
+
+        result.sort((a, b) -> {
+            boolean aUnscreened = "미검진".equals(a.getStatus());
+            boolean bUnscreened = "미검진".equals(b.getStatus());
+            if (aUnscreened && !bUnscreened) return 1;
+            if (!aUnscreened && bUnscreened) return -1;
+            if (aUnscreened && bUnscreened) return (a.getMemberName()).compareTo(b.getMemberName());
+            int orderA = riskOrder(a.getStatus());
+            int orderB = riskOrder(b.getStatus());
+            if (orderA != orderB) return Integer.compare(orderA, orderB);
+            String dateA = a.getLastCheckDate() != null ? a.getLastCheckDate() : "";
+            String dateB = b.getLastCheckDate() != null ? b.getLastCheckDate() : "";
+            int dateCmp = dateB.compareTo(dateA);
+            if (dateCmp != 0) return dateCmp;
+            Integer scoreA = a.getTotalScore() != null ? a.getTotalScore() : 0;
+            Integer scoreB = b.getTotalScore() != null ? b.getTotalScore() : 0;
+            return Integer.compare(scoreB, scoreA);
+        });
+
+        return HealthMonitoringDetailResponse.builder()
+                .type(responseType)
+                .items(result)
                 .build();
+    }
+
+    private static int riskOrder(String status) {
+        if ("위험".equals(status)) return 0;
+        if ("경고".equals(status)) return 1;
+        if ("주의".equals(status)) return 2;
+        if ("정상".equals(status)) return 3;
+        return 4;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AgencyHealthScheduleResponse getAgencyHealthSchedule(Long agencyNo) {
+        findAgencyOrThrow(agencyNo);
+        java.util.Optional<HealthSurvey> opt = healthSurveyRepository.findByAgency_AgencyNo(agencyNo);
+        LocalDate today = LocalDate.now();
+        int period = 15;
+        int cycle = 30;
+        LocalDate baseDate = today;
+        String createdAtStr = null;
+
+        if (opt.isPresent()) {
+            HealthSurvey hs = opt.get();
+            period = hs.getHealthSurveyPeriod() != null ? hs.getHealthSurveyPeriod() : 15;
+            cycle = hs.getHealthSurveyCycle() != null ? hs.getHealthSurveyCycle() : 30;
+            if (hs.getHealthSurveyCreatedAt() != null) {
+                baseDate = hs.getHealthSurveyCreatedAt().toLocalDate();
+                createdAtStr = baseDate.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+            }
+        }
+
+        LocalDate next = baseDate;
+        while (!next.isAfter(today)) {
+            next = next.plusDays(cycle);
+        }
+        long daysUntil = ChronoUnit.DAYS.between(today, next);
+        String nextCheckupDateStr = next.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+
+        return AgencyHealthScheduleResponse.builder()
+                .nextCheckupDate(nextCheckupDateStr)
+                .daysUntil((int) daysUntil)
+                .period(period)
+                .cycle(cycle)
+                .createdAt(createdAtStr)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public void updateAgencyHealthSchedule(Long agencyNo, UpdateHealthScheduleRequest request) {
+        Agency agency = findAgencyOrThrow(agencyNo);
+        int period = request.getPeriod() != null && request.getPeriod() >= 1 && request.getPeriod() <= 365
+                ? request.getPeriod() : 15;
+        int cycle = request.getCycle() != null && request.getCycle() >= 1 && request.getCycle() <= 365
+                ? request.getCycle() : 30;
+
+        java.util.Optional<HealthSurvey> opt = healthSurveyRepository.findByAgency_AgencyNo(agencyNo);
+        HealthSurvey hs;
+        if (opt.isPresent()) {
+            hs = opt.get();
+            hs.setHealthSurveyPeriod(period);
+            hs.setHealthSurveyCycle(cycle);
+        } else {
+            hs = HealthSurvey.builder()
+                    .agency(agency)
+                    .healthSurveyPeriod(period)
+                    .healthSurveyCycle(cycle)
+                    .build();
+        }
+        healthSurveyRepository.save(hs);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AgencyUnscreenedListResponse getAgencyUnscreenedList(Long agencyNo) {
+        findAgencyOrThrow(agencyNo);
+        List<Member> allMembers = memberRepository.findByAgency_AgencyNo(agencyNo);
+        List<Member> targetMembers = allMembers.stream()
+                .filter(m -> m.getMemberRole() == null || !EXCLUDED_ROLE_FOR_HEALTH.equals(m.getMemberRole().trim()))
+                .collect(Collectors.toList());
+
+        List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository.findByAgencyNoWithSurvey(agencyNo);
+        Map<Long, LocalDateTime> mentalLatestByMember = getLatestSubmissionByMember(items, "월간 정신");
+        Map<Long, LocalDateTime> physicalLatestByMember = getLatestSubmissionByMember(items, "월간 신체");
+
+        List<AgencyUnscreenedListResponse.UnscreenedItem> result = new ArrayList<>();
+        for (Member m : targetMembers) {
+            Long memberNo = m.getMemberNo();
+            LocalDateTime mentalLatest = mentalLatestByMember.get(memberNo);
+            LocalDateTime physicalLatest = physicalLatestByMember.get(memberNo);
+            boolean mentalScreened = mentalLatest != null;
+            boolean physicalScreened = physicalLatest != null;
+            if (mentalScreened && physicalScreened) continue;
+
+            String status;
+            if (!mentalScreened && !physicalScreened) {
+                status = "BOTH";
+            } else if (!mentalScreened) {
+                status = "MENTAL_ONLY";
+            } else {
+                status = "PHYSICAL_ONLY";
+            }
+            String lastMental = mentalLatest != null ? mentalLatest.toLocalDate().toString() : null;
+            String lastPhysical = physicalLatest != null ? physicalLatest.toLocalDate().toString() : null;
+            result.add(AgencyUnscreenedListResponse.UnscreenedItem.builder()
+                    .memberNo(memberNo)
+                    .memberName(m.getMemberName() != null ? m.getMemberName() : "")
+                    .position(m.getMemberRole() != null ? m.getMemberRole() : "")
+                    .status(status)
+                    .lastMentalCheckDate(lastMental)
+                    .lastPhysicalCheckDate(lastPhysical)
+                    .build());
+        }
+
+        AgencyHealthScheduleResponse schedule = getAgencyHealthSchedule(agencyNo);
+        return AgencyUnscreenedListResponse.builder()
+                .nextCheckupDate(schedule != null ? schedule.getNextCheckupDate() : null)
+                .items(result)
+                .build();
+    }
+
+    private static final String[] DEADLINE_DAY_LABELS = {"오늘", "내일", "2일 후", "3일 후", "4일 후"};
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<AgencyDeadlineCountResponse.DeadlineItem> getAgencyDeadlineCounts(Long agencyNo) {
+        findAgencyOrThrow(agencyNo);
+        List<Long> projectNos = projectMemberRepository.findDistinctProjectNosByAgencyNoAndManagerRole(agencyNo);
+        LocalDate today = LocalDate.now();
+        int[] counts = new int[5];
+
+        for (Long projectNo : projectNos) {
+            List<KanbanCard> cards = kanbanCardRepository.findByProjectNo(projectNo);
+            for (KanbanCard card : cards) {
+                if ("D".equals(card.getKanbanCardStatus())) continue;
+                LocalDate endedAt = card.getKanbanCardEndedAt();
+                if (endedAt == null) continue;
+                long daysDiff = ChronoUnit.DAYS.between(today, endedAt);
+                if (daysDiff >= 0 && daysDiff <= 4) {
+                    counts[(int) daysDiff]++;
+                }
+            }
+        }
+
+        List<AgencyDeadlineCountResponse.DeadlineItem> result = new ArrayList<>();
+        for (int i = 0; i < DEADLINE_DAY_LABELS.length; i++) {
+            result.add(AgencyDeadlineCountResponse.DeadlineItem.builder()
+                    .name(DEADLINE_DAY_LABELS[i])
+                    .count(counts[i])
+                    .build());
+        }
+        return result;
+    }
+
+    /** 설문 타입별 회원의 최신 제출 시각 맵 */
+    private Map<Long, LocalDateTime> getLatestSubmissionByMember(
+            List<HealthSurveyResponseItem> items,
+            String surveyType) {
+        List<HealthSurveyResponseItem> typeItems = items.stream()
+                .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)
+                .filter(item -> surveyType.equals(item.getHealthSurveyQuestion().getHealthSurveyQuestionType()))
+                .collect(Collectors.toList());
+        Map<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> byMemberThenByTime = typeItems.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getMember().getMemberNo(),
+                        LinkedHashMap::new,
+                        Collectors.groupingBy(HealthSurveyResponseItem::getHealthSurveyQuestionItemCreatedAt)));
+        Map<Long, LocalDateTime> latestByMember = new LinkedHashMap<>();
+        for (Map.Entry<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> e : byMemberThenByTime.entrySet()) {
+            LocalDateTime latest = e.getValue().keySet().stream().max(LocalDateTime::compareTo).orElse(null);
+            if (latest != null) {
+                latestByMember.put(e.getKey(), latest);
+            }
+        }
+        return latestByMember;
     }
 }
