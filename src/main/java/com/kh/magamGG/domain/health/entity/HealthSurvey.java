@@ -8,8 +8,6 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
 @Table(name = "HEALTH_SURVEY")
@@ -39,8 +37,7 @@ public class HealthSurvey {
 
 	@Column(name = "HEALTH_SURVEY_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyUpdatedAt;
-
-	@OneToMany(mappedBy = "healthSurvey", cascade = CascadeType.ALL, orphanRemoval = true)
-	@Builder.Default
-	private List<HealthSurveyQuestion> healthSurveyQuestions = new ArrayList<>();
+	
+	// HealthSurveyQuestion 연관관계 제거 (소속 상관없이 모든 문항 공통 사용)
 }
+

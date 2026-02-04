@@ -14,18 +14,6 @@ import java.util.Optional;
 public interface HealthSurveyResponseItemRepository extends JpaRepository<HealthSurveyResponseItem, Long> {
     
     /**
-     * 특정 회원이 특정 설문에 대해 응답했는지 확인
-     * (총점이 저장된 레코드가 있으면 검진 완료로 간주)
-     */
-    @Query("SELECT i FROM HealthSurveyResponseItem i " +
-           "WHERE i.member.memberNo = :memberNo " +
-           "AND i.healthSurveyQuestion.healthSurvey.healthSurveyNo = :healthSurveyNo")
-    List<HealthSurveyResponseItem> findByMemberNoAndHealthSurveyNo(
-        @Param("memberNo") Long memberNo,
-        @Param("healthSurveyNo") Long healthSurveyNo
-    );
-    
-    /**
      * 특정 회원이 특정 HEALTH_SURVEY_QUESTION_TYPE에 대해 응답했는지 확인
      * (설문 타입은 HEALTH_SURVEY_QUESTION_TYPE 기준)
      */
@@ -38,24 +26,11 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
     );
     
     /**
-     * 특정 회원의 특정 설문 응답 생성일 조회 (가장 최근 것)
-     * CREATED_AT의 유무로 검진 완료 여부 판단
-     */
-    @Query("SELECT i.healthSurveyQuestionItemCreatedAt FROM HealthSurveyResponseItem i " +
-           "WHERE i.member.memberNo = :memberNo " +
-           "AND i.healthSurveyQuestion.healthSurvey.healthSurveyNo = :healthSurveyNo " +
-           "ORDER BY i.healthSurveyQuestionItemCreatedAt DESC")
-    Optional<LocalDateTime> findLatestResponseDateByMemberNoAndHealthSurveyNo(
-        @Param("memberNo") Long memberNo,
-        @Param("healthSurveyNo") Long healthSurveyNo
-    );
-
-    /**
      * 에이전시 소속 회원들의 건강 설문 응답 항목 조회 (최신 응답 산출용)
+     * HealthSurvey 연관관계 제거로 인해 쿼리 수정
      */
     @Query("SELECT i FROM HealthSurveyResponseItem i " +
            "JOIN FETCH i.healthSurveyQuestion q " +
-           "JOIN FETCH q.healthSurvey s " +
            "JOIN i.member m " +
            "WHERE m.agency.agencyNo = :agencyNo " +
            "ORDER BY i.healthSurveyQuestionItemCreatedAt DESC")
