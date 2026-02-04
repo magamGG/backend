@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
@@ -66,5 +67,23 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("memberNos") List<Long> memberNos,
             @Param("fromDate") java.time.LocalDate fromDate,
             @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * 담당자 배정 카드 중 해당 기간과 겹치는 카드 조회 (아티스트 캘린더용).
+     * 카드 기간이 [rangeStart, rangeEnd]와 겹침: startedAt <= rangeEnd AND (endedAt IS NULL OR endedAt >= rangeStart).
+     * KANBAN_CARD_ENDED_AT 느린 순(나중에 끝나는 것 뒤로) 정렬 → 캘린더에서 아래쪽 배치용.
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN FETCH kb.project p " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo " +
+           "AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D') " +
+           "AND kc.kanbanCardStartedAt <= :rangeEnd " +
+           "AND (kc.kanbanCardEndedAt IS NULL OR kc.kanbanCardEndedAt >= :rangeStart) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndDateRangeOverlap(
+            @Param("memberNo") Long memberNo,
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
 }
 
