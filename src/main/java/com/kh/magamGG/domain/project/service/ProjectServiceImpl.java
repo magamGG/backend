@@ -72,6 +72,19 @@ public class ProjectServiceImpl implements ProjectService {
         Set<Long> seenProjectNos = new HashSet<>();
         List<ManagedProjectResponse> result = new ArrayList<>();
         LocalDate today = LocalDate.now();
+        
+        // 정렬을 위해 nextSerialDate를 함께 저장할 임시 클래스
+        class ProjectWithDeadline {
+            ManagedProjectResponse response;
+            LocalDate nextSerialDate;
+            
+            ProjectWithDeadline(ManagedProjectResponse response, LocalDate nextSerialDate) {
+                this.response = response;
+                this.nextSerialDate = nextSerialDate;
+            }
+        }
+        
+        List<ProjectWithDeadline> tempList = new ArrayList<>();
 
         for (ProjectMember pm : allProjectMembers) {
             var project = pm.getProject();
@@ -100,17 +113,41 @@ public class ProjectServiceImpl implements ProjectService {
 
             String artistName = pm.getMember().getMemberName();
 
-            result.add(ManagedProjectResponse.builder()
+            ManagedProjectResponse response = ManagedProjectResponse.builder()
                     .projectNo(project.getProjectNo())
                     .projectName(project.getProjectName())
                     .artist(artistName)
                     .status(status)
                     .progress(progress)
                     .deadline(deadlineStr)
-                    .build());
+                    .build();
+            
+            tempList.add(new ProjectWithDeadline(response, nextSerialDate));
         }
 
-        result.sort(Comparator.comparing(ManagedProjectResponse::getProjectNo));
+        // 마감일(다음 연재일) 기준으로 정렬: 오늘이 연재일인 항목이 제일 위, 그 다음 가까운 순서대로
+        tempList.sort((a, b) -> {
+            if (a.nextSerialDate == null && b.nextSerialDate == null) {
+                return Long.compare(a.response.getProjectNo(), b.response.getProjectNo());
+            }
+            if (a.nextSerialDate == null) return 1;  // null은 뒤로
+            if (b.nextSerialDate == null) return -1; // null은 뒤로
+            
+            // 오늘이 연재일인 항목을 최우선으로
+            boolean aIsToday = a.nextSerialDate.equals(today);
+            boolean bIsToday = b.nextSerialDate.equals(today);
+            if (aIsToday && !bIsToday) return -1;  // a가 오늘이면 앞으로
+            if (!aIsToday && bIsToday) return 1;   // b가 오늘이면 앞으로
+            
+            // 둘 다 오늘이거나 둘 다 오늘이 아니면 날짜 오름차순
+            return a.nextSerialDate.compareTo(b.nextSerialDate);
+        });
+        
+        // 정렬된 결과를 result에 추가
+        for (ProjectWithDeadline item : tempList) {
+            result.add(item.response);
+        }
+        
         return result;
     }
 

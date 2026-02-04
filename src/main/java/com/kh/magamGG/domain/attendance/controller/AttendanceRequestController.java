@@ -191,6 +191,21 @@ public class AttendanceRequestController {
     }
 
     /**
+     * 담당자 대시보드 신청 현황 (담당 작가들의 근태 신청 전체 목록)
+     * GET /api/leave/manager/requests
+     *
+     * 로그인한 MEMBER_NO 기준으로 MANAGER → ARTIST_ASSIGNMENT → ATTENDANCE_REQUEST JOIN
+     */
+    @GetMapping("/manager/requests")
+    public ResponseEntity<List<AttendanceRequestResponse>> getAttendanceRequestsByManager(
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        log.info("담당자 신청 현황 조회: 담당자 회원={}", memberNo);
+        List<AttendanceRequestResponse> list = attendanceService.getAttendanceRequestsByManager(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
      * 현재 로그인한 회원의 현재 적용 중인 근태 상태 조회
      * GET /api/leave/current-status
      * 

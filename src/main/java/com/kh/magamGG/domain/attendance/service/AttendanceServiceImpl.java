@@ -675,4 +675,52 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .map(AttendanceRequestResponse::fromEntity)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public List<AttendanceRequestResponse> getAttendanceRequestsByManager(Long memberNo) {
+        Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            log.debug("담당자 아님: memberNo={}", memberNo);
+            return List.of();
+        }
+
+        // 담당자에게 배정된 작가들의 memberNo 집합
+        Set<Long> artistMemberNos = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo())
+                .stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+
+        if (artistMemberNos.isEmpty()) {
+            return List.of();
+        }
+
+        // 담당자의 에이전시 번호 추론 (없으면 담당 작가 중 한 명의 에이전시 사용)
+        Long agencyNo = Optional.ofNullable(managerOpt.get().getMember().getAgency())
+                .map(a -> a.getAgencyNo())
+                .orElse(null);
+        if (agencyNo == null) {
+            agencyNo = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo()).stream()
+                    .map(a -> a.getArtist().getAgency())
+                    .filter(Objects::nonNull)
+                    .findFirst()
+                    .map(a -> a.getAgencyNo())
+                    .orElse(null);
+        }
+        if (agencyNo == null) {
+            return List.of();
+        }
+
+        // 에이전시 기준으로 조회한 뒤, 담당 작가들만 필터링
+        List<AttendanceRequest> agencyRequests = attendanceRequestRepository.findByAgencyNoWithMember(agencyNo);
+        if (agencyRequests == null || agencyRequests.isEmpty()) {
+            return List.of();
+        }
+
+        return agencyRequests.stream()
+                .filter(req -> !"CANCELLED".equals(req.getAttendanceRequestStatus()))
+                .filter(req -> artistMemberNos.contains(req.getMember().getMemberNo()))
+                .sorted((a, b) -> b.getAttendanceRequestCreatedAt().compareTo(a.getAttendanceRequestCreatedAt()))
+                .map(AttendanceRequestResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
 }
