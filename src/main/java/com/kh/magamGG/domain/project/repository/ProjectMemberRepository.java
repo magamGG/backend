@@ -11,6 +11,10 @@ import java.util.Optional;
 public interface ProjectMemberRepository extends JpaRepository<ProjectMember, Long> {
     List<ProjectMember> findByMember_MemberNo(Long memberNo);
 
+    /** 회원이 소속된 프로젝트 수 (PROJECT_MEMBER 기준, 동일 프로젝트 중복 제거) */
+    @Query("SELECT COUNT(DISTINCT pm.project.projectNo) FROM ProjectMember pm WHERE pm.member.memberNo = :memberNo")
+    long countDistinctProjectsByMemberNo(@Param("memberNo") Long memberNo);
+
     List<ProjectMember> findByProject_ProjectNo(Long projectNo);
 
     boolean existsByProject_ProjectNoAndMember_MemberNo(Long projectNo, Long memberNo);
