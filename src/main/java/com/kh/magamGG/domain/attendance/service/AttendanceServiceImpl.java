@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 import java.util.TreeMap;
 
@@ -190,28 +191,55 @@ public class AttendanceServiceImpl implements AttendanceService {
             .stream()
             .map(java.sql.Date::toLocalDate)
             .collect(Collectors.toList());
+        Set<LocalDate> checkInSet = new HashSet<>(checkInDates);
+        
         // 해당 회원의 승인된 근태 신청 목록
         List<AttendanceRequest> approvedRequests = attendanceRequestRepository.findApprovedByMemberNo(memberNo);
-        // 출근일별: 승인된 신청에 포함되면 그 타입(워케이션/재택 등), 없으면 "출근"
+        
+        // 이번 달 1일부터 오늘까지의 모든 날짜 확인
+        LocalDate firstDayOfMonth = LocalDate.of(year, month, 1);
+        LocalDate today = LocalDate.now();
+        LocalDate endDate = today.isBefore(firstDayOfMonth.plusMonths(1)) ? today : firstDayOfMonth.plusMonths(1).minusDays(1);
+        
         Map<String, Long> typeToCount = new TreeMap<>();
-        for (LocalDate date : checkInDates) {
-            String type = "출근";
+        
+        // 이번 달 1일부터 오늘까지 순회
+        LocalDate currentDate = firstDayOfMonth;
+        while (!currentDate.isAfter(endDate)) {
+            boolean hasCheckIn = checkInSet.contains(currentDate);
+            String type = null;
+            
+            // 승인된 근태 신청 확인
             for (AttendanceRequest req : approvedRequests) {
                 LocalDate start = req.getAttendanceRequestStartDate().toLocalDate();
                 LocalDate end = req.getAttendanceRequestEndDate().toLocalDate();
-                if (!date.isBefore(start) && !date.isAfter(end)) {
+                if (!currentDate.isBefore(start) && !currentDate.isAfter(end)) {
                     type = req.getAttendanceRequestType() != null ? req.getAttendanceRequestType() : "출근";
                     break;
                 }
             }
-            typeToCount.merge(type, 1L, Long::sum);
+            
+            if (hasCheckIn) {
+                // 출근한 날: 승인된 신청이 있으면 그 타입, 없으면 "출근"
+                String finalType = (type != null) ? type : "출근";
+                typeToCount.merge(finalType, 1L, Long::sum);
+            } else if (type != null) {
+                // 출근하지 않았지만 승인된 근태 신청이 있는 날 (연차, 휴가 등)
+                typeToCount.merge(type, 1L, Long::sum);
+            }
+            // 출근하지 않고 승인된 신청도 없으면 집계하지 않음 (미출근은 프론트에서 계산)
+            
+            currentDate = currentDate.plusDays(1);
         }
+        
         List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = typeToCount.entrySet().stream()
             .map(e -> AttendanceStatisticsResponseDto.TypeCount.builder()
                 .type(e.getKey())
                 .count(e.getValue())
                 .build())
             .collect(Collectors.toList());
+        
+        // totalCount는 출근한 날짜 수 (기존 로직 유지)
         return AttendanceStatisticsResponseDto.builder()
             .typeCounts(typeCounts)
             .totalCount(checkInDates.size())
