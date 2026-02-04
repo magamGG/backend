@@ -19,36 +19,22 @@ public class HealthSurveyController {
     private final HealthSurveyService healthSurveyService;
 
     /**
-     * 설문 번호로 질문 목록 조회
-     * 예: GET /api/health-surveys/1/questions
-     */
-    @GetMapping("/{healthSurveyNo}/questions")
-    public ResponseEntity<List<HealthSurveyQuestionResponse>> getQuestionsBySurveyNo(
-        @PathVariable Long healthSurveyNo
-    ) {
-        List<HealthSurveyQuestionResponse> questions =
-            healthSurveyService.getQuestionsBySurveyNo(healthSurveyNo);
-        return ResponseEntity.ok(questions);
-    }
-
-    /**
-     * AgencyNo와 HEALTH_SURVEY_QUESTION_TYPE(데일리 정신 / 데일리 신체 / 월간 정신 / 월간 신체)으로 질문 목록 조회
-     * 해당 에이전시의 설문만 조회
-     * 예: GET /api/health-surveys/type/월간 정신/questions?agencyNo=1
+     * HEALTH_SURVEY_QUESTION_TYPE으로 질문 목록 조회
+     * 소속 상관없이 모든 문항 조회
+     * 예: GET /api/health-surveys/type/월간 정신/questions
      */
     @GetMapping("/type/{healthSurveyType}/questions")
-    public ResponseEntity<List<HealthSurveyQuestionResponse>> getQuestionsBySurveyType(
-        @PathVariable String healthSurveyType,
-        @RequestParam Long agencyNo
+    public ResponseEntity<List<HealthSurveyQuestionResponse>> getQuestionsByType(
+        @PathVariable String healthSurveyType
     ) {
         List<HealthSurveyQuestionResponse> questions =
-            healthSurveyService.getQuestionsBySurveyType(agencyNo, healthSurveyType);
+            healthSurveyService.getQuestionsByType(healthSurveyType);
         return ResponseEntity.ok(questions);
     }
 
     /**
      * 설문 응답 제출
-     * POST /api/health-surveys/{healthSurveyNo}/responses
+     * POST /api/health-surveys/responses
      * 
      * 요청 예시:
      * {
@@ -59,13 +45,12 @@ public class HealthSurveyController {
      *   ]
      * }
      */
-    @PostMapping("/{healthSurveyNo}/responses")
+    @PostMapping("/responses")
     public ResponseEntity<HealthSurveySubmitResponse> submitSurveyResponse(
-        @PathVariable Long healthSurveyNo,
         @RequestBody HealthSurveySubmitRequest request
     ) {
         HealthSurveySubmitResponse response =
-            healthSurveyService.submitSurveyResponse(healthSurveyNo, request);
+            healthSurveyService.submitSurveyResponse(request);
         return ResponseEntity.ok(response);
     }
 
