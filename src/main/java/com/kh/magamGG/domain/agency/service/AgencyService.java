@@ -1,11 +1,16 @@
 package com.kh.magamGG.domain.agency.service;
 
 import com.kh.magamGG.domain.agency.dto.request.JoinRequestRequest;
+import com.kh.magamGG.domain.agency.dto.request.UpdateHealthScheduleRequest;
 import com.kh.magamGG.domain.agency.dto.response.AgencyDashboardMetricsResponse;
 import com.kh.magamGG.domain.agency.dto.response.ArtistDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.AttendanceDistributionResponse;
 import com.kh.magamGG.domain.agency.dto.response.ComplianceTrendResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyDeadlineCountResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyHealthScheduleResponse;
+import com.kh.magamGG.domain.agency.dto.response.AgencyUnscreenedListResponse;
 import com.kh.magamGG.domain.agency.dto.response.HealthDistributionResponse;
+import com.kh.magamGG.domain.agency.dto.response.HealthMonitoringDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 
@@ -61,4 +66,32 @@ public interface AgencyService {
      * 건강 인원 분포 (위험, 주의, 정상)
      */
     HealthDistributionResponse getHealthDistribution(Long agencyNo);
+
+    /**
+     * 검진 모니터링 상세 목록 (정신/신체 타입별 회원별 점수·상태·최근 검사일)
+     * @param type "mental" | "physical"
+     */
+    HealthMonitoringDetailResponse getHealthMonitoringDetail(Long agencyNo, String type);
+
+    /**
+     * 에이전시 건강 검진 일정 (HEALTH_SURVEY 생성일·주기 기반 다음 검진 예정일)
+     * 정신/신체 동일 주기 사용
+     */
+    AgencyHealthScheduleResponse getAgencyHealthSchedule(Long agencyNo);
+
+    /**
+     * 에이전시 건강 검진 설정 수정 (HEALTH_SURVEY period, cycle 업데이트)
+     */
+    void updateAgencyHealthSchedule(Long agencyNo, UpdateHealthScheduleRequest request);
+
+    /**
+     * 에이전시 미검진 인원 목록 (정신/신체 중 하나라도 미검진이면 포함)
+     * status: BOTH, MENTAL_ONLY, PHYSICAL_ONLY
+     */
+    AgencyUnscreenedListResponse getAgencyUnscreenedList(Long agencyNo);
+
+    /**
+     * 에이전시 마감 임박 현황 (담당자 관리 프로젝트의 업무 기준, 오늘~4일 후 5개 집계)
+     */
+    List<AgencyDeadlineCountResponse.DeadlineItem> getAgencyDeadlineCounts(Long agencyNo);
 }

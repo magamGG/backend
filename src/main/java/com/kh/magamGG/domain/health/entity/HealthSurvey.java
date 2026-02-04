@@ -37,7 +37,13 @@ public class HealthSurvey {
 
 	@Column(name = "HEALTH_SURVEY_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime healthSurveyUpdatedAt;
-	
-	// HealthSurveyQuestion 연관관계 제거 (소속 상관없이 모든 문항 공통 사용)
+
+	public void setHealthSurveyPeriod(Integer healthSurveyPeriod) {
+		this.healthSurveyPeriod = healthSurveyPeriod;
+	}
+
+	public void setHealthSurveyCycle(Integer healthSurveyCycle) {
+		this.healthSurveyCycle = healthSurveyCycle;
+	}
 }
 
