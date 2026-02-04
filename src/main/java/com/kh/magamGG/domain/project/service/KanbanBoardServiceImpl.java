@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.project.service;
 
+import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
@@ -35,6 +36,21 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     private final ProjectMemberRepository projectMemberRepository;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
+
+    @Override
+    public MemberKanbanStatsResponseDto getKanbanStatsForMember(Long memberNo) {
+        List<KanbanCard> inProgress = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
+        List<KanbanCard> completed = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "Y");
+        int inProgressCount = inProgress.size();
+        int completedCount = completed.size();
+        return MemberKanbanStatsResponseDto.builder()
+            .totalCount(inProgressCount + completedCount)
+            .inProgressCount(inProgressCount)
+            .completedCount(completedCount)
+            .build();
+    }
 
     @Override
     public List<TodayTaskResponse> getTodayTasksForMember(Long memberNo) {

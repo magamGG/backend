@@ -1,5 +1,6 @@
 package com.kh.magamGG.domain.project.service;
 
+import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanBoardUpdateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
@@ -11,6 +12,9 @@ import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import java.util.List;
 
 public interface KanbanBoardService {
+
+    /** 회원별 칸반 카드 통계 (진행중 N, 완료 Y 개수) */
+    MemberKanbanStatsResponseDto getKanbanStatsForMember(Long memberNo);
 
     /** 아티스트 대시보드 오늘 할 일: 담당자 배정 + 마감일 오늘 + 미완료(N) 카드만 */
     List<TodayTaskResponse> getTodayTasksForMember(Long memberNo);
