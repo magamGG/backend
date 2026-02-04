@@ -47,5 +47,24 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
     @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
            "WHERE kc.projectMember.member.memberNo = :memberNo AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D')")
     long countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(@Param("memberNo") Long memberNo);
+
+    /**
+     * 여러 회원의 특정 기간 내 마감 칸반 카드 조회 (담당자/에이전시 대시보드 마감 임박 현황용)
+     * memberNo IN (...) AND kanbanCardEndedAt BETWEEN :fromDate AND :toDate
+     * 완료(Y), 삭제(D) 제외
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.projectMember pm " +
+           "JOIN FETCH pm.member m " +
+           "WHERE m.memberNo IN :memberNos " +
+           "AND kc.kanbanCardEndedAt >= :fromDate " +
+           "AND kc.kanbanCardEndedAt <= :toDate " +
+           "AND kc.kanbanCardStatus != 'Y' " +
+           "AND kc.kanbanCardStatus != 'D' " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByMemberNosAndDateRange(
+            @Param("memberNos") List<Long> memberNos,
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate);
 }
 
