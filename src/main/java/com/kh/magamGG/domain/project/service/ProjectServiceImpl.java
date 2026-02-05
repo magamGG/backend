@@ -1,5 +1,7 @@
 package com.kh.magamGG.domain.project.service;
 
+import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
+import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository;
 import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
@@ -43,6 +45,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final MemberRepository memberRepository;
     private final NotificationService notificationService;
     private final KanbanCardRepository kanbanCardRepository;
+    private final ProjectLeaveRequestRepository projectLeaveRequestRepository;
 
     private static final int DEADLINE_WARNING_DAYS = 7;
     private static final int PROGRESS_WARNING_THRESHOLD = 70;
@@ -165,12 +168,10 @@ public class ProjectServiceImpl implements ProjectService {
 
             LocalDateTime startedAt = p.getProjectStartedAt();
             if (startedAt == null) continue;
-            LocalDate startDate = startedAt.toLocalDate();
-            int cycleDays = (p.getProjectCycle() != null && p.getProjectCycle() > 0) ? p.getProjectCycle() : 7;
 
-            long daysBetween = ChronoUnit.DAYS.between(startDate, today);
-            int n = daysBetween <= 0 ? 0 : (int) Math.ceil((double) daysBetween / cycleDays);
-            LocalDate nextDate = startDate.plusDays((long) n * cycleDays);
+            // 승인된 휴재 기간을 스킵한 다음 연재일 계산
+            LocalDate nextDate = computeNextSerialDateConsideringHiatus(p, today);
+            if (nextDate == null) continue;
 
             list.add(NextSerialProjectItemResponse.builder()
                 .projectNo(pno)
@@ -182,6 +183,41 @@ public class ProjectServiceImpl implements ProjectService {
         }
         list.sort(Comparator.comparing(NextSerialProjectItemResponse::getNextDeadline));
         return list.size() <= limit ? list : list.subList(0, limit);
+    }
+
+    /**
+     * 프로젝트 주기 기준 다음 연재일 계산. 승인된 휴재(ATTENDANCE_REQUEST_TYPE=휴재, STATUS=APPROVED) 기간은
+     * 연재일에서 제외하고, 휴재 종료 이후의 다음 연재일을 반환한다.
+     */
+    private LocalDate computeNextSerialDateConsideringHiatus(Project p, LocalDate today) {
+        LocalDateTime startedAt = p.getProjectStartedAt();
+        if (startedAt == null) return null;
+        LocalDate startDate = startedAt.toLocalDate();
+        int cycleDays = (p.getProjectCycle() != null && p.getProjectCycle() > 0) ? p.getProjectCycle() : 7;
+
+        List<ProjectLeaveRequest> approvedHiatus = projectLeaveRequestRepository.findApprovedHiatusByProjectNo(p.getProjectNo());
+        List<LocalDate[]> hiatusPeriods = new ArrayList<>();
+        for (ProjectLeaveRequest plr : approvedHiatus) {
+            LocalDate hStart = plr.getAttendanceRequest().getAttendanceRequestStartDate().toLocalDate();
+            LocalDate hEnd = plr.getAttendanceRequest().getAttendanceRequestEndDate().toLocalDate();
+            hiatusPeriods.add(new LocalDate[] { hStart, hEnd });
+        }
+
+        // 연재일 후보: startDate + k * cycleDays (최대 약 2년치)
+        int maxK = 365 * 2 / Math.max(1, cycleDays);
+        for (int k = 0; k <= maxK; k++) {
+            LocalDate candidate = startDate.plusDays((long) k * cycleDays);
+            if (candidate.isBefore(today)) continue;
+            boolean inHiatus = false;
+            for (LocalDate[] period : hiatusPeriods) {
+                if (!candidate.isBefore(period[0]) && !candidate.isAfter(period[1])) {
+                    inHiatus = true;
+                    break;
+                }
+            }
+            if (!inHiatus) return candidate;
+        }
+        return null;
     }
 
     private static final String[] DAY_LABELS = {"오늘", "내일", "2일 후", "3일 후", "4일 후"};
