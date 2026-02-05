@@ -14,6 +14,9 @@ public interface MemoService {
 	/** 로그인 회원의 개인 메모 목록 조회 */
 	List<MemoResponse> listPersonal(Long memberNo);
 
+	/** 로그인 회원의 캘린더 메모 목록 조회 (타입 '캘린더') */
+	List<MemoResponse> listCalendar(Long memberNo);
+
 	/** 개인 메모 수정 (본인만) */
 	MemoResponse update(Long memberNo, Long memoNo, MemoUpdateRequest request);
 

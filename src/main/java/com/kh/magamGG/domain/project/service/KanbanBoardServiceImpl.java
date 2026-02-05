@@ -18,6 +18,7 @@ import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,6 +77,35 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         return cards.stream()
             .map(c -> toCalendarCardResponse(c, rangeStart, rangeEnd))
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<CalendarCardResponse> getDeadlineCardsForMember(Long memberNo) {
+        LocalDate today = LocalDate.now();
+        List<KanbanCard> cards = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardEndedAtGreaterThanEqualOrderByKanbanCardEndedAtAsc(
+                memberNo, today, PageRequest.of(0, 10));
+        return cards.stream()
+            .map(this::toCalendarCardResponseFromCard)
+            .collect(Collectors.toList());
+    }
+
+    private CalendarCardResponse toCalendarCardResponseFromCard(KanbanCard card) {
+        Project project = card.getKanbanBoard() != null ? card.getKanbanBoard().getProject() : null;
+        String projectName = project != null ? project.getProjectName() : "";
+        String projectColor = project != null ? project.getProjectColor() : null;
+        Long projectNo = project != null ? project.getProjectNo() : null;
+        LocalDate start = card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt() : LocalDate.now();
+        LocalDate end = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt() : LocalDate.now();
+        return CalendarCardResponse.builder()
+            .id(card.getKanbanCardNo())
+            .title(card.getKanbanCardName())
+            .startDate(start.format(DATE_FMT))
+            .endDate(end.format(DATE_FMT))
+            .projectColor(projectColor)
+            .projectName(projectName)
+            .projectNo(projectNo)
+            .build();
     }
 
     private CalendarCardResponse toCalendarCardResponse(KanbanCard card, LocalDate rangeStart, LocalDate rangeEnd) {
