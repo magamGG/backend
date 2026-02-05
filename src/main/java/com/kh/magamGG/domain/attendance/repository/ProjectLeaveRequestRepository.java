@@ -51,5 +51,17 @@ public interface ProjectLeaveRequestRepository extends JpaRepository<ProjectLeav
             @Param("projectNo") Long projectNo,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate);
+
+    /**
+     * 특정 프로젝트에 대한 승인된 휴재 신청 목록 (ATTENDANCE_REQUEST_TYPE=휴재, ATTENDANCE_REQUEST_STATUS=APPROVED)
+     * 다음 연재일 계산 시 휴재 기간 스킵에 사용
+     */
+    @Query("SELECT plr FROM ProjectLeaveRequest plr " +
+           "JOIN FETCH plr.attendanceRequest ar " +
+           "WHERE plr.project.projectNo = :projectNo " +
+           "AND ar.attendanceRequestType = '휴재' " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "ORDER BY ar.attendanceRequestStartDate ASC")
+    java.util.List<ProjectLeaveRequest> findApprovedHiatusByProjectNo(@Param("projectNo") Long projectNo);
 }
 
