@@ -885,6 +885,30 @@ public class AgencyServiceImpl implements AgencyService {
     @Transactional(readOnly = true)
     public AgencyUnscreenedListResponse getAgencyUnscreenedList(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
+        LocalDate today = LocalDate.now();
+
+        // 검진 만료일 = HEALTH_SURVEY_PERIOD 계산 (현재 구간 cycleStart + period - 1)
+        // 지연 일수 = CREATED_AT + CYCLE 기준 검진 시작일(cycleStart)부터 오늘까지 검사 안 한 일수
+        java.util.Optional<HealthSurvey> healthSurveyOpt = healthSurveyRepository.findByAgency_AgencyNo(agencyNo);
+        int period = 15;
+        int cycle = 30;
+        LocalDate baseDate = today;
+        if (healthSurveyOpt.isPresent()) {
+            HealthSurvey hs = healthSurveyOpt.get();
+            period = hs.getHealthSurveyPeriod() != null ? hs.getHealthSurveyPeriod() : 15;
+            cycle = hs.getHealthSurveyCycle() != null ? hs.getHealthSurveyCycle() : 30;
+            if (hs.getHealthSurveyCreatedAt() != null) {
+                baseDate = hs.getHealthSurveyCreatedAt().toLocalDate();
+            }
+        }
+        long daysSinceBase = ChronoUnit.DAYS.between(baseDate, today);
+        int k = cycle > 0 ? (int) (daysSinceBase / cycle) : 0;
+        if (daysSinceBase < 0) k = 0;
+        LocalDate cycleStart = baseDate.plusDays((long) k * cycle);
+        LocalDate deadline = cycleStart.plusDays(Math.max(0, period - 1));
+        String nextCheckupDateStr = deadline.format(DateTimeFormatter.ofPattern("yyyy.MM.dd"));
+        int daysOverdue = !today.isBefore(cycleStart) ? (int) ChronoUnit.DAYS.between(cycleStart, today) : 0;
+
         List<Member> allMembers = memberRepository.findByAgency_AgencyNo(agencyNo);
         List<Member> targetMembers = allMembers.stream()
                 .filter(m -> m.getMemberRole() == null || !EXCLUDED_ROLE_FOR_HEALTH.equals(m.getMemberRole().trim()))
@@ -920,12 +944,12 @@ public class AgencyServiceImpl implements AgencyService {
                     .status(status)
                     .lastMentalCheckDate(lastMental)
                     .lastPhysicalCheckDate(lastPhysical)
+                    .daysOverdue(daysOverdue)
                     .build());
         }
 
-        AgencyHealthScheduleResponse schedule = getAgencyHealthSchedule(agencyNo);
         return AgencyUnscreenedListResponse.builder()
-                .nextCheckupDate(schedule != null ? schedule.getNextCheckupDate() : null)
+                .nextCheckupDate(nextCheckupDateStr)
                 .items(result)
                 .build();
     }
@@ -984,5 +1008,38 @@ public class AgencyServiceImpl implements AgencyService {
             }
         }
         return latestByMember;
+    }
+
+    private static final String HEALTH_REMINDER_TYPE = "HEALTH_REM";
+    private static final String HEALTH_REMINDER_NAME = "검진 알림";
+    private static final String HEALTH_REMINDER_TEXT = "건강 검진을 완료해 주세요.";
+
+    @Override
+    @Transactional
+    public void sendUnscreenedNotification(Long agencyNo, Long memberNo) {
+        findAgencyOrThrow(agencyNo);
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+        if (member.getAgency() == null || !agencyNo.equals(member.getAgency().getAgencyNo())) {
+            throw new IllegalArgumentException("해당 에이전시 소속 회원이 아닙니다.");
+        }
+        notificationService.createNotification(memberNo, HEALTH_REMINDER_NAME, HEALTH_REMINDER_TEXT, HEALTH_REMINDER_TYPE);
+    }
+
+    @Override
+    @Transactional
+    public void sendUnscreenedBulkNotification(Long agencyNo) {
+        AgencyUnscreenedListResponse list = getAgencyUnscreenedList(agencyNo);
+        List<AgencyUnscreenedListResponse.UnscreenedItem> overdue = list.getItems().stream()
+                .filter(item -> item.getDaysOverdue() != null && item.getDaysOverdue() >= 7)
+                .collect(Collectors.toList());
+        for (AgencyUnscreenedListResponse.UnscreenedItem item : overdue) {
+            try {
+                notificationService.createNotification(
+                        item.getMemberNo(), HEALTH_REMINDER_NAME, HEALTH_REMINDER_TEXT, HEALTH_REMINDER_TYPE);
+            } catch (Exception e) {
+                log.warn("미검진 알림 발송 실패 memberNo={}", item.getMemberNo(), e);
+            }
+        }
     }
 }

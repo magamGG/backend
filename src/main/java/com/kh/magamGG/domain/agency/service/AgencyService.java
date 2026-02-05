@@ -94,4 +94,14 @@ public interface AgencyService {
      * 에이전시 마감 임박 현황 (담당자 관리 프로젝트의 업무 기준, 오늘~4일 후 5개 집계)
      */
     List<AgencyDeadlineCountResponse.DeadlineItem> getAgencyDeadlineCounts(Long agencyNo);
+
+    /**
+     * 미검진 인원 1명에게 검진 알림 발송 (NOTIFICATION 저장)
+     */
+    void sendUnscreenedNotification(Long agencyNo, Long memberNo);
+
+    /**
+     * 7일 이상 지연된 미검진 인원에게 검진 알림 일괄 발송 (NOTIFICATION 저장)
+     */
+    void sendUnscreenedBulkNotification(Long agencyNo);
 }

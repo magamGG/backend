@@ -33,5 +33,7 @@ public class AgencyUnscreenedListResponse {
         private String status;
         private String lastMentalCheckDate;
         private String lastPhysicalCheckDate;
+        /** health_survey 생성일·cycle·period 기준 현재 구간 마감일 대비 지연 일수 (0 이상) */
+        private Integer daysOverdue;
     }
 }

@@ -133,6 +133,28 @@ public class AgencyController {
     }
 
     /**
+     * 미검진 인원 1명에게 검진 알림 발송
+     * POST /api/agency/{agencyNo}/unscreened-notify/{memberNo}
+     */
+    @PostMapping("/{agencyNo}/unscreened-notify/{memberNo}")
+    public ResponseEntity<Void> sendUnscreenedNotification(
+            @PathVariable Long agencyNo,
+            @PathVariable Long memberNo) {
+        agencyService.sendUnscreenedNotification(agencyNo, memberNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 7일 이상 지연된 미검진 인원에게 검진 알림 일괄 발송
+     * POST /api/agency/{agencyNo}/unscreened-notify-bulk
+     */
+    @PostMapping("/{agencyNo}/unscreened-notify-bulk")
+    public ResponseEntity<Void> sendUnscreenedBulkNotification(@PathVariable Long agencyNo) {
+        agencyService.sendUnscreenedBulkNotification(agencyNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
      * 에이전시 마감 임박 현황 (담당자 관리 프로젝트 업무 기준, 오늘~4일 후 5개 집계)
      * GET /api/agency/{agencyNo}/deadline-counts
      */
