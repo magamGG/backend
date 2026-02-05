@@ -342,8 +342,8 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     @Transactional
     public AttendanceRequestResponse approveAttendanceRequest(Long attendanceRequestNo) {
-        // 근태 신청 조회
-        AttendanceRequest request = attendanceRequestRepository.findById(attendanceRequestNo)
+        // 근태 신청 조회 (프로젝트 정보 포함)
+        AttendanceRequest request = attendanceRequestRepository.findByIdWithProject(attendanceRequestNo)
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 근태 신청입니다."));
 
         // 이미 처리된 경우 예외 처리
@@ -358,6 +358,17 @@ public class AttendanceServiceImpl implements AttendanceService {
             Integer usingDays = request.getAttendanceRequestUsingDays();
             if (memberNo != null) {
                 leaveBalanceDeductionService.deductLeaveBalance(memberNo, requestType, usingDays);
+            }
+        }
+
+        // 휴재 신청인 경우 프로젝트 상태를 "휴재"로 변경
+        if ("휴재".equals(requestType) && request.getProjectLeaveRequest() != null) {
+            Project project = request.getProjectLeaveRequest().getProject();
+            if (project != null) {
+                project.setProjectStatus("휴재");
+                projectRepository.save(project);
+                log.info("프로젝트 상태 업데이트 완료: 프로젝트번호={}, 프로젝트명={}, 상태=휴재",
+                        project.getProjectNo(), project.getProjectName());
             }
         }
 
