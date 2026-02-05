@@ -56,6 +56,18 @@ public class MemberController {
     }
 
     /**
+     * 담당자 회원 번호(memberNo)로 해당 담당자에게 배정된 작가만 조회 (ARTIST_ASSIGNMENT)
+     * 프로젝트 추가 시 담당자 선택 후 작가 목록용
+     */
+    @GetMapping("/manager/by-member/{memberNo}/artists")
+    public ResponseEntity<List<MemberResponse>> getArtistsByManagerMemberNo(
+        @PathVariable Long memberNo
+    ) {
+        List<MemberResponse> response = memberService.getAssignedArtistsByMemberNo(memberNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
      * 담당자별 현재 작업중인 작가 목록 (배정 작가 중 오늘 출근 중인 사람만)
      */
     @GetMapping("/manager/{managerNo}/working-artists")

@@ -591,22 +591,26 @@ public class MemberServiceImpl implements MemberService {
         log.info("작가 배정 해제 완료: artistNo={}", artistNo);
     }
 
+    private static final List<String> ARTIST_ROLES = List.of("웹툰 작가", "웹소설 작가");
+
+    /**
+     * 담당자(MANAGER_NO)에게 배정된 작가만 반환.
+     * MANAGER 테이블의 manager_no로 ARTIST_ASSIGNMENT에서 해당 manager_no와 관계 있는 member_no를 조회하고,
+     * 그 회원의 MEMBER_ROLE이 '웹툰 작가', '웹소설 작가'인 경우만 포함.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<MemberResponse> getArtistsByManagerNo(Long managerNo) {
         try {
             log.debug("담당자별 작가 목록 조회 시작: managerNo={}", managerNo);
-
-            // ARTIST_ASSIGNMENT 테이블에서 해당 managerNo로 배정된 작가 목록 조회
             List<ArtistAssignment> assignments = artistAssignmentRepository.findByManagerNo(managerNo);
             log.debug("조회된 배정 수: {}", assignments.size());
 
             return assignments.stream()
-                .map(assignment -> {
-                    Member artist = assignment.getArtist();
-                    // managerNo는 이미 알고 있으므로 그대로 전달
-                    return convertToResponseWithManagerNo(artist, managerNo);
-                })
+                .map(ArtistAssignment::getArtist)
+                .filter(artist -> artist != null && artist.getMemberRole() != null
+                    && ARTIST_ROLES.contains(artist.getMemberRole().trim()))
+                .map(artist -> convertToResponseWithManagerNo(artist, managerNo))
                 .collect(Collectors.toList());
         } catch (Exception e) {
             log.error("담당자별 작가 목록 조회 실패: managerNo={}, error={}", managerNo, e.getMessage(), e);
@@ -614,6 +618,11 @@ public class MemberServiceImpl implements MemberService {
         }
     }
 
+    /**
+     * 현재 로그인한 담당자(member)의 manager_no를 MANAGER 테이블에서 찾고,
+     * ARTIST_ASSIGNMENT에서 그 manager_no와 관계 있는 member_no 중 MEMBER_ROLE이 '웹툰 작가', '웹소설 작가'인 회원만 반환.
+     * 배정된 작가가 없으면 빈 목록 반환.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<MemberResponse> getAssignedArtistsByMemberNo(Long memberNo) {

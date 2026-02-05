@@ -314,6 +314,15 @@ public class ProjectServiceImpl implements ProjectService {
 
         Member artist = memberRepository.findById(request.getArtistMemberNo())
                 .orElseThrow(() -> new IllegalArgumentException("작가 회원을 찾을 수 없습니다: " + request.getArtistMemberNo()));
+
+        Optional<Manager> creatorManagerOpt = managerRepository.findByMember_MemberNo(creatorNo);
+        if (creatorManagerOpt.isPresent()) {
+            boolean assigned = artistAssignmentRepository.existsByManager_ManagerNoAndArtist_MemberNo(
+                    creatorManagerOpt.get().getManagerNo(), request.getArtistMemberNo());
+            if (!assigned) {
+                throw new IllegalArgumentException("해당 담당자에게 배정된 작가만 프로젝트에 추가할 수 있습니다.");
+            }
+        }
         Long agencyNo = artist.getAgency() != null ? artist.getAgency().getAgencyNo() : null;
         if (agencyNo != null && projectRepository.countByProjectNameAndAgencyNo(projectName, agencyNo) > 0) {
             throw new IllegalArgumentException("이미 같은 이름의 프로젝트가 있습니다.");
