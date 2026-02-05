@@ -16,6 +16,11 @@ import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRequestRepository;
 import com.kh.magamGG.domain.attendance.repository.LeaveBalanceRepository;
 import com.kh.magamGG.domain.attendance.repository.LeaveHistoryRepository;
+import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository;
+import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
+import com.kh.magamGG.domain.project.entity.Project;
+import com.kh.magamGG.domain.project.repository.ProjectRepository;
+import com.kh.magamGG.global.exception.ProjectNotFoundException;
 import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
 import com.kh.magamGG.domain.health.service.DailyHealthCheckService;
 import com.kh.magamGG.domain.member.entity.Manager;
@@ -68,6 +73,8 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final DailyHealthCheckService dailyHealthCheckService;
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final ManagerRepository managerRepository;
+    private final ProjectRepository projectRepository;
+    private final ProjectLeaveRequestRepository projectLeaveRequestRepository;
     // 비즈니스 로직 분리: 연차 차감 서비스
     private final LeaveBalanceDeductionService leaveBalanceDeductionService;
     // 비즈니스 로직 분리: 알림 발송 서비스 (비동기 처리)
@@ -102,6 +109,42 @@ public class AttendanceServiceImpl implements AttendanceService {
         // 저장
         AttendanceRequest savedRequest = attendanceRequestRepository.save(attendanceRequest);
         
+        // 휴재 신청이고 프로젝트 번호가 제공된 경우, PROJECT_LEAVE_REQUEST 저장
+        if ("휴재".equals(request.getAttendanceRequestType()) && request.getProjectNo() != null) {
+            Project project = projectRepository.findById(request.getProjectNo())
+                    .orElseThrow(() -> new ProjectNotFoundException("존재하지 않는 프로젝트입니다."));
+            
+            // 기간이 겹치는 휴재 신청이 있는지 확인
+            List<ProjectLeaveRequest> overlappingRequests = projectLeaveRequestRepository
+                    .findOverlappingRequests(request.getProjectNo(), startDate, endDate);
+            
+            if (!overlappingRequests.isEmpty()) {
+                ProjectLeaveRequest existingRequest = overlappingRequests.get(0);
+                String existingStartDate = existingRequest.getAttendanceRequest()
+                        .getAttendanceRequestStartDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String existingEndDate = existingRequest.getAttendanceRequest()
+                        .getAttendanceRequestEndDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String existingStatus = existingRequest.getAttendanceRequest().getAttendanceRequestStatus();
+                
+                throw new IllegalStateException(
+                    String.format("해당 프로젝트에 이미 휴재 신청이 있습니다. " +
+                                 "기간: %s ~ %s, 상태: %s",
+                                 existingStartDate, existingEndDate, 
+                                 existingStatus.equals("PENDING") ? "대기중" : "승인됨"));
+            }
+            
+            ProjectLeaveRequest projectLeaveRequest = ProjectLeaveRequest.builder()
+                    .attendanceRequest(savedRequest)
+                    .project(project)
+                    .build();
+            
+            projectLeaveRequestRepository.save(projectLeaveRequest);
+            
+            log.info("프로젝트 휴재 신청 생성 완료: 프로젝트 {} ({})", 
+                    project.getProjectName(), 
+                    request.getProjectNo());
+        }
+        
         log.info("근태 신청 생성 완료: 회원 {} ({}), 타입: {}, 기간: {} ~ {}", 
                 member.getMemberName(), 
                 memberNo, 
@@ -117,7 +160,11 @@ public class AttendanceServiceImpl implements AttendanceService {
                 endDate
         );
 
-        return AttendanceRequestResponse.fromEntity(savedRequest);
+        // 프로젝트 정보를 포함하여 조회 (N+1 방지)
+        AttendanceRequest requestWithProject = attendanceRequestRepository.findByIdWithProject(savedRequest.getAttendanceRequestNo())
+                .orElse(savedRequest);
+        
+        return AttendanceRequestResponse.fromEntity(requestWithProject);
     }
     
     @Override
@@ -295,8 +342,8 @@ public class AttendanceServiceImpl implements AttendanceService {
     @Override
     @Transactional
     public AttendanceRequestResponse approveAttendanceRequest(Long attendanceRequestNo) {
-        // 근태 신청 조회
-        AttendanceRequest request = attendanceRequestRepository.findById(attendanceRequestNo)
+        // 근태 신청 조회 (프로젝트 정보 포함)
+        AttendanceRequest request = attendanceRequestRepository.findByIdWithProject(attendanceRequestNo)
                 .orElseThrow(() -> new RuntimeException("존재하지 않는 근태 신청입니다."));
 
         // 이미 처리된 경우 예외 처리
@@ -311,6 +358,17 @@ public class AttendanceServiceImpl implements AttendanceService {
             Integer usingDays = request.getAttendanceRequestUsingDays();
             if (memberNo != null) {
                 leaveBalanceDeductionService.deductLeaveBalance(memberNo, requestType, usingDays);
+            }
+        }
+
+        // 휴재 신청인 경우 프로젝트 상태를 "휴재"로 변경
+        if ("휴재".equals(requestType) && request.getProjectLeaveRequest() != null) {
+            Project project = request.getProjectLeaveRequest().getProject();
+            if (project != null) {
+                project.setProjectStatus("휴재");
+                projectRepository.save(project);
+                log.info("프로젝트 상태 업데이트 완료: 프로젝트번호={}, 프로젝트명={}, 상태=휴재",
+                        project.getProjectNo(), project.getProjectName());
             }
         }
 

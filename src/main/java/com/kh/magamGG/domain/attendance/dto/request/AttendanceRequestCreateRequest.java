@@ -57,4 +57,10 @@ public class AttendanceRequestCreateRequest {
      * DB: MEDICAL_FILE_URL
      */
     private String medicalFileUrl;
+    
+    /**
+     * 프로젝트 번호 (휴재 신청인 경우 선택적)
+     * DB: PROJECT_LEAVE_REQUEST 테이블의 PROJECT_NO
+     */
+    private Long projectNo;
 }

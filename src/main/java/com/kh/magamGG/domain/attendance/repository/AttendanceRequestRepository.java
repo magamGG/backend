@@ -17,6 +17,8 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
            "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
            "WHERE m.agency.agencyNo = :agencyNo " +
            "AND ar.attendanceRequestStatus = 'APPROVED' " +
            "AND ar.attendanceRequestStartDate <= :todayEnd " +
@@ -32,6 +34,8 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
            "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
            "WHERE m.memberNo = :memberNo " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     List<AttendanceRequest> findByMember_MemberNoOrderByAttendanceRequestCreatedAtDesc(@Param("memberNo") Long memberNo);
@@ -41,6 +45,8 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
            "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
            "WHERE ar.attendanceRequestStatus = :status " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     List<AttendanceRequest> findByAttendanceRequestStatusOrderByAttendanceRequestCreatedAtDesc(@Param("status") String status);
@@ -51,6 +57,8 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
            "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
            "WHERE m.agency.agencyNo = :agencyNo " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     List<AttendanceRequest> findByAgencyNoWithMember(@Param("agencyNo") Long agencyNo);
@@ -60,6 +68,8 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
            "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
            "WHERE m.agency.agencyNo = :agencyNo " +
            "AND ar.attendanceRequestStatus = :status " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
@@ -73,10 +83,22 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
      */
     @Query("SELECT ar FROM AttendanceRequest ar " +
            "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
            "WHERE m.memberNo = :memberNo " +
            "AND ar.attendanceRequestStatus = 'APPROVED' " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     List<AttendanceRequest> findApprovedByMemberNo(@Param("memberNo") Long memberNo);
+    
+    /**
+     * 특정 근태 신청 번호로 조회 (프로젝트 정보 포함, N+1 방지)
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
+           "WHERE ar.attendanceRequestNo = :attendanceRequestNo")
+    java.util.Optional<AttendanceRequest> findByIdWithProject(@Param("attendanceRequestNo") Long attendanceRequestNo);
 }
 
 

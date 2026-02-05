@@ -56,7 +56,11 @@ public class Project {
 	@OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
 	@Builder.Default
 	private List<KanbanBoard> kanbanBoards = new ArrayList<>();
-
+	
+	@OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
+	private List<com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest> projectLeaveRequests = new ArrayList<>();
+	
 	public void setProjectName(String projectName) { this.projectName = projectName; }
 	public void setProjectStatus(String projectStatus) { this.projectStatus = projectStatus; }
 	public void setProjectColor(String projectColor) { this.projectColor = projectColor; }

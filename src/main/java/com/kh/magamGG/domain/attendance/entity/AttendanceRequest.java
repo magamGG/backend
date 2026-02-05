@@ -59,6 +59,10 @@ public class AttendanceRequest {
 	@Column(name = "ATTENDANCE_REQUEST_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime attendanceRequestUpdatedAt;
 	
+	// 프로젝트 휴재 신청 (1:0..1 관계)
+	@OneToOne(mappedBy = "attendanceRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+	private ProjectLeaveRequest projectLeaveRequest;
+	
 	/**
 	 * 근태 신청 승인 처리
 	 */

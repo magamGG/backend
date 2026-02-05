@@ -102,10 +102,21 @@ public class AttendanceRequestResponse {
     private LocalDateTime attendanceRequestUpdatedAt;
     
     /**
+     * 프로젝트 번호 (휴재 신청인 경우)
+     * DB: PROJECT_LEAVE_REQUEST 테이블의 PROJECT_NO
+     */
+    private Long projectNo;
+    
+    /**
+     * 프로젝트 이름 (휴재 신청인 경우)
+     */
+    private String projectName;
+    
+    /**
      * Entity -> Response DTO 변환
      */
     public static AttendanceRequestResponse fromEntity(AttendanceRequest entity) {
-        return AttendanceRequestResponse.builder()
+        AttendanceRequestResponse.AttendanceRequestResponseBuilder builder = AttendanceRequestResponse.builder()
                 .attendanceRequestNo(entity.getAttendanceRequestNo())
                 .memberNo(entity.getMember().getMemberNo())
                 .memberName(entity.getMember().getMemberName())
@@ -119,7 +130,14 @@ public class AttendanceRequestResponse {
                 .attendanceRequestStatus(entity.getAttendanceRequestStatus())
                 .attendanceRequestRejectReason(entity.getAttendanceRequestRejectReason())
                 .attendanceRequestCreatedAt(entity.getAttendanceRequestCreatedAt())
-                .attendanceRequestUpdatedAt(entity.getAttendanceRequestUpdatedAt())
-                .build();
+                .attendanceRequestUpdatedAt(entity.getAttendanceRequestUpdatedAt());
+        
+        // 프로젝트 휴재 신청 정보가 있으면 추가
+        if (entity.getProjectLeaveRequest() != null) {
+            builder.projectNo(entity.getProjectLeaveRequest().getProject().getProjectNo())
+                   .projectName(entity.getProjectLeaveRequest().getProject().getProjectName());
+        }
+        
+        return builder.build();
     }
 }
