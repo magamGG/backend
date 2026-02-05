@@ -32,5 +32,24 @@ public interface ProjectLeaveRequestRepository extends JpaRepository<ProjectLeav
            "WHERE plr.project.projectNo = :projectNo " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     java.util.List<ProjectLeaveRequest> findByProjectNo(@Param("projectNo") Long projectNo);
+    
+    /**
+     * 특정 프로젝트의 특정 기간과 겹치는 휴재 신청 조회 (대기중 또는 승인된 것만)
+     * 날짜 겹침 조건: 기존 신청의 시작일 <= 새 신청의 종료일 AND 기존 신청의 종료일 >= 새 신청의 시작일
+     * @param projectNo 프로젝트 번호
+     * @param startDate 신청 시작일
+     * @param endDate 신청 종료일
+     * @return 겹치는 휴재 신청 목록
+     */
+    @Query("SELECT plr FROM ProjectLeaveRequest plr " +
+           "JOIN FETCH plr.attendanceRequest ar " +
+           "WHERE plr.project.projectNo = :projectNo " +
+           "AND ar.attendanceRequestStatus IN ('PENDING', 'APPROVED') " +
+           "AND ar.attendanceRequestStartDate <= :endDate " +
+           "AND ar.attendanceRequestEndDate >= :startDate")
+    java.util.List<ProjectLeaveRequest> findOverlappingRequests(
+            @Param("projectNo") Long projectNo,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }
 

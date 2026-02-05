@@ -20,6 +20,7 @@ import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository
 import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
 import com.kh.magamGG.domain.project.entity.Project;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
+import com.kh.magamGG.global.exception.ProjectNotFoundException;
 import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
 import com.kh.magamGG.domain.health.service.DailyHealthCheckService;
 import com.kh.magamGG.domain.member.entity.Manager;
@@ -111,7 +112,26 @@ public class AttendanceServiceImpl implements AttendanceService {
         // 휴재 신청이고 프로젝트 번호가 제공된 경우, PROJECT_LEAVE_REQUEST 저장
         if ("휴재".equals(request.getAttendanceRequestType()) && request.getProjectNo() != null) {
             Project project = projectRepository.findById(request.getProjectNo())
-                    .orElseThrow(() -> new RuntimeException("존재하지 않는 프로젝트입니다."));
+                    .orElseThrow(() -> new ProjectNotFoundException("존재하지 않는 프로젝트입니다."));
+            
+            // 기간이 겹치는 휴재 신청이 있는지 확인
+            List<ProjectLeaveRequest> overlappingRequests = projectLeaveRequestRepository
+                    .findOverlappingRequests(request.getProjectNo(), startDate, endDate);
+            
+            if (!overlappingRequests.isEmpty()) {
+                ProjectLeaveRequest existingRequest = overlappingRequests.get(0);
+                String existingStartDate = existingRequest.getAttendanceRequest()
+                        .getAttendanceRequestStartDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String existingEndDate = existingRequest.getAttendanceRequest()
+                        .getAttendanceRequestEndDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String existingStatus = existingRequest.getAttendanceRequest().getAttendanceRequestStatus();
+                
+                throw new IllegalStateException(
+                    String.format("해당 프로젝트에 이미 휴재 신청이 있습니다. " +
+                                 "기간: %s ~ %s, 상태: %s",
+                                 existingStartDate, existingEndDate, 
+                                 existingStatus.equals("PENDING") ? "대기중" : "승인됨"));
+            }
             
             ProjectLeaveRequest projectLeaveRequest = ProjectLeaveRequest.builder()
                     .attendanceRequest(savedRequest)
