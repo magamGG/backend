@@ -32,7 +32,10 @@ public class Memo {
 	
 	@Column(name = "MEMO_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime memoCreatedAt;
-	
+
+    @Column(name = "CALENDAR_MEMO_DATE")
+    private LocalDateTime calendarMemoDate;
+
 	@Column(name = "MEMO_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime memoUpdatedAt;
 	
