@@ -23,6 +23,8 @@ public class MemoResponse {
 	private String memoType;
 	private LocalDateTime memoCreatedAt;
 	private LocalDateTime memoUpdatedAt;
+	/** 캘린더 메모일 때 해당 날짜 (DB: CALENDAR_MEMO_DATE) */
+	private LocalDateTime calendarMemoDate;
 
 	public static MemoResponse fromEntity(Memo entity) {
 		return MemoResponse.builder()
@@ -32,6 +34,7 @@ public class MemoResponse {
 				.memoType(entity.getMemoType())
 				.memoCreatedAt(entity.getMemoCreatedAt())
 				.memoUpdatedAt(entity.getMemoUpdatedAt())
+				.calendarMemoDate(entity.getCalendarMemoDate())
 				.build();
 	}
 }

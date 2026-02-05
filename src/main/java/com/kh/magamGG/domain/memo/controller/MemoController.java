@@ -41,6 +41,17 @@ public class MemoController {
 	}
 
 	/**
+	 * 로그인 회원의 캘린더 메모 목록 조회 (타입 '캘린더')
+	 * GET /api/memo/calendar
+	 */
+	@GetMapping("/calendar")
+	public ResponseEntity<List<MemoResponse>> listCalendar(
+			@RequestHeader("X-Member-No") Long memberNo) {
+		List<MemoResponse> list = memoService.listCalendar(memberNo);
+		return ResponseEntity.ok(list);
+	}
+
+	/**
 	 * 개인 메모 수정
 	 * PUT /api/memo/{memoNo}
 	 */

@@ -23,6 +23,9 @@ public interface KanbanBoardService {
     /** 아티스트 캘린더: 담당자 배정 카드 중 해당 월과 기간 겹치는 카드 (PROJECT_COLOR, STARTED_AT, ENDED_AT) */
     List<CalendarCardResponse> getCalendarCardsForMember(Long memberNo, int year, int month);
 
+    /** 마감임박 업무: KANBAN_CARD_ENDED_AT >= 오늘, 이전 날짜 제외, 마감일 가까운 순 (최대 10건) */
+    List<CalendarCardResponse> getDeadlineCardsForMember(Long memberNo);
+
     List<KanbanBoardResponse> getBoardsByProjectNo(Long projectNo);
 
     KanbanBoardResponse createBoard(Long projectNo, KanbanBoardCreateRequest request);

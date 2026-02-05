@@ -107,6 +107,17 @@ public class ProjectController {
     }
 
     /**
+     * 마감임박 업무: KANBAN_CARD_ENDED_AT >= 오늘 (이전 날짜 제외), 마감일 가까운 순
+     * GET /api/projects/my-deadline-cards
+     */
+    @GetMapping("/my-deadline-cards")
+    public ResponseEntity<List<CalendarCardResponse>> getMyDeadlineCards(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        List<CalendarCardResponse> list = kanbanBoardService.getDeadlineCardsForMember(memberNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
      * 담당자 대시보드 마감 임박 현황 (주기 기준: 오늘~4일 후별 다음 연재일 건수)
      * GET /api/projects/deadline-counts
      */

@@ -5,6 +5,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Pageable;
+
 import java.time.LocalDate;
 import java.util.List;
 
@@ -85,5 +87,20 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("memberNo") Long memberNo,
             @Param("rangeStart") LocalDate rangeStart,
             @Param("rangeEnd") LocalDate rangeEnd);
+
+    /**
+     * 마감임박 업무: 담당자 배정 카드 중 KANBAN_CARD_ENDED_AT >= :fromDate (오늘 기준 이전 제외), 완료/삭제 제외, 마감일 가까운 순
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN FETCH kb.project p " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo " +
+           "AND kc.kanbanCardEndedAt >= :fromDate " +
+           "AND (kc.kanbanCardStatus IS NULL OR (kc.kanbanCardStatus <> 'Y' AND kc.kanbanCardStatus <> 'D')) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardEndedAtGreaterThanEqualOrderByKanbanCardEndedAtAsc(
+            @Param("memberNo") Long memberNo,
+            @Param("fromDate") LocalDate fromDate,
+            Pageable pageable);
 }
 

@@ -11,7 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -20,6 +22,7 @@ import java.util.stream.Collectors;
 public class MemoServiceImpl implements MemoService {
 
 	private static final String MEMO_TYPE_PERSONAL = "개인";
+	private static final String MEMO_TYPE_CALENDAR = "캘린더";
 	private static final int MEMO_NAME_MAX_LENGTH = 30;
 	private static final int MEMO_TEXT_MAX_LENGTH = 255;
 
@@ -33,7 +36,7 @@ public class MemoServiceImpl implements MemoService {
 				.orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
 		String memoName = truncate(request.getMemoName(), MEMO_NAME_MAX_LENGTH);
 		if (memoName == null || memoName.isBlank()) {
-			memoName = "새 메모";
+			memoName = MEMO_TYPE_CALENDAR.equals(request.getMemoType()) ? "캘린더 메모" : "새 메모";
 		}
 		String memoText = truncate(request.getMemoText(), MEMO_TEXT_MAX_LENGTH);
 
@@ -41,7 +44,14 @@ public class MemoServiceImpl implements MemoService {
 		memo.setMember(member);
 		memo.setMemoName(memoName);
 		memo.setMemoText(memoText != null ? memoText : "");
-		memo.setMemoType(MEMO_TYPE_PERSONAL);
+		if (MEMO_TYPE_CALENDAR.equals(request.getMemoType())) {
+			memo.setMemoType(MEMO_TYPE_CALENDAR);
+			if (request.getCalendarMemoDate() != null && !request.getCalendarMemoDate().isBlank()) {
+				memo.setCalendarMemoDate(parseCalendarMemoDate(request.getCalendarMemoDate()));
+			}
+		} else {
+			memo.setMemoType(MEMO_TYPE_PERSONAL);
+		}
 		memo.setMemoCreatedAt(LocalDateTime.now());
 		memo.setMemoUpdatedAt(LocalDateTime.now());
 		Memo saved = memoRepository.save(memo);
@@ -58,6 +68,15 @@ public class MemoServiceImpl implements MemoService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
+	public List<MemoResponse> listCalendar(Long memberNo) {
+		return memoRepository.findByMember_MemberNoAndMemoTypeOrderByMemoCreatedAtDesc(memberNo, MEMO_TYPE_CALENDAR)
+				.stream()
+				.map(MemoResponse::fromEntity)
+				.collect(Collectors.toList());
+	}
+
+	@Override
 	@Transactional
 	public MemoResponse update(Long memberNo, Long memoNo, MemoUpdateRequest request) {
 		Memo memo = memoRepository.findById(memoNo)
@@ -65,8 +84,8 @@ public class MemoServiceImpl implements MemoService {
 		if (!memo.getMember().getMemberNo().equals(memberNo)) {
 			throw new IllegalArgumentException("본인의 메모만 수정할 수 있습니다.");
 		}
-		if (!MEMO_TYPE_PERSONAL.equals(memo.getMemoType())) {
-			throw new IllegalArgumentException("개인 메모만 수정할 수 있습니다.");
+		if (!MEMO_TYPE_PERSONAL.equals(memo.getMemoType()) && !MEMO_TYPE_CALENDAR.equals(memo.getMemoType())) {
+			throw new IllegalArgumentException("개인/캘린더 메모만 수정할 수 있습니다.");
 		}
 		String memoName = truncate(request.getMemoName(), MEMO_NAME_MAX_LENGTH);
 		if (memoName != null && !memoName.isBlank()) {
@@ -88,8 +107,8 @@ public class MemoServiceImpl implements MemoService {
 		if (!memo.getMember().getMemberNo().equals(memberNo)) {
 			throw new IllegalArgumentException("본인의 메모만 삭제할 수 있습니다.");
 		}
-		if (!MEMO_TYPE_PERSONAL.equals(memo.getMemoType())) {
-			throw new IllegalArgumentException("개인 메모만 삭제할 수 있습니다.");
+		if (!MEMO_TYPE_PERSONAL.equals(memo.getMemoType()) && !MEMO_TYPE_CALENDAR.equals(memo.getMemoType())) {
+			throw new IllegalArgumentException("개인/캘린더 메모만 삭제할 수 있습니다.");
 		}
 		memoRepository.delete(memo);
 	}
@@ -98,6 +117,16 @@ public class MemoServiceImpl implements MemoService {
 		if (value == null) return null;
 		if (value.length() <= maxLength) return value;
 		return value.substring(0, maxLength);
+	}
+
+	private static LocalDateTime parseCalendarMemoDate(String dateStr) {
+		if (dateStr == null || dateStr.isBlank()) return null;
+		try {
+			LocalDate date = LocalDate.parse(dateStr.trim());
+			return date.atTime(LocalTime.MIN);
+		} catch (Exception e) {
+			return null;
+		}
 	}
 }
 

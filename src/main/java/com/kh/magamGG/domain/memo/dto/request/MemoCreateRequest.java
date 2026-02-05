@@ -20,4 +20,10 @@ public class MemoCreateRequest {
 
 	/** 메모 내용 (DB: MEMO_TEXT, max 255) */
 	private String memoText;
+
+	/** 메모 타입 (예: 개인, 캘린더) */
+	private String memoType;
+
+	/** 캘린더 메모일 때 해당 날짜 (yyyy-MM-dd, DB: CALENDAR_MEMO_DATE) */
+	private String calendarMemoDate;
 }
