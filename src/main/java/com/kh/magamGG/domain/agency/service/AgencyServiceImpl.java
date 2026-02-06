@@ -21,6 +21,7 @@ import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRequestRepository;
 import com.kh.magamGG.domain.attendance.repository.LeaveBalanceRepository;
 import com.kh.magamGG.domain.member.entity.Manager;
+import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
 import com.kh.magamGG.domain.member.repository.ManagerRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.entity.NewRequest;
@@ -71,6 +72,7 @@ public class AgencyServiceImpl implements AgencyService {
     private final NewRequestRepository newRequestRepository;
     private final NotificationService notificationService;
     private final ManagerRepository managerRepository;
+    private final ArtistAssignmentRepository artistAssignmentRepository;
     private final LeaveBalanceRepository leaveBalanceRepository;
     private final ProjectRepository projectRepository;
     private final KanbanCardRepository kanbanCardRepository;
@@ -1008,6 +1010,206 @@ public class AgencyServiceImpl implements AgencyService {
             }
         }
         return latestByMember;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HealthDistributionResponse getHealthDistributionForManager(Long memberNo) {
+        java.util.Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            return emptyHealthDistribution();
+        }
+        Manager manager = managerOpt.get();
+        List<com.kh.magamGG.domain.member.entity.ArtistAssignment> assignments =
+                artistAssignmentRepository.findByManagerNo(manager.getManagerNo());
+        Set<Long> assignedMemberNos = assignments.stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+        if (assignedMemberNos.isEmpty()) {
+            return emptyHealthDistribution();
+        }
+        Member member = manager.getMember();
+        if (member.getAgency() == null) {
+            return emptyHealthDistribution();
+        }
+        Long agencyNo = member.getAgency().getAgencyNo();
+        List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository.findByAgencyNoWithSurvey(agencyNo);
+        int totalTarget = assignedMemberNos.size();
+        List<HealthDistributionResponse.HealthItem> mentalDistribution =
+                buildHealthDistributionForType(items, "월간 정신", assignedMemberNos, totalTarget);
+        List<HealthDistributionResponse.HealthItem> physicalDistribution =
+                buildHealthDistributionForType(items, "월간 신체", assignedMemberNos, totalTarget);
+        return HealthDistributionResponse.builder()
+                .mentalDistribution(mentalDistribution)
+                .physicalDistribution(physicalDistribution)
+                .build();
+    }
+
+    private HealthDistributionResponse emptyHealthDistribution() {
+        List<HealthDistributionResponse.HealthItem> empty = List.of(
+                HealthDistributionResponse.HealthItem.builder().name("위험").value(0L).color("#EF4444").build(),
+                HealthDistributionResponse.HealthItem.builder().name("경고").value(0L).color("#CA8A04").build(),
+                HealthDistributionResponse.HealthItem.builder().name("주의").value(0L).color("#FF9800").build(),
+                HealthDistributionResponse.HealthItem.builder().name("정상").value(0L).color("#10B981").build(),
+                HealthDistributionResponse.HealthItem.builder().name("미검진").value(0L).color("#94A3B8").build());
+        return HealthDistributionResponse.builder()
+                .mentalDistribution(new ArrayList<>(empty))
+                .physicalDistribution(new ArrayList<>(empty))
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AgencyHealthScheduleResponse getHealthScheduleForManager(Long memberNo) {
+        java.util.Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            return AgencyHealthScheduleResponse.builder()
+                    .nextCheckupDate("-").daysUntil(0).period(15).cycle(30).createdAt(null).build();
+        }
+        Member member = managerOpt.get().getMember();
+        if (member.getAgency() == null) {
+            return AgencyHealthScheduleResponse.builder()
+                    .nextCheckupDate("-").daysUntil(0).period(15).cycle(30).createdAt(null).build();
+        }
+        return getAgencyHealthSchedule(member.getAgency().getAgencyNo());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AgencyUnscreenedListResponse getUnscreenedListForManager(Long memberNo) {
+        java.util.Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            return AgencyUnscreenedListResponse.builder().nextCheckupDate("-").items(List.of()).build();
+        }
+        Manager manager = managerOpt.get();
+        List<com.kh.magamGG.domain.member.entity.ArtistAssignment> assignments =
+                artistAssignmentRepository.findByManagerNo(manager.getManagerNo());
+        Set<Long> assignedMemberNos = assignments.stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+        if (assignedMemberNos.isEmpty()) {
+            return AgencyUnscreenedListResponse.builder().nextCheckupDate("-").items(List.of()).build();
+        }
+        Member member = manager.getMember();
+        if (member.getAgency() == null) {
+            return AgencyUnscreenedListResponse.builder().nextCheckupDate("-").items(List.of()).build();
+        }
+        AgencyUnscreenedListResponse full = getAgencyUnscreenedList(member.getAgency().getAgencyNo());
+        List<AgencyUnscreenedListResponse.UnscreenedItem> filtered = full.getItems().stream()
+                .filter(item -> assignedMemberNos.contains(item.getMemberNo()))
+                .collect(Collectors.toList());
+        return AgencyUnscreenedListResponse.builder()
+                .nextCheckupDate(full.getNextCheckupDate())
+                .items(filtered)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public HealthMonitoringDetailResponse getHealthMonitoringDetailForManager(Long memberNo, String type) {
+        java.util.Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) {
+            return HealthMonitoringDetailResponse.builder().type(type == null ? "mental" : type).items(List.of()).build();
+        }
+        Manager manager = managerOpt.get();
+        List<com.kh.magamGG.domain.member.entity.ArtistAssignment> assignments =
+                artistAssignmentRepository.findByManagerNo(manager.getManagerNo());
+        Set<Long> assignedMemberNos = assignments.stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toSet());
+        if (assignedMemberNos.isEmpty()) {
+            return HealthMonitoringDetailResponse.builder().type(type == null ? "mental" : type).items(List.of()).build();
+        }
+        Member managerMember = manager.getMember();
+        if (managerMember.getAgency() == null) {
+            return HealthMonitoringDetailResponse.builder().type(type == null ? "mental" : type).items(List.of()).build();
+        }
+        Long agencyNo = managerMember.getAgency().getAgencyNo();
+        List<Member> targetMembers = memberRepository.findAllById(assignedMemberNos);
+        String surveyType = "physical".equalsIgnoreCase(type) ? "월간 신체" : "월간 정신";
+        String responseType = "physical".equalsIgnoreCase(type) ? "physical" : "mental";
+
+        List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository.findByAgencyNoWithSurvey(agencyNo);
+        List<HealthSurveyResponseItem> typeItems = items.stream()
+                .filter(item -> item.getHealthSurveyQuestionItemCreatedAt() != null)
+                .filter(item -> surveyType.equals(item.getHealthSurveyQuestion().getHealthSurveyQuestionType()))
+                .filter(item -> assignedMemberNos.contains(item.getMember().getMemberNo()))
+                .collect(Collectors.toList());
+
+        Map<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> byMemberThenByTime = typeItems.stream()
+                .collect(Collectors.groupingBy(
+                        item -> item.getMember().getMemberNo(),
+                        LinkedHashMap::new,
+                        Collectors.groupingBy(HealthSurveyResponseItem::getHealthSurveyQuestionItemCreatedAt)));
+
+        List<HealthMonitoringDetailResponse.HealthMonitoringDetailItem> result = new ArrayList<>();
+        Set<Long> screenedMemberNos = new HashSet<>();
+
+        for (Map.Entry<Long, Map<LocalDateTime, List<HealthSurveyResponseItem>>> entry : byMemberThenByTime.entrySet()) {
+            Long artistMemberNo = entry.getKey();
+            Map<LocalDateTime, List<HealthSurveyResponseItem>> byTime = entry.getValue();
+            LocalDateTime latestCreatedAt = byTime.keySet().stream().max(LocalDateTime::compareTo).orElse(null);
+            if (latestCreatedAt == null) continue;
+            List<HealthSurveyResponseItem> latestSubmission = byTime.get(latestCreatedAt);
+            if (latestSubmission == null || latestSubmission.isEmpty()) continue;
+
+            Member member = latestSubmission.get(0).getMember();
+            int totalScore = latestSubmission.stream()
+                    .mapToInt(item -> item.getHealthSurveyQuestionItemAnswerScore() != null ? item.getHealthSurveyQuestionItemAnswerScore() : 0)
+                    .sum();
+            String level;
+            try {
+                level = healthSurveyService.evaluateRiskLevel(surveyType, totalScore);
+            } catch (Exception e) {
+                level = HealthSurveyRiskLevelDto.NORMAL;
+            }
+            screenedMemberNos.add(artistMemberNo);
+            String lastCheckDate = latestCreatedAt.toLocalDate().toString();
+            String position = member.getMemberRole() != null ? member.getMemberRole() : "";
+            result.add(HealthMonitoringDetailResponse.HealthMonitoringDetailItem.builder()
+                    .memberNo(artistMemberNo)
+                    .memberName(member.getMemberName() != null ? member.getMemberName() : "")
+                    .position(position)
+                    .totalScore(totalScore)
+                    .status(level)
+                    .lastCheckDate(lastCheckDate)
+                    .build());
+        }
+
+        for (Member m : targetMembers) {
+            if (screenedMemberNos.contains(m.getMemberNo())) continue;
+            result.add(HealthMonitoringDetailResponse.HealthMonitoringDetailItem.builder()
+                    .memberNo(m.getMemberNo())
+                    .memberName(m.getMemberName() != null ? m.getMemberName() : "")
+                    .position(m.getMemberRole() != null ? m.getMemberRole() : "")
+                    .totalScore(null)
+                    .status("미검진")
+                    .lastCheckDate(null)
+                    .build());
+        }
+
+        result.sort((a, b) -> {
+            boolean aUnscreened = "미검진".equals(a.getStatus());
+            boolean bUnscreened = "미검진".equals(b.getStatus());
+            if (aUnscreened && !bUnscreened) return 1;
+            if (!aUnscreened && bUnscreened) return -1;
+            if (aUnscreened && bUnscreened) return (a.getMemberName()).compareTo(b.getMemberName());
+            int orderA = riskOrder(a.getStatus());
+            int orderB = riskOrder(b.getStatus());
+            if (orderA != orderB) return Integer.compare(orderA, orderB);
+            String dateA = a.getLastCheckDate() != null ? a.getLastCheckDate() : "";
+            String dateB = b.getLastCheckDate() != null ? b.getLastCheckDate() : "";
+            int dateCmp = dateB.compareTo(dateA);
+            if (dateCmp != 0) return dateCmp;
+            Integer scoreA = a.getTotalScore() != null ? a.getTotalScore() : 0;
+            Integer scoreB = b.getTotalScore() != null ? b.getTotalScore() : 0;
+            return Integer.compare(scoreB, scoreA);
+        });
+
+        return HealthMonitoringDetailResponse.builder()
+                .type(responseType)
+                .items(result)
+                .build();
     }
 
     private static final String HEALTH_REMINDER_TYPE = "HEALTH_REM";

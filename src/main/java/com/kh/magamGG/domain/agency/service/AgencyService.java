@@ -91,6 +91,26 @@ public interface AgencyService {
     AgencyUnscreenedListResponse getAgencyUnscreenedList(Long agencyNo);
 
     /**
+     * 담당자(memberNo)의 배정 작가(ARTIST_ASSIGNMENT)만 대상으로 한 건강 인원 분포 (정신/신체 도넛용)
+     */
+    HealthDistributionResponse getHealthDistributionForManager(Long memberNo);
+
+    /**
+     * 담당자 소속 에이전시 기준 건강 검진 일정 (다음 검진 예정일 등)
+     */
+    AgencyHealthScheduleResponse getHealthScheduleForManager(Long memberNo);
+
+    /**
+     * 담당자 배정 작가 중 미검진 인원 목록
+     */
+    AgencyUnscreenedListResponse getUnscreenedListForManager(Long memberNo);
+
+    /**
+     * 담당자 배정 작가 검진 모니터링 상세 (정신/신체 타입별, 점수·상태·최근 검사일)
+     */
+    HealthMonitoringDetailResponse getHealthMonitoringDetailForManager(Long memberNo, String type);
+
+    /**
      * 에이전시 마감 임박 현황 (담당자 관리 프로젝트의 업무 기준, 오늘~4일 후 5개 집계)
      */
     List<AgencyDeadlineCountResponse.DeadlineItem> getAgencyDeadlineCounts(Long agencyNo);
