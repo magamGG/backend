@@ -62,7 +62,12 @@ import java.util.TreeMap;
 @Slf4j
 @Transactional(readOnly = true)
 public class AttendanceServiceImpl implements AttendanceService {
-    
+
+    /** 휴가로 집계하는 타입: 해당 날짜에 승인되면 출근 이력이 있어도 휴가로 집계 */
+    private static final Set<String> LEAVE_TYPES = Set.of("연차", "반차", "반반차", "병가");
+    /** 실제 출근(ATTENDANCE) 이력이 있는 날만 집계하는 타입. 승인 기간이 아닌 실제 체크인 일수만 표시 */
+    private static final Set<String> ATTENDANCE_REQUIRED_TYPES = Set.of("재택근무", "워케이션");
+
     private final AttendanceRequestRepository attendanceRequestRepository;
     private final AttendanceRepository attendanceRepository;
     private final LeaveHistoryRepository leaveHistoryRepository;
@@ -255,27 +260,36 @@ public class AttendanceServiceImpl implements AttendanceService {
         while (!currentDate.isAfter(endDate)) {
             boolean hasCheckIn = checkInSet.contains(currentDate);
             String type = null;
-            
+            boolean isLeaveType = false;
+
             // 승인된 근태 신청 확인
             for (AttendanceRequest req : approvedRequests) {
                 LocalDate start = req.getAttendanceRequestStartDate().toLocalDate();
                 LocalDate end = req.getAttendanceRequestEndDate().toLocalDate();
                 if (!currentDate.isBefore(start) && !currentDate.isAfter(end)) {
                     type = req.getAttendanceRequestType() != null ? req.getAttendanceRequestType() : "출근";
+                    isLeaveType = type != null && LEAVE_TYPES.contains(type);
                     break;
                 }
             }
-            
-            if (hasCheckIn) {
-                // 출근한 날: 승인된 신청이 있으면 그 타입, 없으면 "출근"
+
+            // 휴재는 근태 통계에 포함하지 않음
+            if (type != null && "휴재".equals(type)) {
+                currentDate = currentDate.plusDays(1);
+                continue;
+            }
+            // 휴가(연차·병가 등) 승인된 날은 출근 이력 유무와 관계없이 휴가로 집계
+            if (type != null && isLeaveType) {
+                typeToCount.merge(type, 1L, Long::sum);
+            } else if (hasCheckIn) {
+                // 실제 출근한 날: 승인된 타입(재택/워케이션 등)이 있으면 그 타입, 없으면 '출근'
                 String finalType = (type != null) ? type : "출근";
                 typeToCount.merge(finalType, 1L, Long::sum);
-            } else if (type != null) {
-                // 출근하지 않았지만 승인된 근태 신청이 있는 날 (연차, 휴가 등)
+            } else if (type != null && !ATTENDANCE_REQUIRED_TYPES.contains(type)) {
+                // 재택근무·워케이션은 실제 출근 이력이 있는 날만 집계(위 hasCheckIn 분기에서만 집계)
                 typeToCount.merge(type, 1L, Long::sum);
             }
-            // 출근하지 않고 승인된 신청도 없으면 집계하지 않음 (미출근은 프론트에서 계산)
-            
+
             currentDate = currentDate.plusDays(1);
         }
         
