@@ -1,6 +1,106 @@
 package com.kh.magamGG.domain.project.repository;
 
-public interface KanbanCardRepository {
-}
+import com.kh.magamGG.domain.project.entity.KanbanCard;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import org.springframework.data.domain.Pageable;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
+
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN kc.kanbanBoard kb " +
+           "WHERE kb.project.projectNo = :projectNo")
+    List<KanbanCard> findByProjectNo(@Param("projectNo") Long projectNo);
+
+    List<KanbanCard> findByKanbanBoard_Project_ProjectNo(Long projectNo);
+
+    /**
+     * 담당자 배정 + 미완료(N) 카드 전부 조회, 마감일 가까운 순 정렬 (아티스트 대시보드 오늘 할 일용).
+     * Y(완료), D(삭제) 제외. 마감일 NULL은 맨 뒤로.
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = :status " +
+           "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(
+            @Param("memberNo") Long memberNo, @Param("status") String status);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 (PROJECT_MEMBER 경유, 상태 N=미완료만)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = 'N'")
+    long countByProjectMember_Member_MemberNo(@Param("memberNo") Long memberNo);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - 지정 상태만 (PROJECT_MEMBER 경유, status='Y' 완료 등)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = :status")
+    long countByProjectMember_Member_MemberNoAndKanbanCardStatus(
+            @Param("memberNo") Long memberNo, @Param("status") String status);
+
+    /**
+     * 회원에게 배정된 칸반 카드 수 - STATUS가 'D'(삭제)가 아닌 것만 (카드 "작업 N개" 표시용)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D')")
+    long countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(@Param("memberNo") Long memberNo);
+
+    /**
+     * 여러 회원의 특정 기간 내 마감 칸반 카드 조회 (담당자/에이전시 대시보드 마감 임박 현황용)
+     * memberNo IN (...) AND kanbanCardEndedAt BETWEEN :fromDate AND :toDate
+     * 완료(Y), 삭제(D) 제외
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.projectMember pm " +
+           "JOIN FETCH pm.member m " +
+           "WHERE m.memberNo IN :memberNos " +
+           "AND kc.kanbanCardEndedAt >= :fromDate " +
+           "AND kc.kanbanCardEndedAt <= :toDate " +
+           "AND kc.kanbanCardStatus != 'Y' " +
+           "AND kc.kanbanCardStatus != 'D' " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByMemberNosAndDateRange(
+            @Param("memberNos") List<Long> memberNos,
+            @Param("fromDate") java.time.LocalDate fromDate,
+            @Param("toDate") java.time.LocalDate toDate);
+
+    /**
+     * 담당자 배정 카드 중 해당 기간과 겹치는 카드 조회 (아티스트 캘린더용).
+     * 카드 기간이 [rangeStart, rangeEnd]와 겹침: startedAt <= rangeEnd AND (endedAt IS NULL OR endedAt >= rangeStart).
+     * KANBAN_CARD_ENDED_AT 느린 순(나중에 끝나는 것 뒤로) 정렬 → 캘린더에서 아래쪽 배치용.
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN FETCH kb.project p " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo " +
+           "AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D') " +
+           "AND kc.kanbanCardStartedAt <= :rangeEnd " +
+           "AND (kc.kanbanCardEndedAt IS NULL OR kc.kanbanCardEndedAt >= :rangeStart) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndDateRangeOverlap(
+            @Param("memberNo") Long memberNo,
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
+
+    /**
+     * 마감임박 업무: 담당자 배정 카드 중 KANBAN_CARD_ENDED_AT >= :fromDate (오늘 기준 이전 제외), 완료/삭제 제외, 마감일 가까운 순
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN FETCH kb.project p " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo " +
+           "AND kc.kanbanCardEndedAt >= :fromDate " +
+           "AND (kc.kanbanCardStatus IS NULL OR (kc.kanbanCardStatus <> 'Y' AND kc.kanbanCardStatus <> 'D')) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardEndedAtGreaterThanEqualOrderByKanbanCardEndedAtAsc(
+            @Param("memberNo") Long memberNo,
+            @Param("fromDate") LocalDate fromDate,
+            Pageable pageable);
+}
 

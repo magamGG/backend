@@ -2,6 +2,8 @@ package com.kh.magamGG.domain.notification.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "NOTIFICATION")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Notification {
 	
 	@Id
@@ -36,4 +40,18 @@ public class Notification {
 	
 	@Column(name = "NOTIFICATION_TYPE", length = 10)
 	private String notificationType;
+	
+	/**
+	 * 알림 읽음 처리
+	 */
+	public void markAsRead() {
+		this.notificationStatus = "N";
+	}
+	
+	/**
+	 * 알림이 읽지 않은 상태인지 확인
+	 */
+	public boolean isUnread() {
+		return "Y".equals(this.notificationStatus);
+	}
 }

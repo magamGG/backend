@@ -1,16 +1,17 @@
 package com.kh.magamGG.domain.memo.entity;
 
-import com.kh.magamGG.domain.calendar.entity.CalendarEvent;
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "MEMO")
 @Getter
+@Setter
 @NoArgsConstructor
 public class Memo {
 	
@@ -23,10 +24,6 @@ public class Memo {
 	@JoinColumn(name = "MEMBER_NO", nullable = false)
 	private Member member;
 	
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "CALENDAR_EVENT_NO", nullable = false)
-	private CalendarEvent calendarEvent;
-	
 	@Column(name = "MEMO_NAME", nullable = false, length = 30)
 	private String memoName;
 	
@@ -35,7 +32,10 @@ public class Memo {
 	
 	@Column(name = "MEMO_CREATED_AT", nullable = false, columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP")
 	private LocalDateTime memoCreatedAt;
-	
+
+    @Column(name = "CALENDAR_MEMO_DATE")
+    private LocalDateTime calendarMemoDate;
+
 	@Column(name = "MEMO_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime memoUpdatedAt;
 	

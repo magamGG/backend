@@ -2,16 +2,19 @@ package com.kh.magamGG.domain.attendance.entity;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "ATTENDANCE_REQUEST")
 @Getter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class AttendanceRequest {
 	
 	@Id
@@ -55,4 +58,49 @@ public class AttendanceRequest {
 	
 	@Column(name = "ATTENDANCE_REQUEST_UPDATED_AT", columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 	private LocalDateTime attendanceRequestUpdatedAt;
+	
+	// 프로젝트 휴재 신청 (1:0..1 관계)
+	@OneToOne(mappedBy = "attendanceRequest", cascade = CascadeType.ALL, orphanRemoval = true)
+	private ProjectLeaveRequest projectLeaveRequest;
+	
+	/**
+	 * 근태 신청 승인 처리
+	 */
+	public void approve() {
+		this.attendanceRequestStatus = "APPROVED";
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
+	
+	/**
+	 * 근태 신청 반려 처리
+	 * @param rejectReason 반려 사유
+	 */
+	public void reject(String rejectReason) {
+		this.attendanceRequestStatus = "REJECTED";
+		this.attendanceRequestRejectReason = rejectReason;
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
+
+	/**
+	 * 근태 신청 취소 처리 (신청자가 대기/반려 상태에서 취소)
+	 */
+	public void cancel() {
+		this.attendanceRequestStatus = "CANCELLED";
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
+
+	/**
+	 * 근태 신청 수정 (PENDING 상태에서만)
+	 */
+	public void update(String requestType, LocalDateTime startDate, LocalDateTime endDate, Integer usingDays,
+			String reason, String workcationLocation, String medicalFileUrl) {
+		this.attendanceRequestType = requestType != null ? requestType : this.attendanceRequestType;
+		this.attendanceRequestStartDate = startDate;
+		this.attendanceRequestEndDate = endDate;
+		this.attendanceRequestUsingDays = usingDays;
+		this.attendanceRequestReason = reason;
+		this.workcationLocation = workcationLocation != null ? workcationLocation : "";
+		this.medicalFileUrl = medicalFileUrl != null ? medicalFileUrl : "";
+		this.attendanceRequestUpdatedAt = LocalDateTime.now();
+	}
 }

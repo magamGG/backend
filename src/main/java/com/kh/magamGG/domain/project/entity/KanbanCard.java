@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "KANBAN_CARD")
+@Table(name = "kanban_card")
 @Getter
 @NoArgsConstructor
 public class KanbanCard {
@@ -26,6 +26,9 @@ public class KanbanCard {
 	
 	@Column(name = "KANBAN_CARD_NAME", nullable = false, length = 50)
 	private String kanbanCardName;
+
+	@Column(name = "KANBAN_CARD_DESCRIPTION", length = 1000)
+	private String kanbanCardDescription;
 	
 	@Column(name = "KANBAN_CARD_STATUS", nullable = false, columnDefinition = "VARCHAR(1) DEFAULT 'N'")
 	private String kanbanCardStatus;
@@ -48,7 +51,27 @@ public class KanbanCard {
 	
 	@OneToMany(mappedBy = "kanbanCard", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<Comment> comments = new ArrayList<>();
-	
-	@OneToMany(mappedBy = "kanbanCard", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<TaskHistory> taskHistories = new ArrayList<>();
+
+	@PrePersist
+	protected void onCreate() {
+		if (kanbanCardCreatedAt == null) {
+			kanbanCardCreatedAt = LocalDateTime.now();
+		}
+		if (kanbanCardUpdatedAt == null) {
+			kanbanCardUpdatedAt = LocalDateTime.now();
+		}
+	}
+
+	@PreUpdate
+	protected void onUpdate() {
+		kanbanCardUpdatedAt = LocalDateTime.now();
+	}
+
+	public void setKanbanBoard(KanbanBoard kanbanBoard) { this.kanbanBoard = kanbanBoard; }
+	public void setKanbanCardName(String kanbanCardName) { this.kanbanCardName = kanbanCardName; }
+	public void setKanbanCardDescription(String kanbanCardDescription) { this.kanbanCardDescription = kanbanCardDescription; }
+	public void setKanbanCardStatus(String kanbanCardStatus) { this.kanbanCardStatus = kanbanCardStatus; }
+	public void setProjectMember(ProjectMember projectMember) { this.projectMember = projectMember; }
+	public void setKanbanCardStartedAt(LocalDate kanbanCardStartedAt) { this.kanbanCardStartedAt = kanbanCardStartedAt; }
+	public void setKanbanCardEndedAt(LocalDate kanbanCardEndedAt) { this.kanbanCardEndedAt = kanbanCardEndedAt; }
 }

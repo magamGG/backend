@@ -1,8 +1,11 @@
 package com.kh.magamGG.domain.project.entity;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -11,35 +14,58 @@ import java.util.List;
 @Entity
 @Table(name = "PROJECT")
 @Getter
+@Setter
 @NoArgsConstructor
+@AllArgsConstructor
+@Builder
 public class Project {
-	
+
 	@Id
 	@GeneratedValue(strategy = GenerationType.IDENTITY)
 	@Column(name = "PROJECT_NO")
 	private Long projectNo;
-	
+
 	@Column(name = "PROJECT_NAME", nullable = false, length = 100)
 	private String projectName;
-	
+
 	@Column(name = "PROJECT_STATUS", nullable = false, columnDefinition = "VARCHAR(100) DEFAULT '연재'")
 	private String projectStatus;
-	
+
 	@Column(name = "PROJECT_COLOR", nullable = false, length = 50)
 	private String projectColor;
 
-    @Column(name = "PROJECT_CYCLE")
-    private Integer projectCycle;
+	@Column(name = "PROJECT_CYCLE")
+	private Integer projectCycle;
 
-    @Column(name = "THUMBNAIL_FILE", length = 500)
-    private String thumbnailFile;
+	@Column(name = "THUMBNAIL_FILE", length = 500)
+	private String thumbnailFile;
 
-    @Column(name = "PROJECT_STARTED_AT")
-    private LocalDateTime projectStartedAt;
-	
+	@Column(name = "PROJECT_STARTED_AT")
+	private LocalDateTime projectStartedAt;
+
+	@Column(name = "PROJECT_GENRE", length = 100)
+	private String projectGenre;
+
+	@Column(name = "PLATFORM", length = 100)
+	private String platform;
+
 	@OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
 	private List<ProjectMember> projectMembers = new ArrayList<>();
+
+	@OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
+	private List<KanbanBoard> kanbanBoards = new ArrayList<>();
 	
 	@OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true)
-	private List<KanbanBoard> kanbanBoards = new ArrayList<>();
+	@Builder.Default
+	private List<com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest> projectLeaveRequests = new ArrayList<>();
+	
+	public void setProjectName(String projectName) { this.projectName = projectName; }
+	public void setProjectStatus(String projectStatus) { this.projectStatus = projectStatus; }
+	public void setProjectColor(String projectColor) { this.projectColor = projectColor; }
+	public void setProjectCycle(Integer projectCycle) { this.projectCycle = projectCycle; }
+	public void setPlatform(String platform) { this.platform = platform; }
+	public void setThumbnailFile(String thumbnailFile) { this.thumbnailFile = thumbnailFile; }
+	public void setProjectStartedAt(java.time.LocalDateTime projectStartedAt) { this.projectStartedAt = projectStartedAt; }
 }

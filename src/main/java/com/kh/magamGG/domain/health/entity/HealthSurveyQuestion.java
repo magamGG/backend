@@ -19,15 +19,17 @@ public class HealthSurveyQuestion {
 	@Column(name = "HEALTH_SURVEY_QUESTION_NO")
 	private Long healthSurveyQuestionNo;
 	
-	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "HEALTH_SURVEY_NO", nullable = false)
-	private HealthSurvey healthSurvey;
+	// HealthSurvey 연관관계 제거 (소속 상관없이 모든 문항 공통 사용)
 	
 	@Column(name = "HEALTH_SURVEY_ORDER")
 	private Integer healthSurveyOrder;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_CONTENT", length = 1000)
 	private String healthSurveyQuestionContent;
+
+	// 질문 유형 ("월간 정신", "월간 신체")
+	@Column(name = "HEALTH_SURVEY_QUESTION_TYPE", length = 20)
+	private String healthSurveyQuestionType;
 	
 	@Column(name = "HEALTH_SURVEY_QUESTION_MIN_SCORE")
 	private Integer healthSurveyQuestionMinScore;
