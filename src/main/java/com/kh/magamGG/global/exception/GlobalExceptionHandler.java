@@ -3,6 +3,7 @@ package com.kh.magamGG.global.exception;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
@@ -114,6 +115,27 @@ public class GlobalExceptionHandler {
                 request.getDescription(false).replace("uri=", "")
         );
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(
+            MethodArgumentNotValidException ex, WebRequest request) {
+        StringBuilder errors = new StringBuilder();
+        ex.getBindingResult().getFieldErrors().forEach(error -> {
+            if (errors.length() > 0) {
+                errors.append("; ");
+            }
+            errors.append(error.getField()).append(": ").append(error.getDefaultMessage());
+        });
+        
+        log.error("입력값 검증 실패: {}", errors.toString());
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                "BAD_REQUEST",
+                "입력값 검증 실패: " + errors.toString(),
+                request.getDescription(false).replace("uri=", "")
+        );
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
