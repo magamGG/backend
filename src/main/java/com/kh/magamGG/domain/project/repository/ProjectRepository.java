@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 public interface ProjectRepository extends JpaRepository<Project, Long> {
@@ -36,4 +37,13 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     long countByProjectNameAndAgencyNo(
             @Param("projectName") String projectName,
             @Param("agencyNo") Long agencyNo);
+
+    /** 에이전시 소속 회원이 참여한 프로젝트 중 projectStartedAt 기준 해당 시점까지 생성된 수 (전월 대비 집계용) */
+    @Query("SELECT COUNT(DISTINCT p) FROM Project p " +
+           "JOIN p.projectMembers pm " +
+           "WHERE pm.member.agency.agencyNo = :agencyNo " +
+           "AND p.projectStartedAt IS NOT NULL AND p.projectStartedAt <= :before")
+    long countByAgencyNoAndProjectStartedAtBefore(
+            @Param("agencyNo") Long agencyNo,
+            @Param("before") LocalDateTime before);
 }
