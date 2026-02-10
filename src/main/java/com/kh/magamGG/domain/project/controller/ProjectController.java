@@ -107,6 +107,19 @@ public class ProjectController {
     }
 
     /**
+     * 담당자/에이전시 캘린더: 로그인 회원이 속한 모든 프로젝트의 칸반 카드 목록 (PROJECT_COLOR, STARTED_AT, ENDED_AT)
+     * GET /api/projects/my-projects-calendar-cards?year=2026&month=1
+     */
+    @GetMapping("/my-projects-calendar-cards")
+    public ResponseEntity<List<CalendarCardResponse>> getMyProjectsCalendarCards(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam int year,
+            @RequestParam int month) {
+        List<CalendarCardResponse> list = kanbanBoardService.getCalendarCardsForMyProjects(memberNo, year, month);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
      * 마감임박 업무: KANBAN_CARD_ENDED_AT >= 오늘 (이전 날짜 제외), 마감일 가까운 순
      * GET /api/projects/my-deadline-cards
      */

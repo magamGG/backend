@@ -29,4 +29,10 @@ public interface ArtistAssignmentRepository extends JpaRepository<ArtistAssignme
      * 특정 작가의 배정 삭제
      */
     void deleteByArtist_MemberNo(Long artistMemberNo);
+
+    /**
+     * 특정 담당자(MANAGER_NO)에게 배정된 '근무중'(ACTIVE, WORKCATION, REMOTE_WORK) 상태인 작가 목록
+     */
+    @Query("SELECT a FROM ArtistAssignment a JOIN FETCH a.artist WHERE a.manager.managerNo = :managerNo AND a.artist.memberStatus IN ('ACTIVE', 'WORKCATION', 'REMOTE_WORK')")
+    List<ArtistAssignment> findWorkingArtistsByManagerNo(@Param("managerNo") Long managerNo);
 }

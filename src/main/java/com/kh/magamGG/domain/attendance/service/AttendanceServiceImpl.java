@@ -795,4 +795,92 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .map(AttendanceRequestResponse::fromEntity)
                 .collect(Collectors.toList());
     }
+
+    @Override
+    public AttendanceStatisticsResponseDto getAdminCalendar(Long agencyNo, int year, int month) {
+        validateAgencyExists(agencyNo);
+        
+        // 해당 월의 첫날과 마지막날
+        LocalDate firstDay = LocalDate.of(year, month, 1);
+        LocalDate lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth());
+        
+        // 에이전시 소속 직원들의 승인된 근태 신청 조회
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository
+                .findApprovedByAgencyNoAndDateRange(agencyNo, firstDay.atStartOfDay(), lastDay.atTime(23, 59, 59));
+        
+        // 캘린더 이벤트 생성
+        List<AttendanceStatisticsResponseDto.CalendarEvent> calendarEvents = new ArrayList<>();
+        
+        for (AttendanceRequest request : approvedRequests) {
+            String eventType = request.getAttendanceRequestType();
+            String colorCode = getColorCodeByType(eventType);
+            String title = getMemberName(request) + " - " + eventType;
+            
+            // 신청 기간 내의 모든 날짜에 대해 이벤트 생성
+            LocalDate startDate = request.getAttendanceRequestStartDate().toLocalDate();
+            LocalDate endDate = request.getAttendanceRequestEndDate().toLocalDate();
+            
+            // 해당 월 범위 내에서만 이벤트 생성
+            LocalDate eventStart = startDate.isBefore(firstDay) ? firstDay : startDate;
+            LocalDate eventEnd = endDate.isAfter(lastDay) ? lastDay : endDate;
+            
+            LocalDate currentDate = eventStart;
+            while (!currentDate.isAfter(eventEnd)) {
+                calendarEvents.add(AttendanceStatisticsResponseDto.CalendarEvent.builder()
+                        .memberNo(request.getMember().getMemberNo())
+                        .memberName(getMemberName(request))
+                        .eventDate(currentDate)
+                        .eventType(eventType)
+                        .colorCode(colorCode)
+                        .title(title)
+                        .build());
+                
+                currentDate = currentDate.plusDays(1);
+            }
+        }
+        
+        // 기본 통계 정보도 함께 반환 (기존 로직 활용)
+        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = approvedRequests.stream()
+                .collect(Collectors.groupingBy(AttendanceRequest::getAttendanceRequestType, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> AttendanceStatisticsResponseDto.TypeCount.builder()
+                        .type(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+        
+        return AttendanceStatisticsResponseDto.builder()
+                .typeCounts(typeCounts)
+                .totalCount(approvedRequests.size())
+                .calendarEvents(calendarEvents)
+                .build();
+    }
+    
+    /**
+     * 근무 유형별 색상 코드 반환
+     */
+    private String getColorCodeByType(String eventType) {
+        switch (eventType) {
+            case "재택근무":
+                return "#FF8C00"; // 주황색
+            case "연차":
+            case "반차":
+            case "반반차":
+            case "병가":
+                return "#808080"; // 회색
+            case "워케이션":
+                return "#8A2BE2"; // 보라색
+            default:
+                return "#4CAF50"; // 기본 녹색
+        }
+    }
+    
+    /**
+     * 회원 이름 안전하게 가져오기
+     */
+    private String getMemberName(AttendanceRequest request) {
+        return request.getMember() != null && request.getMember().getMemberName() != null 
+                ? request.getMember().getMemberName() 
+                : "알 수 없음";
+    }
 }
