@@ -13,7 +13,8 @@ public interface ManagerRepository extends JpaRepository<Manager, Long> {
     /**
      * 특정 에이전시의 담당자 목록 조회
      */
-    @Query("SELECT DISTINCT m FROM Manager m JOIN FETCH m.member mem LEFT JOIN FETCH mem.agency WHERE (mem.agency IS NOT NULL AND mem.agency.agencyNo = :agencyNo)")
+    @Query("SELECT DISTINCT m FROM Manager m JOIN FETCH m.member mem LEFT JOIN FETCH mem.agency " +
+           "WHERE (mem.agency IS NOT NULL AND mem.agency.agencyNo = :agencyNo AND mem.memberStatus = 'ACTIVE')")
     List<Manager> findByAgencyNo(@Param("agencyNo") Long agencyNo);
     
     /**

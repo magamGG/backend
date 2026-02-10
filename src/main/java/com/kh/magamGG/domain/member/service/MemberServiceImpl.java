@@ -23,7 +23,9 @@ import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.health.repository.DailyHealthCheckRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyRepository;
+import com.kh.magamGG.domain.project.entity.KanbanCard;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
+import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
@@ -61,6 +63,7 @@ public class MemberServiceImpl implements MemberService {
     private final PasswordEncoder passwordEncoder;
     private final AgencyCodeGenerator agencyCodeGenerator;
     private final ProjectMemberRepository projectMemberRepository;
+    private final KanbanCardRepository kanbanCardRepository;
     private final DailyHealthCheckRepository dailyHealthCheckRepository;
     private final ManagerRepository managerRepository;
     private final ArtistAssignmentRepository artistAssignmentRepository;
@@ -316,7 +319,33 @@ public class MemberServiceImpl implements MemberService {
             throw new IllegalArgumentException("이미 탈퇴 처리된 회원입니다.");
         }
 
-        // 실제 삭제 대신 상태를 BLOCKED로 변경
+        // 1. PROJECT_MEMBER 정리: 칸반 카드 재배치 후 제거
+        List<ProjectMember> myProjectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
+        for (ProjectMember pm : myProjectMembers) {
+            List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_ProjectMemberNo(pm.getProjectMemberNo());
+            List<ProjectMember> othersInProject = projectMemberRepository.findByProject_ProjectNo(pm.getProject().getProjectNo())
+                    .stream()
+                    .filter(p -> !p.getProjectMemberNo().equals(pm.getProjectMemberNo()))
+                    .toList();
+            if (!othersInProject.isEmpty()) {
+                ProjectMember fallback = othersInProject.get(0);
+                for (KanbanCard card : cards) {
+                    card.setProjectMember(fallback);
+                }
+                projectMemberRepository.delete(pm);
+            } else {
+                log.warn("프로젝트 {}에 탈퇴 회원 {} 외 다른 멤버 없음. PROJECT_MEMBER 유지", pm.getProject().getProjectNo(), memberNo);
+            }
+        }
+
+        // 2. ARTIST_ASSIGNMENT 정리 (작가/담당자 배정 해제)
+        artistAssignmentRepository.deleteByArtist_MemberNo(memberNo);
+        artistAssignmentRepository.deleteByManager_Member_MemberNo(memberNo);
+
+        // 3. agency_no 외래키 끊기 (탈퇴 회원을 에이전시 목록에서 제외)
+        member.setAgency(null);
+
+        // 4. 상태를 BLOCKED로 변경
         member.updateStatus("BLOCKED");
         memberRepository.save(member);
     }
@@ -530,8 +559,28 @@ public class MemberServiceImpl implements MemberService {
             savedAssignment.getArtist().getMemberNo(),
             savedAssignment.getManager().getManagerNo());
 
-        // 알림 생성 (LAZY 로딩을 위해 트랜잭션 내에서 접근)
+        // 담당자가 없지만 연재/휴재 상태인 작가의 프로젝트에 새 담당자를 PROJECT_MEMBER로 자동 추가
+        List<ProjectMember> artistProjectMembers = projectMemberRepository.findByMember_MemberNo(artistNo);
         Member managerMember = manager.getMember();
+        for (ProjectMember artistPm : artistProjectMembers) {
+            var proj = artistPm.getProject();
+            String status = proj.getProjectStatus();
+            if (!"연재".equals(status) && !"휴재".equals(status)) {
+                continue;
+            }
+            Optional<ProjectMember> existingManager = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(proj.getProjectNo(), "담당자");
+            if (existingManager.isEmpty()) {
+                ProjectMember newManagerPm = ProjectMember.builder()
+                    .member(managerMember)
+                    .project(proj)
+                    .projectMemberRole("담당자")
+                    .build();
+                projectMemberRepository.save(newManagerPm);
+                log.info("작가 프로젝트(연재/휴재)에 담당자 자동 배치: projectNo={}, projectName={}", proj.getProjectNo(), proj.getProjectName());
+            }
+        }
+
+        // 알림 생성 (LAZY 로딩을 위해 트랜잭션 내에서 접근)
         String notificationType = "ASSIGNMENT";
 
         createNotificationSafely(
@@ -572,6 +621,26 @@ public class MemberServiceImpl implements MemberService {
             assignmentToDelete.getArtistAssignmentNo(),
             artist.getMemberNo(),
             manager.getManagerNo());
+
+        // 담당자가 없어진 작가의 프로젝트에서 PROJECT_MEMBER의 담당자만 제거 (칸반 카드는 작가에게 재배치)
+        List<ProjectMember> artistProjectMembers = projectMemberRepository.findByMember_MemberNo(artist.getMemberNo());
+        for (ProjectMember artistPm : artistProjectMembers) {
+            Long projectNo = artistPm.getProject().getProjectNo();
+            List<ProjectMember> allInProject = projectMemberRepository.findByProject_ProjectNo(projectNo);
+            Optional<ProjectMember> managerPmOpt = allInProject.stream()
+                .filter(pm -> "담당자".equals(pm.getProjectMemberRole())
+                    && pm.getMember().getMemberNo().equals(managerMember.getMemberNo()))
+                .findFirst();
+            if (managerPmOpt.isPresent()) {
+                ProjectMember managerPm = managerPmOpt.get();
+                List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_ProjectMemberNo(managerPm.getProjectMemberNo());
+                for (KanbanCard card : cards) {
+                    card.setProjectMember(artistPm);
+                }
+                projectMemberRepository.delete(managerPm);
+                log.info("프로젝트 {} 에서 담당자 PROJECT_MEMBER 제거 완료: projectMemberNo={}", projectNo, managerPm.getProjectMemberNo());
+            }
+        }
 
         // 배정 해제 전에 알림 생성
         String notificationType = "ASSIGNMENT";
