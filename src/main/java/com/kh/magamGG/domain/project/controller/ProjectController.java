@@ -6,6 +6,7 @@ import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.CommentCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.CommentUpdateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardUpdateRequest;
+import com.kh.magamGG.domain.project.dto.request.AssignManagerRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectMemberAddRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
@@ -15,6 +16,7 @@ import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
+import com.kh.magamGG.domain.project.dto.response.AssignableManagerResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
@@ -324,6 +326,38 @@ public class ProjectController {
         if (memberNos != null && !memberNos.isEmpty()) {
             projectService.addProjectMembers(projectNo, memberNos);
         }
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 프로젝트에 배치 가능한 담당자 목록 (프로젝트 작가들이 ARTIST_ASSIGNMENT로 연결된 담당자만)
+     * GET /api/projects/{projectNo}/assignable-managers
+     */
+    @GetMapping("/{projectNo}/assignable-managers")
+    public ResponseEntity<List<AssignableManagerResponse>> getAssignableManagers(
+            @PathVariable Long projectNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        List<AssignableManagerResponse> list = projectService.getAssignableManagers(projectNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 프로젝트 담당자 배치 (PROJECT_MEMBER role 담당자 및 KANBAN_CARD 담당자 업데이트)
+     * PUT /api/projects/{projectNo}/assign-manager
+     */
+    @PutMapping("/{projectNo}/assign-manager")
+    public ResponseEntity<Void> assignManagerToProject(
+            @PathVariable Long projectNo,
+            @RequestBody AssignManagerRequest request,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        if (request.getManagerNo() == null) {
+            throw new IllegalArgumentException("managerNo는 필수입니다.");
+        }
+        projectService.assignManagerToProject(projectNo, request.getManagerNo());
         return ResponseEntity.ok().build();
     }
 

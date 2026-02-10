@@ -2,6 +2,7 @@ package com.kh.magamGG.domain.member.repository;
 
 import com.kh.magamGG.domain.member.entity.ArtistAssignment;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -29,6 +30,11 @@ public interface ArtistAssignmentRepository extends JpaRepository<ArtistAssignme
      * 특정 작가의 배정 삭제
      */
     void deleteByArtist_MemberNo(Long artistMemberNo);
+
+    /** 특정 담당자(manager.member.memberNo)의 배정 삭제 */
+    @Modifying
+    @Query("DELETE FROM ArtistAssignment a WHERE a.manager.member.memberNo = :memberNo")
+    void deleteByManager_Member_MemberNo(@Param("memberNo") Long memberNo);
 
     /**
      * 특정 담당자(MANAGER_NO)에게 배정된 '근무중'(ACTIVE, WORKCATION, REMOTE_WORK) 상태인 작가 목록

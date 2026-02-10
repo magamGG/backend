@@ -400,11 +400,8 @@ public class AgencyServiceImpl implements AgencyService {
     public AgencyDashboardMetricsResponse getDashboardMetrics(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
 
-        // 활동 작가: 에이전시 소속 웹툰/웹소설 작가 (ACTIVE 또는 status 미설정)
-        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
-        long activeArtistCount = artists.stream()
-                .filter(m -> m.getMemberStatus() == null || "ACTIVE".equals(m.getMemberStatus()))
-                .count();
+        // 활동 작가: 에이전시 소속 작가·어시스턴트 수 (웹툰작가, 웹소설작가, 어시스트 전체, ACTIVE만)
+        long activeArtistCount = memberRepository.countArtistsAndAssistantsByAgencyNo(agencyNo);
 
         // 진행 프로젝트: 에이전시 소속 회원이 참여한 연재 중 프로젝트
         long activeProjectCount = projectRepository.findActiveProjectsByAgencyNo(agencyNo).size();
@@ -455,14 +452,10 @@ public class AgencyServiceImpl implements AgencyService {
                 : thisMonthRate;
         String complianceRateChange = formatMonthOverMonthChange(currentForChange, lastMonthRate, true);
 
-        // 활동 작가: new_request 승인 건수 누적 기준 전월 대비 (전월 말일까지 0이면 0으로 비교)
+        // 활동 작가: 에이전시 소속 작가수 단순 표시 (전월 대비 제외)
         LocalDateTime endOfLastMonth = lastMonth.atEndOfMonth().atTime(LocalTime.MAX);
         LocalDateTime now = LocalDateTime.now();
-        long approvedByLastMonth = newRequestRepository.countByAgency_AgencyNoAndNewRequestStatusAndNewRequestDateLessThanEqual(
-                agencyNo, "승인", endOfLastMonth);
-        long approvedByNow = newRequestRepository.countByAgency_AgencyNoAndNewRequestStatusAndNewRequestDateLessThanEqual(
-                agencyNo, "승인", now);
-        String activeArtistChange = formatMonthOverMonthChangeForCount(approvedByNow, approvedByLastMonth, "명");
+        String activeArtistChange = null;
 
         // 진행 프로젝트: 프로젝트 생성일(projectStartedAt) 기준 누적 전월 대비
         long projectsByLastMonth = projectRepository.countByAgencyNoAndProjectStartedAtBefore(agencyNo, endOfLastMonth);
