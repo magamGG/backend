@@ -1,6 +1,7 @@
 package com.kh.magamGG.domain.project.service;
 
 import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
+import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository;
 import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.entity.Member;
@@ -10,6 +11,7 @@ import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
+import com.kh.magamGG.domain.project.dto.response.AssignableManagerResponse;
 import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
@@ -46,6 +48,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final NotificationService notificationService;
     private final KanbanCardRepository kanbanCardRepository;
     private final ProjectLeaveRequestRepository projectLeaveRequestRepository;
+    private final AttendanceRepository attendanceRepository;
 
     private static final int DEADLINE_WARNING_DAYS = 7;
     private static final int PROGRESS_WARNING_THRESHOLD = 70;
@@ -479,7 +482,8 @@ public class ProjectServiceImpl implements ProjectService {
     @Override
     public List<ProjectMemberResponse> getProjectMembers(Long projectNo) {
         List<ProjectMember> list = projectMemberRepository.findByProject_ProjectNo(projectNo);
-        return list.stream().map(this::toProjectMemberResponse).collect(Collectors.toList());
+        LocalDate today = LocalDate.now();
+        return list.stream().map(pm -> toProjectMemberResponse(pm, today)).collect(Collectors.toList());
     }
 
     @Override
@@ -560,6 +564,74 @@ public class ProjectServiceImpl implements ProjectService {
             .collect(Collectors.toList());
     }
 
+    @Override
+    public List<AssignableManagerResponse> getAssignableManagers(Long projectNo) {
+        projectRepository.findById(projectNo)
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        List<ProjectMember> projectMembers = projectMemberRepository.findByProject_ProjectNo(projectNo);
+        Set<Long> seenManagerNos = new HashSet<>();
+        List<AssignableManagerResponse> result = new ArrayList<>();
+        for (ProjectMember pm : projectMembers) {
+            if ("담당자".equals(pm.getProjectMemberRole())) continue;
+            Long artistMemberNo = pm.getMember().getMemberNo();
+            artistAssignmentRepository.findByArtistMemberNo(artistMemberNo).ifPresent(assignment -> {
+                Manager manager = assignment.getManager();
+                if (manager != null && seenManagerNos.add(manager.getManagerNo())) {
+                    Member managerMember = manager.getMember();
+                    if (managerMember != null && "ACTIVE".equals(managerMember.getMemberStatus())) {
+                        result.add(AssignableManagerResponse.builder()
+                            .managerNo(manager.getManagerNo())
+                            .memberNo(managerMember.getMemberNo())
+                            .memberName(managerMember.getMemberName())
+                            .build());
+                    }
+                }
+            });
+        }
+        return result;
+    }
+
+    @Override
+    @Transactional
+    public void assignManagerToProject(Long projectNo, Long managerNo) {
+        Project project = projectRepository.findById(projectNo)
+            .orElseThrow(() -> new IllegalArgumentException("프로젝트를 찾을 수 없습니다: " + projectNo));
+        Manager newManager = managerRepository.findById(managerNo)
+            .orElseThrow(() -> new IllegalArgumentException("담당자를 찾을 수 없습니다: " + managerNo));
+        Member newManagerMember = newManager.getMember();
+        if (newManagerMember == null || !"ACTIVE".equals(newManagerMember.getMemberStatus())) {
+            throw new IllegalArgumentException("활성 상태인 담당자만 배치할 수 있습니다.");
+        }
+        List<AssignableManagerResponse> assignable = getAssignableManagers(projectNo);
+        boolean allowed = assignable.stream().anyMatch(a -> a.getManagerNo().equals(managerNo));
+        if (!allowed) {
+            throw new IllegalArgumentException("해당 담당자는 이 프로젝트 작가와 연결되어 있지 않아 배치할 수 없습니다.");
+        }
+        Optional<ProjectMember> currentManagerPm = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(projectNo, "담당자");
+        ProjectMember newManagerPm = projectMemberRepository.findByProject_ProjectNo(projectNo).stream()
+            .filter(pm -> pm.getMember().getMemberNo().equals(newManagerMember.getMemberNo()))
+            .findFirst()
+            .orElse(null);
+        if (newManagerPm == null) {
+            newManagerPm = new ProjectMember();
+            newManagerPm.setProject(project);
+            newManagerPm.setMember(newManagerMember);
+            newManagerPm.setProjectMemberRole("담당자");
+            newManagerPm = projectMemberRepository.save(newManagerPm);
+        } else {
+            newManagerPm.setProjectMemberRole("담당자");
+            newManagerPm = projectMemberRepository.save(newManagerPm);
+        }
+        if (currentManagerPm.isPresent() && !currentManagerPm.get().getProjectMemberNo().equals(newManagerPm.getProjectMemberNo())) {
+            ProjectMember oldPm = currentManagerPm.get();
+            List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_ProjectMemberNo(oldPm.getProjectMemberNo());
+            for (KanbanCard card : cards) {
+                card.setProjectMember(newManagerPm);
+            }
+            projectMemberRepository.delete(oldPm);
+        }
+    }
+
     private ProjectListResponse toProjectListResponse(Project project, List<ProjectMember> members) {
         String artistName = null;
         Long artistMemberNo = null;
@@ -591,8 +663,9 @@ public class ProjectServiceImpl implements ProjectService {
             .build();
     }
 
-    private ProjectMemberResponse toProjectMemberResponse(ProjectMember pm) {
+    private ProjectMemberResponse toProjectMemberResponse(ProjectMember pm, LocalDate today) {
         Member m = pm.getMember();
+        String todayStatus = resolveTodayAttendanceStatus(m.getMemberNo(), today);
         return ProjectMemberResponse.builder()
             .projectMemberNo(pm.getProjectMemberNo())
             .memberNo(m.getMemberNo())
@@ -603,6 +676,18 @@ public class ProjectServiceImpl implements ProjectService {
             .memberRole(m.getMemberRole())
             .memberProfileImage(m.getMemberProfileImage())
             .memberStatus(m.getMemberStatus())
+            .todayAttendanceStatus(todayStatus)
             .build();
+    }
+
+    /** 오늘 ATTENDANCE 마지막 기록 기준: 출근→작업중, 퇴근→작업 종료, 없음→작업 시작 전 */
+    private String resolveTodayAttendanceStatus(Long memberNo, LocalDate today) {
+        List<com.kh.magamGG.domain.attendance.entity.Attendance> list =
+            attendanceRepository.findTodayLastAttendanceByMemberNo(memberNo, today);
+        if (list == null || list.isEmpty()) return "작업 시작 전";
+        String lastType = list.get(0).getAttendanceType();
+        if ("출근".equals(lastType)) return "작업중";
+        if ("퇴근".equals(lastType)) return "작업 종료";
+        return "작업 시작 전";
     }
 }
