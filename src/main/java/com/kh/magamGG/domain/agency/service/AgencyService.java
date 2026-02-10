@@ -21,6 +21,13 @@ public interface AgencyService {
     List<JoinRequestResponse> getJoinRequests(Long agencyNo);
     JoinRequestResponse approveJoinRequest(Long newRequestNo);
     JoinRequestResponse rejectJoinRequest(Long newRequestNo, String rejectionReason);
+    
+    /**
+     * 회원의 대기 중인 가입 요청 조회 (회원별 가입 요청 상태 확인용)
+     * @param memberNo 회원 번호
+     * @return 대기 중인 가입 요청이 있으면 JoinRequestResponse, 없으면 null
+     */
+    JoinRequestResponse getMyPendingJoinRequest(Long memberNo);
 
     /**
      * 에이전시 정보 조회

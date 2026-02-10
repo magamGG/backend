@@ -186,6 +186,20 @@ public class AgencyController {
         return ResponseEntity.ok(responses);
     }
     
+    /**
+     * 회원의 대기 중인 가입 요청 조회
+     * GET /api/agency/my-join-request
+     */
+    @GetMapping("/my-join-request")
+    public ResponseEntity<JoinRequestResponse> getMyJoinRequest(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        JoinRequestResponse response = agencyService.getMyPendingJoinRequest(memberNo);
+        if (response == null) {
+            return ResponseEntity.noContent().build(); // 204 No Content
+        }
+        return ResponseEntity.ok(response);
+    }
+    
     @PostMapping("/join-requests/{newRequestNo}/approve")
     public ResponseEntity<JoinRequestResponse> approveJoinRequest(@PathVariable Long newRequestNo) {
         JoinRequestResponse response = agencyService.approveJoinRequest(newRequestNo);
