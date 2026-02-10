@@ -134,6 +134,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(agency.getAgencyNo())
+                .agencyName(agency.getAgencyName())
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
                 .memberEmail(member.getMemberEmail())
@@ -157,6 +158,7 @@ public class AgencyServiceImpl implements AgencyService {
                 .map(nr -> JoinRequestResponse.builder()
                         .newRequestNo(nr.getNewRequestNo())
                         .agencyNo(nr.getAgency().getAgencyNo())
+                        .agencyName(nr.getAgency().getAgencyName())
                         .memberNo(nr.getMember().getMemberNo())
                         .memberName(nr.getMember().getMemberName())
                         .memberEmail(nr.getMember().getMemberEmail())
@@ -184,9 +186,16 @@ public class AgencyServiceImpl implements AgencyService {
         }
         
         NewRequest nr = pendingRequest.get();
+        
+        // agencyNo를 얻어서 Agency를 직접 조회 (LAZY 프록시 초기화 대신 명시적 조회)
+        Long agencyNo = nr.getAgency().getAgencyNo(); // 프록시에서 agencyNo만 가져옴
+        Agency agency = agencyRepository.findById(agencyNo)
+                .orElseThrow(() -> new AgencyNotFoundException("에이전시를 찾을 수 없습니다."));
+        
         return JoinRequestResponse.builder()
                 .newRequestNo(nr.getNewRequestNo())
-                .agencyNo(nr.getAgency().getAgencyNo())
+                .agencyNo(agencyNo)
+                .agencyName(agency.getAgencyName()) // 직접 조회한 Agency에서 가져옴
                 .memberNo(nr.getMember().getMemberNo())
                 .memberName(nr.getMember().getMemberName())
                 .memberEmail(nr.getMember().getMemberEmail())
@@ -283,6 +292,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(agencyNo)
+                .agencyName(agencyName)
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
                 .memberEmail(member.getMemberEmail())
@@ -321,6 +331,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(newRequest.getAgency().getAgencyNo())
+                .agencyName(newRequest.getAgency().getAgencyName())
                 .memberNo(newRequest.getMember().getMemberNo())
                 .memberName(newRequest.getMember().getMemberName())
                 .memberEmail(newRequest.getMember().getMemberEmail())
