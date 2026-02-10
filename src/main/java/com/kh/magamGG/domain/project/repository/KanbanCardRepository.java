@@ -102,5 +102,19 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("memberNo") Long memberNo,
             @Param("fromDate") LocalDate fromDate,
             Pageable pageable);
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN kb.project p " +
+           "JOIN FETCH kc.projectMember pm " +
+           "JOIN FETCH pm.member m " +
+           "WHERE p.projectNo IN :projectNos " +
+           "AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D') " +
+           "AND kc.kanbanCardStartedAt <= :rangeEnd " +
+           "AND (kc.kanbanCardEndedAt IS NULL OR kc.kanbanCardEndedAt >= :rangeStart) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByProjectNoInAndDateRangeOverlap(
+            @Param("projectNos") List<Long> projectNos,
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
 }
 

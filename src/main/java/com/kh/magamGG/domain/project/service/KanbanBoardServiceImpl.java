@@ -80,6 +80,35 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     }
 
     @Override
+    public List<CalendarCardResponse> getCalendarCardsForMyProjects(Long memberNo, int year, int month) {
+        if (memberNo == null) return List.of();
+        
+        YearMonth ym = YearMonth.of(year, month);
+        LocalDate rangeStart = ym.atDay(1);
+        LocalDate rangeEnd = ym.atEndOfMonth();
+
+        // 1. 회원이 소속된 프로젝트 목록 조회 (NPE 방지 및 중복 제거)
+        List<Long> projectNos = projectMemberRepository.findByMember_MemberNo(memberNo).stream()
+                .filter(pm -> pm != null && pm.getProject() != null)
+                .map(pm -> pm.getProject().getProjectNo())
+                .filter(id -> id != null)
+                .distinct()
+                .collect(Collectors.toList());
+
+        if (projectNos.isEmpty()) {
+            return List.of();
+        }
+
+        // 2. 해당 프로젝트들의 칸반 카드 조회
+        List<KanbanCard> cards = kanbanCardRepository.findByProjectNoInAndDateRangeOverlap(
+                projectNos, rangeStart, rangeEnd);
+
+        return cards.stream()
+                .map(c -> toCalendarCardResponse(c, rangeStart, rangeEnd))
+                .collect(Collectors.toList());
+    }
+
+    @Override
     public List<CalendarCardResponse> getDeadlineCardsForMember(Long memberNo) {
         LocalDate today = LocalDate.now();
         List<KanbanCard> cards = kanbanCardRepository
@@ -95,6 +124,11 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         String projectName = project != null ? project.getProjectName() : "";
         String projectColor = project != null ? project.getProjectColor() : null;
         Long projectNo = project != null ? project.getProjectNo() : null;
+
+        ProjectMember pm = card.getProjectMember();
+        Long assigneeNo = (pm != null && pm.getMember() != null) ? pm.getMember().getMemberNo() : null;
+        String assigneeName = (pm != null && pm.getMember() != null) ? pm.getMember().getMemberName() : null;
+
         LocalDate start = card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt() : LocalDate.now();
         LocalDate end = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt() : LocalDate.now();
         return CalendarCardResponse.builder()
@@ -105,6 +139,8 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             .projectColor(projectColor)
             .projectName(projectName)
             .projectNo(projectNo)
+            .assigneeNo(assigneeNo)
+            .assigneeName(assigneeName)
             .build();
     }
 
@@ -113,6 +149,12 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         String projectName = project != null ? project.getProjectName() : "";
         String projectColor = project != null ? project.getProjectColor() : null;
         Long projectNo = project != null ? project.getProjectNo() : null;
+        String projectStatus = project != null ? project.getProjectStatus() : null;
+
+        ProjectMember pm = card.getProjectMember();
+        Long assigneeNo = (pm != null && pm.getMember() != null) ? pm.getMember().getMemberNo() : null;
+        String assigneeName = (pm != null && pm.getMember() != null) ? pm.getMember().getMemberName() : null;
+
         LocalDate start = card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt() : rangeStart;
         LocalDate end = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt() : rangeEnd;
         if (start.isBefore(rangeStart)) start = rangeStart;
@@ -125,6 +167,9 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             .projectColor(projectColor)
             .projectName(projectName)
             .projectNo(projectNo)
+            .assigneeNo(assigneeNo)
+            .assigneeName(assigneeName)
+            .projectStatus(projectStatus)
             .build();
     }
 

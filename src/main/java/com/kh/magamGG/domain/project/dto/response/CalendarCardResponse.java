@@ -23,4 +23,8 @@ public class CalendarCardResponse {
     private String projectColor;
     private String projectName;
     private Long projectNo;
+    private Long assigneeNo;
+    private String assigneeName;
+    /** 프로젝트 상태 (SERIALIZATION, HIATUS 등) */
+    private String projectStatus;
 }
