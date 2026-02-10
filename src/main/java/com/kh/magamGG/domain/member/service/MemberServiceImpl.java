@@ -364,15 +364,19 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
-        // 해당 회원의 가장 최근 데일리 체크 1건만 조회
+        // 해당 회원의 오늘 날짜 데일리 체크만 조회 (오늘 체크한 것만)
         MemberDetailResponse.HealthCheckInfo healthCheck = null;
-        Optional<DailyHealthCheck> latestOpt = dailyHealthCheckRepository.findFirstByMember_MemberNoOrderByHealthCheckCreatedAtDesc(memberNo);
-        if (latestOpt.isPresent()) {
-            DailyHealthCheck latest = latestOpt.get();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDateTime dayStart = today.atStartOfDay();
+        java.time.LocalDateTime dayEnd = today.atTime(23, 59, 59, 999_999_999);
+        Optional<DailyHealthCheck> todayOpt = dailyHealthCheckRepository
+                .findFirstByMember_MemberNoAndHealthCheckCreatedAtBetweenOrderByHealthCheckCreatedAtDesc(memberNo, dayStart, dayEnd);
+        if (todayOpt.isPresent()) {
+            DailyHealthCheck latest = todayOpt.get();
             healthCheck = MemberDetailResponse.HealthCheckInfo.builder()
                 .date(latest.getHealthCheckCreatedAt() != null
                     ? latest.getHealthCheckCreatedAt().toLocalDate().toString()
-                    : java.time.LocalDate.now().toString())
+                    : today.toString())
                 .condition(latest.getHealthCondition() != null ? latest.getHealthCondition() : "보통")
                 .sleepHours(latest.getSleepHours() != null ? latest.getSleepHours() : 0)
                 .discomfortLevel(latest.getDiscomfortLevel() != null ? latest.getDiscomfortLevel() : 0)

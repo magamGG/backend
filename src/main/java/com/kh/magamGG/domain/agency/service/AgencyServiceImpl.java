@@ -409,13 +409,21 @@ public class AgencyServiceImpl implements AgencyService {
         // 진행 프로젝트: 에이전시 소속 회원이 참여한 연재 중 프로젝트
         long activeProjectCount = projectRepository.findActiveProjectsByAgencyNo(agencyNo).size();
 
-        // 평균 마감 준수율: 에이전시 프로젝트의 KANBAN_CARD 기준
+        // 평균 마감 준수율: 에이전시 프로젝트의 KANBAN_CARD 기준 (전체 누적)
         List<com.kh.magamGG.domain.project.entity.Project> allAgencyProjects =
                 projectRepository.findAllProjectsByAgencyNo(agencyNo);
 
         LocalDate today = LocalDate.now();
+        YearMonth thisMonth = YearMonth.from(today);
+        YearMonth lastMonth = thisMonth.minusMonths(1);
+
         long totalPastDeadline = 0;
         long completedOnTime = 0;
+        long thisMonthTotal = 0;
+        long thisMonthCompleted = 0;
+        long lastMonthTotal = 0;
+        long lastMonthCompleted = 0;
+
         for (var project : allAgencyProjects) {
             List<KanbanCard> cards = kanbanCardRepository.findByProjectNo(project.getProjectNo());
             for (KanbanCard card : cards) {
@@ -425,20 +433,83 @@ public class AgencyServiceImpl implements AgencyService {
                 if ("Y".equals(card.getKanbanCardStatus())) {
                     completedOnTime++;
                 }
+                YearMonth cardMonth = YearMonth.from(card.getKanbanCardEndedAt());
+                if (cardMonth.equals(thisMonth)) {
+                    thisMonthTotal++;
+                    if ("Y".equals(card.getKanbanCardStatus())) thisMonthCompleted++;
+                } else if (cardMonth.equals(lastMonth)) {
+                    lastMonthTotal++;
+                    if ("Y".equals(card.getKanbanCardStatus())) lastMonthCompleted++;
+                }
             }
         }
         double complianceRate = totalPastDeadline > 0
                 ? (completedOnTime * 100.0 / totalPastDeadline)
                 : 100.0;
 
+        // 전월 대비 증감률 (전월 집계 없으면 0으로 간주, 이번달·전월 둘 다 없을 때는 전체 준수율 기준으로 상승 표시)
+        double thisMonthRate = thisMonthTotal > 0 ? (thisMonthCompleted * 100.0 / thisMonthTotal) : 0.0;
+        double lastMonthRate = lastMonthTotal > 0 ? (lastMonthCompleted * 100.0 / lastMonthTotal) : 0.0;
+        double currentForChange = (lastMonthTotal == 0 && thisMonthTotal == 0 && totalPastDeadline > 0)
+                ? complianceRate
+                : thisMonthRate;
+        String complianceRateChange = formatMonthOverMonthChange(currentForChange, lastMonthRate, true);
+
+        // 활동 작가: new_request 승인 건수 누적 기준 전월 대비 (전월 말일까지 0이면 0으로 비교)
+        LocalDateTime endOfLastMonth = lastMonth.atEndOfMonth().atTime(LocalTime.MAX);
+        LocalDateTime now = LocalDateTime.now();
+        long approvedByLastMonth = newRequestRepository.countByAgency_AgencyNoAndNewRequestStatusAndNewRequestDateLessThanEqual(
+                agencyNo, "승인", endOfLastMonth);
+        long approvedByNow = newRequestRepository.countByAgency_AgencyNoAndNewRequestStatusAndNewRequestDateLessThanEqual(
+                agencyNo, "승인", now);
+        String activeArtistChange = formatMonthOverMonthChangeForCount(approvedByNow, approvedByLastMonth, "명");
+
+        // 진행 프로젝트: 프로젝트 생성일(projectStartedAt) 기준 누적 전월 대비
+        long projectsByLastMonth = projectRepository.countByAgencyNoAndProjectStartedAtBefore(agencyNo, endOfLastMonth);
+        long projectsByNow = projectRepository.countByAgencyNoAndProjectStartedAtBefore(agencyNo, now);
+        String activeProjectChange = formatMonthOverMonthChangeForCount(projectsByNow, projectsByLastMonth, "개");
+
         return AgencyDashboardMetricsResponse.builder()
                 .averageDeadlineComplianceRate(Math.round(complianceRate * 10) / 10.0)
                 .activeArtistCount(activeArtistCount)
                 .activeProjectCount(activeProjectCount)
-                .complianceRateChange(null)
-                .activeArtistChange(null)
-                .activeProjectChange(null)
+                .complianceRateChange(complianceRateChange)
+                .activeArtistChange(activeArtistChange)
+                .activeProjectChange(activeProjectChange)
                 .build();
+    }
+
+    /**
+     * 전월 대비 증감률 문자열 생성. 전월 집계 없으면 0으로 간주.
+     * @param current 이번달 값 (율이면 0~100)
+     * @param previous 전월 값 (집계 없으면 0)
+     * @param isRate true면 퍼센트 값(율)
+     */
+    private String formatMonthOverMonthChange(double current, double previous, boolean isRate) {
+        if (previous == 0) {
+            if (current > 0) return "전월 0% 대비 +" + (Math.round(current * 10) / 10.0) + "%";
+            return "전월 대비 0%";
+        }
+        double changePercent = ((current - previous) / previous) * 100.0;
+        double rounded = Math.round(changePercent * 10) / 10.0;
+        if (rounded > 0) return "전월 대비 +" + rounded + "%";
+        if (rounded < 0) return "전월 대비 " + rounded + "%";
+        return "전월 대비 0%";
+    }
+
+    /**
+     * 전월 대비 증감률 문자열 생성 (개수 기준). 전월 0이면 "전월 0명 대비 +n명" 형태.
+     */
+    private String formatMonthOverMonthChangeForCount(long current, long previous, String unit) {
+        if (previous == 0) {
+            if (current > 0) return "전월 0" + unit + " 대비 +" + current + unit;
+            return "전월 대비 0%";
+        }
+        double changePercent = ((current - previous) / (double) previous) * 100.0;
+        double rounded = Math.round(changePercent * 10) / 10.0;
+        if (rounded > 0) return "전월 대비 +" + rounded + "%";
+        if (rounded < 0) return "전월 대비 " + rounded + "%";
+        return "전월 대비 0%";
     }
 
     @Override
@@ -506,17 +577,16 @@ public class AgencyServiceImpl implements AgencyService {
             log.warn("작품별 아티스트 분포 조회 중 오류: {}", e.getMessage());
             return ArtistDistributionResponse.builder()
                     .distribution(Collections.emptyList())
-                    .maxArtistProjectName(null)
+                    .maxArtistProjectNames(Collections.emptyList())
                     .build();
         }
         if (rows == null || rows.isEmpty()) {
             return ArtistDistributionResponse.builder()
                     .distribution(Collections.emptyList())
-                    .maxArtistProjectName(null)
+                    .maxArtistProjectNames(Collections.emptyList())
                     .build();
         }
         List<ArtistDistributionResponse.ArtistDistributionItem> distribution = new ArrayList<>();
-        String maxArtistProjectName = null;
         long maxArtists = 0;
         for (Object[] row : rows) {
             String projectName = row[0] != null ? String.valueOf(row[0]) : "-";
@@ -528,12 +598,19 @@ public class AgencyServiceImpl implements AgencyService {
                     .build());
             if (artistsCount > maxArtists) {
                 maxArtists = artistsCount;
-                maxArtistProjectName = projectName;
+            }
+        }
+        List<String> maxArtistProjectNames = new ArrayList<>();
+        if (maxArtists > 0) {
+            for (ArtistDistributionResponse.ArtistDistributionItem item : distribution) {
+                if (item.getArtists() != null && item.getArtists().longValue() == maxArtists) {
+                    maxArtistProjectNames.add(item.getName());
+                }
             }
         }
         return ArtistDistributionResponse.builder()
                 .distribution(distribution)
-                .maxArtistProjectName(maxArtistProjectName)
+                .maxArtistProjectNames(maxArtistProjectNames)
                 .build();
     }
 
