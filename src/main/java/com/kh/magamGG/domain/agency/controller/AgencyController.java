@@ -17,6 +17,7 @@ import com.kh.magamGG.domain.agency.dto.response.HealthMonitoringDetailResponse;
 import com.kh.magamGG.domain.agency.dto.response.JoinRequestResponse;
 import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.service.AgencyService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,7 +33,7 @@ public class AgencyController {
     
     @PostMapping("/join-request")
     public ResponseEntity<JoinRequestResponse> createJoinRequest(
-            @RequestBody JoinRequestRequest request,
+            @Valid @RequestBody JoinRequestRequest request,
             @RequestHeader("X-Member-No") Long memberNo) {
         JoinRequestResponse response = agencyService.createJoinRequest(request, memberNo);
         return ResponseEntity.ok(response);
@@ -184,6 +185,20 @@ public class AgencyController {
     public ResponseEntity<List<JoinRequestResponse>> getJoinRequests(@PathVariable Long agencyNo) {
         List<JoinRequestResponse> responses = agencyService.getJoinRequests(agencyNo);
         return ResponseEntity.ok(responses);
+    }
+    
+    /**
+     * 회원의 대기 중인 가입 요청 조회
+     * GET /api/agency/my-join-request
+     */
+    @GetMapping("/my-join-request")
+    public ResponseEntity<JoinRequestResponse> getMyJoinRequest(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        JoinRequestResponse response = agencyService.getMyPendingJoinRequest(memberNo);
+        if (response == null) {
+            return ResponseEntity.noContent().build(); // 204 No Content
+        }
+        return ResponseEntity.ok(response);
     }
     
     @PostMapping("/join-requests/{newRequestNo}/approve")

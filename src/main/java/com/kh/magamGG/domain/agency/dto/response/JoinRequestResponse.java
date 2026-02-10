@@ -14,6 +14,7 @@ import java.time.LocalDateTime;
 public class JoinRequestResponse {
     private Long newRequestNo;
     private Long agencyNo;
+    private String agencyName;
     private Long memberNo;
     private String memberName;
     private String memberEmail;
