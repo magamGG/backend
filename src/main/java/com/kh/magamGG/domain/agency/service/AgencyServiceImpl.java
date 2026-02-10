@@ -54,10 +54,12 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -132,6 +134,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(agency.getAgencyNo())
+                .agencyName(agency.getAgencyName())
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
                 .memberEmail(member.getMemberEmail())
@@ -155,6 +158,7 @@ public class AgencyServiceImpl implements AgencyService {
                 .map(nr -> JoinRequestResponse.builder()
                         .newRequestNo(nr.getNewRequestNo())
                         .agencyNo(nr.getAgency().getAgencyNo())
+                        .agencyName(nr.getAgency().getAgencyName())
                         .memberNo(nr.getMember().getMemberNo())
                         .memberName(nr.getMember().getMemberName())
                         .memberEmail(nr.getMember().getMemberEmail())
@@ -164,6 +168,42 @@ public class AgencyServiceImpl implements AgencyService {
                         .newRequestStatus(nr.getNewRequestStatus())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public JoinRequestResponse getMyPendingJoinRequest(Long memberNo) {
+        // 회원의 모든 가입 요청 조회
+        List<NewRequest> requests = newRequestRepository.findByMember_MemberNo(memberNo);
+        
+        // 대기 중인 요청만 필터링 (가장 최근 것)
+        Optional<NewRequest> pendingRequest = requests.stream()
+                .filter(nr -> "대기".equals(nr.getNewRequestStatus()))
+                .max(Comparator.comparing(NewRequest::getNewRequestDate));
+        
+        if (pendingRequest.isEmpty()) {
+            return null; // 대기 중인 요청이 없으면 null 반환
+        }
+        
+        NewRequest nr = pendingRequest.get();
+        
+        // agencyNo를 얻어서 Agency를 직접 조회 (LAZY 프록시 초기화 대신 명시적 조회)
+        Long agencyNo = nr.getAgency().getAgencyNo(); // 프록시에서 agencyNo만 가져옴
+        Agency agency = agencyRepository.findById(agencyNo)
+                .orElseThrow(() -> new AgencyNotFoundException("에이전시를 찾을 수 없습니다."));
+        
+        return JoinRequestResponse.builder()
+                .newRequestNo(nr.getNewRequestNo())
+                .agencyNo(agencyNo)
+                .agencyName(agency.getAgencyName()) // 직접 조회한 Agency에서 가져옴
+                .memberNo(nr.getMember().getMemberNo())
+                .memberName(nr.getMember().getMemberName())
+                .memberEmail(nr.getMember().getMemberEmail())
+                .memberPhone(nr.getMember().getMemberPhone())
+                .memberRole(nr.getMember().getMemberRole())
+                .newRequestDate(nr.getNewRequestDate())
+                .newRequestStatus(nr.getNewRequestStatus())
+                .build();
     }
 
     @Override
@@ -252,6 +292,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(agencyNo)
+                .agencyName(agencyName)
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
                 .memberEmail(member.getMemberEmail())
@@ -290,6 +331,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(newRequest.getAgency().getAgencyNo())
+                .agencyName(newRequest.getAgency().getAgencyName())
                 .memberNo(newRequest.getMember().getMemberNo())
                 .memberName(newRequest.getMember().getMemberName())
                 .memberEmail(newRequest.getMember().getMemberEmail())
