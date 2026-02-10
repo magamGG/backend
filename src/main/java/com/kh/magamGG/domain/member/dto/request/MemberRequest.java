@@ -2,6 +2,7 @@ package com.kh.magamGG.domain.member.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -13,6 +14,7 @@ import lombok.Setter;
 public class MemberRequest {
     @NotBlank(message = "이름은 필수입니다.")
     @Size(max = 20, message = "이름은 20자 이하여야 합니다.")
+    @Pattern(regexp = "^[가-힣a-zA-Z]*$", message = "이름은 한글, 영문만 입력 가능합니다.")
     private String memberName;
     
     @NotBlank(message = "이메일은 필수입니다.")
@@ -22,6 +24,7 @@ public class MemberRequest {
     
     @NotBlank(message = "비밀번호는 필수입니다.")
     @Size(max = 100, message = "비밀번호는 100자 이하여야 합니다.")
+    @Pattern(regexp = "^\\S*$", message = "비밀번호에는 공백을 사용할 수 없습니다.")
     private String memberPassword;
     
     @NotBlank(message = "연락처는 필수입니다.")
