@@ -20,6 +20,7 @@ public class JoinRequestRequest {
     private String memberName;
     
     @Size(max = 50, message = "이메일은 50자 이하여야 합니다.")
+    @Pattern(regexp = "^\\S*$", message = "이메일에는 공백을 사용할 수 없습니다.")
     private String memberEmail;
     
     @Size(max = 15, message = "연락처는 15자 이하여야 합니다.")

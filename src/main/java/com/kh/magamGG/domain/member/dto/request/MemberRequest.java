@@ -20,6 +20,7 @@ public class MemberRequest {
     @NotBlank(message = "이메일은 필수입니다.")
     @Email(message = "올바른 이메일 형식이 아닙니다.")
     @Size(max = 50, message = "이메일은 50자 이하여야 합니다.")
+    @Pattern(regexp = "^\\S*$", message = "이메일에는 공백을 사용할 수 없습니다.")
     private String memberEmail;
     
     @NotBlank(message = "비밀번호는 필수입니다.")
