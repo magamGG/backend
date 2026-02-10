@@ -99,6 +99,24 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
            "LEFT JOIN FETCH plr.project " +
            "WHERE ar.attendanceRequestNo = :attendanceRequestNo")
     java.util.Optional<AttendanceRequest> findByIdWithProject(@Param("attendanceRequestNo") Long attendanceRequestNo);
+
+    /**
+     * 관리자 캘린더용 - 에이전시 소속 회원들의 승인된 근태 신청 조회 (특정 기간)
+     * 캘린더 표시를 위해 날짜 범위로 필터링
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
+           "WHERE m.agency.agencyNo = :agencyNo " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "AND ar.attendanceRequestStartDate <= :endDate " +
+           "AND ar.attendanceRequestEndDate >= :startDate " +
+           "ORDER BY ar.attendanceRequestStartDate ASC")
+    List<AttendanceRequest> findApprovedByAgencyNoAndDateRange(
+            @Param("agencyNo") Long agencyNo,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }
 
 
