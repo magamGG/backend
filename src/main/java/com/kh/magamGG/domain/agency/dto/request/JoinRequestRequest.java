@@ -24,5 +24,6 @@ public class JoinRequestRequest {
     private String memberEmail;
     
     @Size(max = 15, message = "연락처는 15자 이하여야 합니다.")
+    @Pattern(regexp = "^[0-9\\-]*$", message = "연락처는 숫자와 하이픈(-)만 입력 가능합니다.")
     private String memberPhone;
 }
