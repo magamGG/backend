@@ -20,4 +20,9 @@ public interface DailyHealthCheckRepository extends JpaRepository<DailyHealthChe
      */
     Optional<DailyHealthCheck> findFirstByMember_MemberNoAndHealthCheckCreatedAtBetweenOrderByHealthCheckCreatedAtDesc(
             Long memberNo, LocalDateTime startInclusive, LocalDateTime endInclusive);
+
+    /**
+     * 회원의 최근 N건 건강 체크 조회 (최신순)
+     */
+    List<DailyHealthCheck> findTop10ByMember_MemberNoOrderByHealthCheckCreatedAtDesc(Long memberNo);
 }
