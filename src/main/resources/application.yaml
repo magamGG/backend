@@ -32,8 +32,10 @@ spring:
     cache-names: leaveBalance, agencyInfo
 
 jwt:
-  secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
-  expiration: 86400000
+  access-secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
+  refresh-secret: YFnYVmZB+SBXIQ2NEeRncq7yLjGQ4sXBCq12UyZHXd=
+  access-expiration: 900000      # 15분 (밀리초)
+  refresh-expiration: 604800000  # 7일 (밀리초)
 
 server:
   port: 8888
