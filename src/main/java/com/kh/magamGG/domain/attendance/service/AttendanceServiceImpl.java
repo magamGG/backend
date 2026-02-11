@@ -19,6 +19,7 @@ import com.kh.magamGG.domain.attendance.repository.LeaveHistoryRepository;
 import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository;
 import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
 import com.kh.magamGG.domain.project.entity.Project;
+import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import com.kh.magamGG.global.exception.ProjectNotFoundException;
 import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
@@ -79,6 +80,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final ManagerRepository managerRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final ProjectLeaveRequestRepository projectLeaveRequestRepository;
     // 비즈니스 로직 분리: 연차 차감 서비스
     private final LeaveBalanceDeductionService leaveBalanceDeductionService;
@@ -375,7 +377,7 @@ public class AttendanceServiceImpl implements AttendanceService {
             }
         }
 
-        // 휴재 신청인 경우 프로젝트 상태를 "휴재"로 변경
+        // 휴재 신청인 경우 프로젝트 상태를 "휴재"로 변경 + PROJECT_MEMBER 전원 알림
         if ("휴재".equals(requestType) && request.getProjectLeaveRequest() != null) {
             Project project = request.getProjectLeaveRequest().getProject();
             if (project != null) {
@@ -383,6 +385,17 @@ public class AttendanceServiceImpl implements AttendanceService {
                 projectRepository.save(project);
                 log.info("프로젝트 상태 업데이트 완료: 프로젝트번호={}, 프로젝트명={}, 상태=휴재",
                         project.getProjectNo(), project.getProjectName());
+
+                // 프로젝트 참여 인원 전원에게 휴재 알림
+                String message = project.getProjectName() + " 작품이 휴재로 전환되었습니다.";
+                projectMemberRepository.findByProject_ProjectNo(project.getProjectNo()).forEach(pm -> {
+                    try {
+                        notificationService.createNotification(
+                                pm.getMember().getMemberNo(), "작품 휴재", message, "PROJ_HIATUS");
+                    } catch (Exception e) {
+                        log.warn("휴재 알림 발송 실패: memberNo={}", pm.getMember().getMemberNo(), e);
+                    }
+                });
             }
         }
 
@@ -577,6 +590,15 @@ public class AttendanceServiceImpl implements AttendanceService {
         history.setLeaveHistoryReason(request.getNote() != null ? request.getNote() : "");
         history.setLeaveHistoryAmount(adjustment);
         leaveHistoryRepository.save(history);
+
+        // 연차 조정 알림 발송
+        String reason = request.getReason() != null ? request.getReason() : "";
+        String message = String.format("연차가 %d일 조정되었습니다. 사유: %s", adjustment, reason);
+        try {
+            notificationService.createNotification(memberNo, "연차 조정", message, "LEAVE_ADJ");
+        } catch (Exception e) {
+            log.warn("연차 조정 알림 발송 실패: memberNo={}", memberNo, e);
+        }
 
         log.info("연차 조정 완료: 회원번호={}, 사유={}, 조정일수={}, 조정 후 잔여={}", memberNo, request.getReason(), adjustment, newRemain);
         // 응답 시 balance.getMember() lazy load 방지: 이미 가진 값으로 DTO 생성
