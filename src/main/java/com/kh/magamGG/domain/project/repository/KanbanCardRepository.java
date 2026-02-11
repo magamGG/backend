@@ -19,6 +19,8 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
 
     List<KanbanCard> findByKanbanBoard_Project_ProjectNo(Long projectNo);
 
+    List<KanbanCard> findByProjectMember_ProjectMemberNo(Long projectMemberNo);
+
     /**
      * 담당자 배정 + 미완료(N) 카드 전부 조회, 마감일 가까운 순 정렬 (아티스트 대시보드 오늘 할 일용).
      * Y(완료), D(삭제) 제외. 마감일 NULL은 맨 뒤로.
@@ -102,5 +104,19 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("memberNo") Long memberNo,
             @Param("fromDate") LocalDate fromDate,
             Pageable pageable);
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN kb.project p " +
+           "JOIN FETCH kc.projectMember pm " +
+           "JOIN FETCH pm.member m " +
+           "WHERE p.projectNo IN :projectNos " +
+           "AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D') " +
+           "AND kc.kanbanCardStartedAt <= :rangeEnd " +
+           "AND (kc.kanbanCardEndedAt IS NULL OR kc.kanbanCardEndedAt >= :rangeStart) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByProjectNoInAndDateRangeOverlap(
+            @Param("projectNos") List<Long> projectNos,
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
 }
 

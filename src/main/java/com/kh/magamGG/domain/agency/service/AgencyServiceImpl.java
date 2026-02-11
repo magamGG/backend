@@ -54,10 +54,12 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -132,6 +134,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(agency.getAgencyNo())
+                .agencyName(agency.getAgencyName())
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
                 .memberEmail(member.getMemberEmail())
@@ -155,6 +158,7 @@ public class AgencyServiceImpl implements AgencyService {
                 .map(nr -> JoinRequestResponse.builder()
                         .newRequestNo(nr.getNewRequestNo())
                         .agencyNo(nr.getAgency().getAgencyNo())
+                        .agencyName(nr.getAgency().getAgencyName())
                         .memberNo(nr.getMember().getMemberNo())
                         .memberName(nr.getMember().getMemberName())
                         .memberEmail(nr.getMember().getMemberEmail())
@@ -164,6 +168,42 @@ public class AgencyServiceImpl implements AgencyService {
                         .newRequestStatus(nr.getNewRequestStatus())
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public JoinRequestResponse getMyPendingJoinRequest(Long memberNo) {
+        // 회원의 모든 가입 요청 조회
+        List<NewRequest> requests = newRequestRepository.findByMember_MemberNo(memberNo);
+        
+        // 대기 중인 요청만 필터링 (가장 최근 것)
+        Optional<NewRequest> pendingRequest = requests.stream()
+                .filter(nr -> "대기".equals(nr.getNewRequestStatus()))
+                .max(Comparator.comparing(NewRequest::getNewRequestDate));
+        
+        if (pendingRequest.isEmpty()) {
+            return null; // 대기 중인 요청이 없으면 null 반환
+        }
+        
+        NewRequest nr = pendingRequest.get();
+        
+        // agencyNo를 얻어서 Agency를 직접 조회 (LAZY 프록시 초기화 대신 명시적 조회)
+        Long agencyNo = nr.getAgency().getAgencyNo(); // 프록시에서 agencyNo만 가져옴
+        Agency agency = agencyRepository.findById(agencyNo)
+                .orElseThrow(() -> new AgencyNotFoundException("에이전시를 찾을 수 없습니다."));
+        
+        return JoinRequestResponse.builder()
+                .newRequestNo(nr.getNewRequestNo())
+                .agencyNo(agencyNo)
+                .agencyName(agency.getAgencyName()) // 직접 조회한 Agency에서 가져옴
+                .memberNo(nr.getMember().getMemberNo())
+                .memberName(nr.getMember().getMemberName())
+                .memberEmail(nr.getMember().getMemberEmail())
+                .memberPhone(nr.getMember().getMemberPhone())
+                .memberRole(nr.getMember().getMemberRole())
+                .newRequestDate(nr.getNewRequestDate())
+                .newRequestStatus(nr.getNewRequestStatus())
+                .build();
     }
 
     @Override
@@ -252,6 +292,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(agencyNo)
+                .agencyName(agencyName)
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
                 .memberEmail(member.getMemberEmail())
@@ -290,6 +331,7 @@ public class AgencyServiceImpl implements AgencyService {
         return JoinRequestResponse.builder()
                 .newRequestNo(newRequest.getNewRequestNo())
                 .agencyNo(newRequest.getAgency().getAgencyNo())
+                .agencyName(newRequest.getAgency().getAgencyName())
                 .memberNo(newRequest.getMember().getMemberNo())
                 .memberName(newRequest.getMember().getMemberName())
                 .memberEmail(newRequest.getMember().getMemberEmail())
@@ -358,11 +400,8 @@ public class AgencyServiceImpl implements AgencyService {
     public AgencyDashboardMetricsResponse getDashboardMetrics(Long agencyNo) {
         findAgencyOrThrow(agencyNo);
 
-        // 활동 작가: 에이전시 소속 웹툰/웹소설 작가 (ACTIVE 또는 status 미설정)
-        List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
-        long activeArtistCount = artists.stream()
-                .filter(m -> m.getMemberStatus() == null || "ACTIVE".equals(m.getMemberStatus()))
-                .count();
+        // 활동 작가: 에이전시 소속 작가·어시스턴트 수 (웹툰작가, 웹소설작가, 어시스트 전체, ACTIVE만)
+        long activeArtistCount = memberRepository.countArtistsAndAssistantsByAgencyNo(agencyNo);
 
         // 진행 프로젝트: 에이전시 소속 회원이 참여한 연재 중 프로젝트
         long activeProjectCount = projectRepository.findActiveProjectsByAgencyNo(agencyNo).size();
@@ -413,14 +452,10 @@ public class AgencyServiceImpl implements AgencyService {
                 : thisMonthRate;
         String complianceRateChange = formatMonthOverMonthChange(currentForChange, lastMonthRate, true);
 
-        // 활동 작가: new_request 승인 건수 누적 기준 전월 대비 (전월 말일까지 0이면 0으로 비교)
+        // 활동 작가: 에이전시 소속 작가수 단순 표시 (전월 대비 제외)
         LocalDateTime endOfLastMonth = lastMonth.atEndOfMonth().atTime(LocalTime.MAX);
         LocalDateTime now = LocalDateTime.now();
-        long approvedByLastMonth = newRequestRepository.countByAgency_AgencyNoAndNewRequestStatusAndNewRequestDateLessThanEqual(
-                agencyNo, "승인", endOfLastMonth);
-        long approvedByNow = newRequestRepository.countByAgency_AgencyNoAndNewRequestStatusAndNewRequestDateLessThanEqual(
-                agencyNo, "승인", now);
-        String activeArtistChange = formatMonthOverMonthChangeForCount(approvedByNow, approvedByLastMonth, "명");
+        String activeArtistChange = null;
 
         // 진행 프로젝트: 프로젝트 생성일(projectStartedAt) 기준 누적 전월 대비
         long projectsByLastMonth = projectRepository.countByAgencyNoAndProjectStartedAtBefore(agencyNo, endOfLastMonth);

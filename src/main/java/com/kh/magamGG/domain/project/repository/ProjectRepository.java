@@ -38,6 +38,14 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
             @Param("projectName") String projectName,
             @Param("agencyNo") Long agencyNo);
 
+    /**
+     * 특정 회원(작가)이 참여한 진행 중('연재') 프로젝트 목록
+     */
+    @Query("SELECT DISTINCT p FROM Project p " +
+           "JOIN p.projectMembers pm " +
+           "WHERE pm.member.memberNo = :memberNo " +
+           "AND p.projectStatus = '연재'")
+    List<Project> findActiveProjectsByMemberNo(@Param("memberNo") Long memberNo);
     /** 에이전시 소속 회원이 참여한 프로젝트 중 projectStartedAt 기준 해당 시점까지 생성된 수 (전월 대비 집계용) */
     @Query("SELECT COUNT(DISTINCT p) FROM Project p " +
            "JOIN p.projectMembers pm " +
