@@ -73,7 +73,7 @@ public class AuthService {
                 .memberNo(member.getMemberNo())
                 .refreshTokenHash(tokenHash)
                 .refreshTokenFamily(tokenFamily)
-                .refreshTokenIsRevoked(false)
+                .refreshTokenIsRevoked("F")
                 .refreshTokenExpiresAt(expiryDate)
                 .refreshTokenCreatedAt(LocalDateTime.now())
                 .build();
@@ -112,9 +112,9 @@ public class AuthService {
         // 2. 토큰 해시 생성
         String tokenHash = jwtTokenProvider.hashToken(refreshTokenValue);
 
-        // 3. DB 조회
+        // 3. DB 조회 (revoked가 "F"인 것만 조회)
         RefreshToken refreshToken = refreshTokenRepository
-                .findByRefreshTokenHashAndRefreshTokenIsRevokedFalse(tokenHash)
+                .findByRefreshTokenHashAndRefreshTokenIsRevoked(tokenHash, "F")
                 .orElse(null);
 
         // 4. 없으면 TokenNotFoundException
@@ -126,7 +126,7 @@ public class AuthService {
         }
 
         // 5. revoked=true면 RevokedTokenException
-        if (refreshToken.getRefreshTokenIsRevoked()) {
+        if (refreshToken.isRevoked()) {
             throw new RevokedTokenException("무효화된 Refresh Token입니다.");
         }
 
@@ -142,7 +142,7 @@ public class AuthService {
         // 현재 토큰을 제외한 다른 토큰이 활성 상태면 재사용 공격
         boolean reuseDetected = familyTokens.stream()
                 .filter(token -> !token.getRefreshTokenId().equals(refreshToken.getRefreshTokenId()))
-                .anyMatch(token -> !token.getRefreshTokenIsRevoked() && !token.isExpired());
+                .anyMatch(token -> !token.isRevoked() && !token.isExpired());
 
         if (reuseDetected) {
             // 같은 tokenFamily 전부 revoked 처리
@@ -176,7 +176,7 @@ public class AuthService {
                 .memberNo(member.getMemberNo())
                 .refreshTokenHash(newTokenHash)
                 .refreshTokenFamily(refreshToken.getRefreshTokenFamily()) // 같은 패밀리 유지
-                .refreshTokenIsRevoked(false)
+                .refreshTokenIsRevoked("F")
                 .refreshTokenExpiresAt(LocalDateTime.now().plusDays(7))
                 .refreshTokenCreatedAt(LocalDateTime.now())
                 .build();
@@ -200,9 +200,9 @@ public class AuthService {
         // Refresh Token 해시 생성
         String tokenHash = jwtTokenProvider.hashToken(refreshTokenValue);
 
-        // 해당 토큰 조회
+        // 해당 토큰 조회 (revoked가 "F"인 것만)
         RefreshToken refreshToken = refreshTokenRepository
-                .findByRefreshTokenHashAndRefreshTokenIsRevokedFalse(tokenHash)
+                .findByRefreshTokenHashAndRefreshTokenIsRevoked(tokenHash, "F")
                 .orElse(null);
 
         if (refreshToken != null) {

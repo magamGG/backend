@@ -36,9 +36,9 @@ public class RefreshToken {
     @Column(name = "REFRESH_TOKEN_FAMILY", nullable = false, length = 36)
     private String refreshTokenFamily;
 
-    @Column(name = "REFRESH_TOKEN_IS_REVOKED", nullable = false)
+    @Column(name = "REFRESH_TOKEN_IS_REVOKED", nullable = false, length = 1)
     @Builder.Default
-    private Boolean refreshTokenIsRevoked = false;
+    private String refreshTokenIsRevoked = "F"; // T / F
 
     @Column(name = "REFRESH_TOKEN_EXPIRES_AT", nullable = false)
     private LocalDateTime refreshTokenExpiresAt;
@@ -48,7 +48,7 @@ public class RefreshToken {
     @Builder.Default
     private LocalDateTime refreshTokenCreatedAt = LocalDateTime.now();
 
-    @Column(name = "REFRESH_TOKEN_UPDATED_AT", nullable = false,
+    @Column(name = "REFRESH_TOKEN_UPDATED_AT",
             columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
     @Builder.Default
     private LocalDateTime refreshTokenUpdatedAt = LocalDateTime.now();
@@ -64,10 +64,17 @@ public class RefreshToken {
     }
 
     /**
+     * 토큰 무효화 여부 확인
+     */
+    public boolean isRevoked() {
+        return "T".equalsIgnoreCase(this.refreshTokenIsRevoked);
+    }
+
+    /**
      * 토큰 무효화 처리
      */
     public void revoke() {
-        this.refreshTokenIsRevoked = true;
+        this.refreshTokenIsRevoked = "T";
         this.refreshTokenUpdatedAt = LocalDateTime.now();
     }
 
