@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.time.LocalDateTime;
 
 /**
@@ -21,9 +20,10 @@ import java.time.LocalDateTime;
 @Slf4j
 @Transactional(readOnly = true)
 public class DailyHealthCheckService {
-    
+
     private final DailyHealthCheckRepository dailyHealthCheckRepository;
     private final MemberRepository memberRepository;
+    private final HealthRiskNotificationService healthRiskNotificationService;
     
     /**
      * 일일 건강 체크 등록
@@ -48,9 +48,16 @@ public class DailyHealthCheckService {
         
         // 저장 (DAILY_HEALTH_CHECK 테이블에 INSERT)
         DailyHealthCheck saved = dailyHealthCheckRepository.save(dailyHealthCheck);
-        
+
+        // 3일 연속 위험 조건 충족 시 담당자/에이전시 관리자 알림 (통합 발송)
+        try {
+            healthRiskNotificationService.checkAndNotifyIfRisk(memberNo);
+        } catch (Exception e) {
+            log.warn("건강 위험 알림 처리 실패: memberNo={}", memberNo, e);
+        }
+
         log.info("일일 건강 체크 등록 완료: 회원번호={}, 건강체크번호={}", memberNo, saved.getDailyHealthNo());
-        
+
         return saved;
     }
 }
