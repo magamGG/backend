@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class MemberUpdateRequestDto {
 	@Size(max = 20, message = "이름은 20자 이하여야 합니다.")
-	@Pattern(regexp = "^[가-힣a-zA-Z]*$", message = "이름은 한글, 영문만 입력 가능합니다.")
+	@Pattern(regexp = "^[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z]*$", message = "이름은 한글, 영문만 입력 가능합니다.")
 	private String memberName;
 	
 	@Size(max = 15, message = "연락처는 15자 이하여야 합니다.")

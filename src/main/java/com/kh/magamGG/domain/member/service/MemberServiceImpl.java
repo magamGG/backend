@@ -82,6 +82,11 @@ public class MemberServiceImpl implements MemberService {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
         }
 
+        // 이름에 초성이 포함되어 있는지 검증
+        if (hasHangulJamo(request.getMemberName())) {
+            throw new IllegalArgumentException("이름을 완성해주세요. 초성을 포함할 수 없습니다.");
+        }
+
         // 에이전시 처리
         Agency agency = null;
         String agencyCode = null;
@@ -194,6 +199,11 @@ public class MemberServiceImpl implements MemberService {
     public void updateProfile(Long memberNo, MemberUpdateRequestDto requestDto) {
         Member member = memberRepository.findById(memberNo)
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        // 이름에 초성이 포함되어 있는지 검증
+        if (requestDto.getMemberName() != null && hasHangulJamo(requestDto.getMemberName())) {
+            throw new IllegalArgumentException("이름을 완성해주세요. 초성을 포함할 수 없습니다.");
+        }
 
         // 이메일은 변경하지 않음 (로그인 ID이므로)
         member.updateProfile(
@@ -831,5 +841,18 @@ public class MemberServiceImpl implements MemberService {
         } catch (IOException e) {
             log.error("파일 삭제 실패: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 한글 자모(초성, 중성)가 포함되어 있는지 검증
+     * @param text 검증할 텍스트
+     * @return 한글 자모가 포함되어 있으면 true
+     */
+    private boolean hasHangulJamo(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        // 한글 자모가 있는지 확인 (ㄱ~ㅎ, ㅏ~ㅣ)
+        return text.matches(".*[ㄱ-ㅎㅏ-ㅣ].*");
     }
 }
