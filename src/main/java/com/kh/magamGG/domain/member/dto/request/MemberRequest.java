@@ -14,7 +14,7 @@ import lombok.Setter;
 public class MemberRequest {
     @NotBlank(message = "이름은 필수입니다.")
     @Size(max = 20, message = "이름은 20자 이하여야 합니다.")
-    @Pattern(regexp = "^[가-힣a-zA-Z]*$", message = "이름은 한글, 영문만 입력 가능합니다.")
+    @Pattern(regexp = "^[가-힣ㄱ-ㅎㅏ-ㅣa-zA-Z]*$", message = "이름은 한글, 영문만 입력 가능합니다.")
     private String memberName;
     
     @NotBlank(message = "이메일은 필수입니다.")
