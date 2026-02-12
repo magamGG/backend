@@ -28,6 +28,7 @@ import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
+import com.kh.magamGG.domain.auth.service.EmailVerificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.DuplicateAgencyCodeException;
 import com.kh.magamGG.global.exception.DuplicateEmailException;
@@ -70,6 +71,7 @@ public class MemberServiceImpl implements MemberService {
     private final NotificationService notificationService;
     private final AttendanceRepository attendanceRepository;
     private final HealthSurveyRepository healthSurveyRepository;
+    private final EmailVerificationService emailVerificationService;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -77,6 +79,11 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse register(MemberRequest request) {
+        // 이메일 인증 완료 여부 확인
+        if (!emailVerificationService.isEmailVerified(request.getMemberEmail())) {
+            throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
+        }
+        
         // 이메일 중복 체크
         if (memberRepository.existsByMemberEmail(request.getMemberEmail())) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
@@ -156,6 +163,9 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
+        // 회원가입 완료 후 인증 상태 제거
+        emailVerificationService.removeVerifiedEmail(request.getMemberEmail());
+        
         return MemberResponse.builder()
             .memberNo(savedMember.getMemberNo())
             .memberName(savedMember.getMemberName())

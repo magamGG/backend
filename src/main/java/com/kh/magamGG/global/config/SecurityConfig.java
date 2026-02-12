@@ -31,7 +31,7 @@ public class  SecurityConfig {
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // JWT 필터 추가
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members").permitAll() // 로그인, 토큰 갱신, 회원가입은 인증 없이 접근 가능
+                .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증은 인증 없이 접근 가능
                 .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
                 .anyRequest().authenticated() // 나머지는 인증 필요
             );
