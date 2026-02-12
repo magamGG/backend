@@ -2,7 +2,9 @@ package com.kh.magamGG.domain.notification.service;
 
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+import com.kh.magamGG.domain.notification.dto.response.NotificationResponse;
 import com.kh.magamGG.domain.notification.entity.Notification;
+import com.kh.magamGG.domain.notification.repository.EmitterRepository;
 import com.kh.magamGG.domain.notification.repository.NotificationRepository;
 import com.kh.magamGG.global.exception.MemberNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -10,9 +12,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 알림 서비스 구현체
@@ -23,8 +28,11 @@ import java.util.List;
 @Transactional(readOnly = true)
 public class NotificationServiceImpl implements NotificationService {
 
+    private static final Long DEFAULT_TIMEOUT = 60L * 1000 * 60; // 60분
+
     private final NotificationRepository notificationRepository;
     private final MemberRepository memberRepository;
+    private final EmitterRepository emitterRepository;
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = false)
@@ -54,10 +62,56 @@ public class NotificationServiceImpl implements NotificationService {
         Notification saved = notificationRepository.save(notification);
         log.info("알림 INSERT 완료: notificationNo={}", saved.getNotificationNo());
 
+        // SSE 실시간 Push
+        pushToClient(memberNo, saved);
+
         log.info("알림 저장 완료: notificationNo={}, 회원={}, 제목={}, 타입={}",
             saved.getNotificationNo(), member.getMemberName(), name, type);
 
         return saved;
+    }
+
+    @Override
+    public SseEmitter subscribe(Long memberNo, String lastEventId) {
+        String emitterId = memberNo + "_" + System.currentTimeMillis();
+        SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT);
+        emitterRepository.save(emitterId, emitter);
+
+        emitter.onCompletion(() -> emitterRepository.deleteById(emitterId));
+        emitter.onTimeout(() -> emitterRepository.deleteById(emitterId));
+
+        // 503 에러 방지용 더미 전송
+        sendToClient(emitter, emitterId, "EventStream Created. [memberNo=" + memberNo + "]");
+
+        log.info("SSE 구독: memberNo={}, emitterId={}", memberNo, emitterId);
+        return emitter;
+    }
+
+    @Override
+    public void pushToClient(Long memberNo, Notification notification) {
+        Map<String, SseEmitter> emitters = emitterRepository.findAllEmitterStartWithByMemberNo(String.valueOf(memberNo));
+        NotificationResponse response = NotificationResponse.fromEntity(notification);
+
+        emitters.forEach((id, emitter) -> {
+            try {
+                emitter.send(SseEmitter.event()
+                        .id(id)
+                        .name("sse")
+                        .data(response));
+            } catch (IOException e) {
+                emitterRepository.deleteById(id);
+                log.error("SSE 전송 실패: emitterId={}", id, e);
+            }
+        });
+    }
+
+    private void sendToClient(SseEmitter emitter, String id, Object data) {
+        try {
+            emitter.send(SseEmitter.event().id(id).name("sse").data(data));
+        } catch (IOException e) {
+            emitterRepository.deleteById(id);
+            log.error("SSE 연결 오류: emitterId={}", id, e);
+        }
     }
 
     @Override
