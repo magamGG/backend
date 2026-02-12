@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.action.internal.OrphanRemovalAction;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -54,6 +55,12 @@ public class ChatRoom {
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ChatRoomMember> roomMembers = new ArrayList<>();
+
+    @Column(name = "PROJECT_NO", nullable = true)
+    private Long projectNo;
+
+    @Column(name = "AGENCY_NO")
+    private Long agencyNo;
 }
 
 
