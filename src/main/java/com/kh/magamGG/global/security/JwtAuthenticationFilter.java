@@ -56,12 +56,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Authorization 헤더에서 Bearer 토큰 추출
+     * Authorization 헤더 또는 쿼리 파라미터에서 토큰 추출
+     * EventSource(SSE)는 커스텀 헤더를 보낼 수 없으므로 /api/notifications/subscribe 는 token 쿼리 파라미터 사용
      */
     private String extractToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
             return bearerToken.substring(7);
+        }
+        // SSE 구독: EventSource는 헤더 불가 → token 쿼리 파라미터
+        if (request.getRequestURI() != null && request.getRequestURI().contains("/api/notifications/subscribe")) {
+            String tokenParam = request.getParameter("token");
+            if (tokenParam != null && !tokenParam.isBlank()) {
+                return tokenParam;
+            }
         }
         return null;
     }

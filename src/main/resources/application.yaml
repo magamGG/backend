@@ -65,8 +65,11 @@ mail:
 file:
   upload-dir: uploads
 
-# Ollama AI 설정
+# Ollama AI 설정 (설치된 모델 사용: ollama list 확인)
+# - qwen2.5:7b: 4.3GB 필요 (메모리 부족 시 사용 불가)
+# - qwen2.5:1.5b: ~1.5GB (ollama pull qwen2.5:1.5b)
+# - qwen2:0.5b: ~500MB (ollama pull qwen2:0.5b)
 ollama:
   base-url: http://localhost:11434
-  model: qwen2.5:7b
+  model: qwen2:0.5b   # 가장 작음(~500MB). 없으면: ollama pull qwen2:0.5b
   timeout: 120000
