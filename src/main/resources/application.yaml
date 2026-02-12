@@ -46,3 +46,9 @@ server:
 
 file:
   upload-dir: uploads
+
+# Ollama AI 설정
+ollama:
+  base-url: http://localhost:11434
+  model: qwen2.5:7b
+  timeout: 120000
