@@ -135,6 +135,7 @@ public class MemberServiceImpl implements MemberService {
         member.setMemberEmail(request.getMemberEmail());
         member.setMemberPassword(encodedPassword);
         member.setMemberPhone(request.getMemberPhone());
+        member.setMemberAddress(request.getMemberAddress() != null ? request.getMemberAddress().trim() : null);
         member.setMemberRole(request.getMemberRole());
         member.setMemberStatus("ACTIVE");
         member.setAgency(agency);
