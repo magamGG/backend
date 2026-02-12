@@ -13,7 +13,8 @@ import java.time.LocalDateTime;
 @Table(name = "REFRESH_TOKEN", indexes = {
     @Index(name = "idx_token_hash", columnList = "REFRESH_TOKEN_HASH"),
     @Index(name = "idx_member_no", columnList = "MEMBER_NO"),
-    @Index(name = "idx_token_family", columnList = "REFRESH_TOKEN_FAMILY")
+    @Index(name = "idx_token_family", columnList = "REFRESH_TOKEN_FAMILY"),
+    @Index(name = "idx_token_hash_revoked", columnList = "REFRESH_TOKEN_HASH, REFRESH_TOKEN_IS_REVOKED") // 복합 인덱스
 })
 @Getter
 @Setter

@@ -2,6 +2,8 @@ logging:
   level:
     org.hibernate.SQL: DEBUG
     org.hibernate.orm.jdbc.bind: TRACE
+    com.kh.magamGG.global.security.JwtAuthenticationFilter: INFO
+    com.kh.magamGG.domain.notification: INFO
 
 spring:
   application:
@@ -32,8 +34,8 @@ spring:
     cache-names: leaveBalance, agencyInfo
 
 jwt:
-  access-secret: XEnXUlYA+RAWHP1MDdQHmbq6xKiFP3rWABp01TxYGWc=
-  refresh-secret: YFnYVmZB+SBXIQ2NEeRncq7yLjGQ4sXBCq12UyZHXd=
+  access-secret: ${JWT_ACCESS_SECRET:dev-access-secret-key-12345678901234567890123456789012}
+  refresh-secret: ${JWT_REFRESH_SECRET:dev-refresh-secret-key-98765432109876543210987654321098}
   access-expiration: 900000      # 15분 (밀리초)
   refresh-expiration: 604800000  # 7일 (밀리초)
 
