@@ -89,6 +89,22 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
            "AND ar.attendanceRequestStatus = 'APPROVED' " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     List<AttendanceRequest> findApprovedByMemberNo(@Param("memberNo") Long memberNo);
+
+    /**
+     * 근태 통계용: 특정 회원의 승인된 근태 신청 중, 해당 기간과 하루라도 겹치는 건만 조회
+     * (해당 월 1일 00:00 ~ periodEnd 23:59 사이에 start~end가 겹치는 APPROVED 건)
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "WHERE m.memberNo = :memberNo " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "AND ar.attendanceRequestStartDate <= :periodEnd " +
+           "AND ar.attendanceRequestEndDate >= :periodStart " +
+           "ORDER BY ar.attendanceRequestStartDate ASC")
+    List<AttendanceRequest> findApprovedByMemberNoAndDateRange(
+            @Param("memberNo") Long memberNo,
+            @Param("periodStart") java.time.LocalDateTime periodStart,
+            @Param("periodEnd") java.time.LocalDateTime periodEnd);
     
     /**
      * 특정 근태 신청 번호로 조회 (프로젝트 정보 포함, N+1 방지)

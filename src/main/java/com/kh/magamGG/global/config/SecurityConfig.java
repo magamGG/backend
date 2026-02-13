@@ -34,13 +34,19 @@ public class  SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // CORS 설정 (SSE를 포함한 모든 요청에 적용)
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
+
+            // CSRF 비활성화 (JWT는 Stateless이므로 CSRF 공격에 취약하지 않음)
+            // 단, 쿠키 기반 인증을 사용한다면 활성화 필요
             .csrf(csrf -> csrf.disable())
+
+            // 세션 정책: STATELESS (JWT 사용)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // JWT 필터 추가
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(ex -> ex
-                .authenticationEntryPoint(jsonAuthenticationEntryPoint)  // 미인증 시 401 + JSON
-                .accessDeniedHandler(jsonAccessDeniedHandler)            // 인증됐으나 권한 없음 시 403 + JSON
+                .authenticationEntryPoint(jsonAuthenticationEntryPoint)
+                .accessDeniedHandler(jsonAccessDeniedHandler)
             )
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**",
