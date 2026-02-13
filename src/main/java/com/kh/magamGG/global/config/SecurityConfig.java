@@ -45,6 +45,7 @@ public class  SecurityConfig {
                 .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**",
                                  "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기는 인증 없이 접근 가능
                 .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
+                .requestMatchers("/ws-stomp/**").permitAll() // WebSocket 엔드포인트 허용
                 .anyRequest().authenticated() // 나머지는 인증 필요
             );
 
