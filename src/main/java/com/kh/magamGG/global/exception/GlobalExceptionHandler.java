@@ -221,12 +221,12 @@ public class GlobalExceptionHandler {
             TokenNotFoundException ex, WebRequest request) {
         log.error("토큰을 찾을 수 없음: {}", ex.getMessage());
         ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.NOT_FOUND.value(),
-                "NOT_FOUND",
+                HttpStatus.UNAUTHORIZED.value(), // 404 → 401로 변경 (인증 관련 예외는 401이 적절)
+                "UNAUTHORIZED",
                 ex.getMessage(),
                 request.getDescription(false).replace("uri=", "")
         );
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
     }
 
     @ExceptionHandler(RevokedTokenException.class)
@@ -258,7 +258,8 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TokenReuseDetectedException.class)
     public ResponseEntity<ErrorResponse> handleTokenReuseDetectedException(
             TokenReuseDetectedException ex, WebRequest request) {
-        log.error("토큰 재사용 감지: {}", ex.getMessage());
+        // 보안 로그: 재사용 공격 감지 (이미 AuthService에서 로깅됨)
+        log.error("🔒 [보안 경고] 토큰 재사용 감지: {}", ex.getMessage());
         ErrorResponse errorResponse = new ErrorResponse(
                 HttpStatus.UNAUTHORIZED.value(),
                 "UNAUTHORIZED",

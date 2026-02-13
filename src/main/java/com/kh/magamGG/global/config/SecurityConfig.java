@@ -26,12 +26,23 @@ public class  SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
+            // CORS 설정 (SSE를 포함한 모든 요청에 적용)
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
+
+            // CSRF 비활성화 (JWT는 Stateless이므로 CSRF 공격에 취약하지 않음)
+            // 단, 쿠키 기반 인증을 사용한다면 활성화 필요
             .csrf(csrf -> csrf.disable())
+
+            // 세션 정책: STATELESS (JWT 사용)
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // JWT 필터 추가
+
+            // JWT 필터를 UsernamePasswordAuthenticationFilter 전에 추가
+            // 이렇게 하면 모든 요청이 JWT 필터를 거치게 됨
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+
+            // 엔드포인트별 인증 요구사항 설정
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**", 
+                .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**",
                                  "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기는 인증 없이 접근 가능
                 .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
                 .anyRequest().authenticated() // 나머지는 인증 필요
