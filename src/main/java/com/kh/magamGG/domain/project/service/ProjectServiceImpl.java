@@ -13,6 +13,7 @@ import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.AssignableManagerResponse;
 import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
+import com.kh.magamGG.domain.project.dto.response.DelayedTaskItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
@@ -154,6 +155,46 @@ public class ProjectServiceImpl implements ProjectService {
             result.add(item.response);
         }
         
+        return result;
+    }
+
+    @Override
+    public int getDelayCountForProject(Long projectNo) {
+        List<KanbanCard> cards = kanbanCardRepository.findByProjectNo(projectNo);
+        LocalDate today = LocalDate.now();
+        return (int) cards.stream()
+                .filter(c -> c.getKanbanCardEndedAt() != null && c.getKanbanCardEndedAt().isBefore(today))
+                .filter(c -> !"Y".equals(c.getKanbanCardStatus()) && !"D".equals(c.getKanbanCardStatus()))
+                .count();
+    }
+
+    @Override
+    public List<DelayedTaskItemResponse> getDelayedTasksForManager(Long memberNo) {
+        Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(memberNo);
+        if (managerOpt.isEmpty()) return List.of();
+        List<Long> artistMemberNos = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo())
+                .stream()
+                .map(a -> a.getArtist().getMemberNo())
+                .collect(Collectors.toList());
+        if (artistMemberNos.isEmpty()) return List.of();
+        LocalDate today = LocalDate.now();
+        List<KanbanCard> cards = kanbanCardRepository.findByMemberNosAndDateRange(
+                artistMemberNos, today.minusYears(1), today);
+        List<DelayedTaskItemResponse> result = new ArrayList<>();
+        for (KanbanCard card : cards) {
+            if ("Y".equals(card.getKanbanCardStatus()) || "D".equals(card.getKanbanCardStatus())) continue;
+            if (card.getKanbanCardEndedAt() == null || !card.getKanbanCardEndedAt().isBefore(today)) continue;
+            int daysDelayed = (int) ChronoUnit.DAYS.between(card.getKanbanCardEndedAt(), today);
+            String artistName = card.getProjectMember() != null && card.getProjectMember().getMember() != null
+                    ? card.getProjectMember().getMember().getMemberName() : "";
+            if (artistName == null) artistName = "";
+            result.add(DelayedTaskItemResponse.builder()
+                    .title(card.getKanbanCardName() != null ? card.getKanbanCardName() : "(제목 없음)")
+                    .artistName(artistName)
+                    .daysDelayed(daysDelayed)
+                    .build());
+        }
+        result.sort(Comparator.comparingInt(DelayedTaskItemResponse::getDaysDelayed).reversed());
         return result;
     }
 

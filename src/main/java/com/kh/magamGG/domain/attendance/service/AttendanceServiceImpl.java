@@ -812,8 +812,15 @@ public class AttendanceServiceImpl implements AttendanceService {
 
         return agencyRequests.stream()
                 .filter(req -> !"CANCELLED".equals(req.getAttendanceRequestStatus()))
-                .filter(req -> artistMemberNos.contains(req.getMember().getMemberNo()))
-                .sorted((a, b) -> b.getAttendanceRequestCreatedAt().compareTo(a.getAttendanceRequestCreatedAt()))
+                .filter(req -> req.getMember() != null && artistMemberNos.contains(req.getMember().getMemberNo()))
+                .sorted((a, b) -> {
+                    var at = a.getAttendanceRequestCreatedAt();
+                    var bt = b.getAttendanceRequestCreatedAt();
+                    if (at == null && bt == null) return 0;
+                    if (at == null) return 1;
+                    if (bt == null) return -1;
+                    return bt.compareTo(at);
+                })
                 .map(AttendanceRequestResponse::fromEntity)
                 .collect(Collectors.toList());
     }

@@ -16,12 +16,14 @@ public class CorsConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 개발 환경: 프론트엔드 개발 서버 (Vite 기본 포트)
+        // 개발 환경: 프론트엔드 개발 서버 (Vite 포트 5173/5174 등)
         // 프로덕션: 실제 프론트엔드 도메인으로 변경 필요
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",  // Vite 기본 포트
-                "http://localhost:3000",  // React 기본 포트 (대비)
-                "http://127.0.0.1:5173"
+                "http://localhost:5173",
+                "http://localhost:5174",  // Vite 다른 포트
+                "http://localhost:3000",
+                "http://127.0.0.1:5173",
+                "http://127.0.0.1:5174"
         ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));

@@ -3,6 +3,7 @@ package com.kh.magamGG.domain.project.service;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
+import com.kh.magamGG.domain.project.dto.response.DelayedTaskItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.AssignableManagerResponse;
@@ -18,6 +19,16 @@ public interface ProjectService {
      * @param memberNo 로그인한 담당자 회원 번호
      */
     List<ManagedProjectResponse> getManagedProjectsByManager(Long memberNo);
+
+    /**
+     * 프로젝트별 지연 건수 (마감일 지났고 미완료인 칸반 카드 수)
+     */
+    int getDelayCountForProject(Long projectNo);
+
+    /**
+     * 담당자 퀵 리포트용: 담당 작가들의 지연된 작업 목록 (마감일 지남 + 미완료)
+     */
+    List<DelayedTaskItemResponse> getDelayedTasksForManager(Long memberNo);
 
     /**
      * 아티스트 대시보드 "다음 연재 프로젝트": PROJECT_MEMBER 소속 + PROJECT_STARTED_AT, PROJECT_CYCLE로 계산한 다음 연재일 목록
