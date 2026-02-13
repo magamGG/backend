@@ -46,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,8 +65,8 @@ import java.util.TreeMap;
 @Transactional(readOnly = true)
 public class AttendanceServiceImpl implements AttendanceService {
 
-    /** 휴가로 집계하는 타입: 해당 날짜에 승인되면 출근 이력이 있어도 휴가로 집계 */
-    private static final Set<String> LEAVE_TYPES = Set.of("연차", "반차", "반반차", "병가");
+    /** 휴가로 집계하는 타입: 해당 날짜에 승인되면 출근 이력 없어도 휴가로 집계 (연차/병가 등) */
+    private static final Set<String> LEAVE_TYPES = Set.of("연차", "반차", "반반차", "병가", "VACATION");
     /** 실제 출근(ATTENDANCE) 이력이 있는 날만 집계하는 타입. 승인 기간이 아닌 실제 체크인 일수만 표시 */
     private static final Set<String> ATTENDANCE_REQUIRED_TYPES = Set.of("재택근무", "워케이션");
 
@@ -239,73 +240,82 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month) {
-        // member_no 기준 attendance에서 출근한 날짜 목록 조회
-        List<LocalDate> checkInDates = attendanceRepository
-            .findDistinctCheckInDatesByMemberNoAndMonth(memberNo, year, month)
-            .stream()
-            .map(java.sql.Date::toLocalDate)
-            .collect(Collectors.toList());
-        Set<LocalDate> checkInSet = new HashSet<>(checkInDates);
-        
-        // 해당 회원의 승인된 근태 신청 목록
-        List<AttendanceRequest> approvedRequests = attendanceRequestRepository.findApprovedByMemberNo(memberNo);
-        
-        // 이번 달 1일부터 오늘까지의 모든 날짜 확인
+        // member_no 기준 attendance에서 근무일(출근/재택근무/워케이션) 날짜·타입 조회
+        List<Object[]> datesWithTypes = attendanceRepository
+            .findDistinctCheckInDatesWithTypeByMemberNoAndMonth(memberNo, year, month);
+        Set<LocalDate> checkInSet = new HashSet<>();
+        Map<LocalDate, String> dateToAttendanceType = new HashMap<>();
+        for (Object[] row : datesWithTypes) {
+            LocalDate d = ((java.sql.Date) row[0]).toLocalDate();
+            String t = row[1] != null ? ((String) row[1]).trim() : "출근";
+            checkInSet.add(d);
+            dateToAttendanceType.merge(d, t, (a, b) -> "출근".equals(a) ? b : a);
+        }
+
+        // 현재 날짜 기준: 해당 월 1일 ~ 오늘(또는 월말) 사이만 집계
         LocalDate firstDayOfMonth = LocalDate.of(year, month, 1);
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.isBefore(firstDayOfMonth.plusMonths(1)) ? today : firstDayOfMonth.plusMonths(1).minusDays(1);
-        
+
+        // 해당 기간과 겹치는 승인된 근태 신청만 조회 (연차/병가 등 휴가 포함)
+        LocalDateTime periodStart = firstDayOfMonth.atStartOfDay();
+        LocalDateTime periodEnd = endDate.atTime(23, 59, 59);
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository
+            .findApprovedByMemberNoAndDateRange(memberNo, periodStart, periodEnd);
+
         Map<String, Long> typeToCount = new TreeMap<>();
-        
-        // 이번 달 1일부터 오늘까지 순회
+
         LocalDate currentDate = firstDayOfMonth;
         while (!currentDate.isAfter(endDate)) {
             boolean hasCheckIn = checkInSet.contains(currentDate);
             String type = null;
             boolean isLeaveType = false;
 
-            // 승인된 근태 신청 확인
             for (AttendanceRequest req : approvedRequests) {
                 LocalDate start = req.getAttendanceRequestStartDate().toLocalDate();
                 LocalDate end = req.getAttendanceRequestEndDate().toLocalDate();
                 if (!currentDate.isBefore(start) && !currentDate.isAfter(end)) {
-                    type = req.getAttendanceRequestType() != null ? req.getAttendanceRequestType() : "출근";
-                    isLeaveType = type != null && LEAVE_TYPES.contains(type);
+                    String raw = req.getAttendanceRequestType();
+                    type = (raw != null && !raw.isEmpty()) ? raw.trim() : "출근";
+                    // DB에 영문(VACATION) 저장된 경우 연차로 통일
+                    if ("VACATION".equalsIgnoreCase(type)) {
+                        type = "연차";
+                    }
+                    isLeaveType = LEAVE_TYPES.contains(type);
                     break;
                 }
             }
 
-            // 휴재는 근태 통계에 포함하지 않음
             if (type != null && "휴재".equals(type)) {
                 currentDate = currentDate.plusDays(1);
                 continue;
             }
-            // 휴가(연차·병가 등) 승인된 날은 출근 이력 유무와 관계없이 휴가로 집계
+            // 휴가(연차·병가 등): 출근 이력 없어도 승인된 해당 날짜는 휴가로 집계
             if (type != null && isLeaveType) {
                 typeToCount.merge(type, 1L, Long::sum);
             } else if (hasCheckIn) {
-                // 실제 출근한 날: 승인된 타입(재택/워케이션 등)이 있으면 그 타입, 없으면 '출근'
-                String finalType = (type != null) ? type : "출근";
+                String finalType = (type != null) ? type : dateToAttendanceType.getOrDefault(currentDate, "출근");
                 typeToCount.merge(finalType, 1L, Long::sum);
             } else if (type != null && !ATTENDANCE_REQUIRED_TYPES.contains(type)) {
-                // 재택근무·워케이션은 실제 출근 이력이 있는 날만 집계(위 hasCheckIn 분기에서만 집계)
                 typeToCount.merge(type, 1L, Long::sum);
             }
 
             currentDate = currentDate.plusDays(1);
         }
-        
+
         List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = typeToCount.entrySet().stream()
             .map(e -> AttendanceStatisticsResponseDto.TypeCount.builder()
                 .type(e.getKey())
                 .count(e.getValue())
                 .build())
             .collect(Collectors.toList());
-        
-        // totalCount는 출근한 날짜 수 (기존 로직 유지)
+
+        // totalCount는 typeCounts 합계와 일치시켜 파이/범례와 불일치 방지 (출근+연차+재택 등 전체 일수)
+        long totalFromTypes = typeToCount.values().stream().mapToLong(Long::longValue).sum();
+
         return AttendanceStatisticsResponseDto.builder()
             .typeCounts(typeCounts)
-            .totalCount(checkInDates.size())
+            .totalCount(totalFromTypes > 0 ? (int) totalFromTypes : checkInSet.size())
             .build();
     }
     
