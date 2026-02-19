@@ -79,3 +79,10 @@ public-data:
     api-key: pFg7%2B9ZuBDORVUL2Qy9DA9FffkmHzyemVbSPIN0trHBQjjgZp%2FfruTLqscT7swt3tdGf1Wi0tjZ6Lehba3YeHg%3D%3D
     base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
     data-dir: holidays  # uploads/holidays 디렉토리에 저장
+
+# Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+notion:
+  client-id: ${NOTION_CLIENT_ID:}
+  client-secret: ${NOTION_CLIENT_SECRET:}
+  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
+  api-version: "2022-06-28"

@@ -118,5 +118,12 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("projectNos") List<Long> projectNos,
             @Param("rangeStart") LocalDate rangeStart,
             @Param("rangeEnd") LocalDate rangeEnd);
+
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "LEFT JOIN FETCH kc.projectMember pm " +
+           "LEFT JOIN FETCH pm.member m " +
+           "WHERE kb.project.projectNo = :projectNo")
+    List<KanbanCard> findByProjectNoWithBoardAndMember(@Param("projectNo") Long projectNo);
 }
 

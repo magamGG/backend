@@ -61,6 +61,15 @@ public class Project {
 	@Builder.Default
 	private List<com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest> projectLeaveRequests = new ArrayList<>();
 	
+	@Column(name = "NOTION_ACCESS_TOKEN", length = 500)
+	private String notionAccessToken;
+
+	@Column(name = "NOTION_DATABASE_ID", length = 100)
+	private String notionDatabaseId;
+
+	@Column(name = "NOTION_WORKSPACE_NAME", length = 100)
+	private String notionWorkspaceName;
+
 	public void setProjectName(String projectName) { this.projectName = projectName; }
 	public void setProjectStatus(String projectStatus) { this.projectStatus = projectStatus; }
 	public void setProjectColor(String projectColor) { this.projectColor = projectColor; }
@@ -68,4 +77,7 @@ public class Project {
 	public void setPlatform(String platform) { this.platform = platform; }
 	public void setThumbnailFile(String thumbnailFile) { this.thumbnailFile = thumbnailFile; }
 	public void setProjectStartedAt(java.time.LocalDateTime projectStartedAt) { this.projectStartedAt = projectStartedAt; }
+	public void setNotionAccessToken(String notionAccessToken) { this.notionAccessToken = notionAccessToken; }
+	public void setNotionDatabaseId(String notionDatabaseId) { this.notionDatabaseId = notionDatabaseId; }
+	public void setNotionWorkspaceName(String notionWorkspaceName) { this.notionWorkspaceName = notionWorkspaceName; }
 }
