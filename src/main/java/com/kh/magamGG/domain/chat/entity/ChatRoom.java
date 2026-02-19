@@ -54,6 +54,12 @@ public class ChatRoom {
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<ChatRoomMember> roomMembers = new ArrayList<>();
+
+    @Column(name = "PROJECT_NO", nullable = true)
+    private Long projectNo;
+
+    @Column(name = "AGENCY_NO")
+    private Long agencyNo;
 }
 
 
