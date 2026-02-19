@@ -30,20 +30,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        String requestURI = request.getRequestURI();
-        String method = request.getMethod();
+        // 모든 요청에 대해 로그 출력 (INFO 레벨)
+        log.info("=== JWT 필터 진입: {} ===", request.getRequestURI());
         
-        log.info("🔍 JWT Filter - 요청: {} {}", method, requestURI);
-
-        // 1. Authorization 헤더에서 토큰 추출
+        // 1. 토큰 추출 (헤더 또는 쿼리 파라미터)
         String token = extractToken(request);
-        
-        if (token != null) {
-            log.info("🔑 JWT 토큰 발견: {}...", token.substring(0, Math.min(token.length(), 20)));
-            log.debug("🔑 전체 JWT 토큰: {}", token);
-        } else {
-            log.info("❌ JWT 토큰 없음");
-        }
+        log.info("토큰 추출 결과: {}", token != null ? "있음" : "없음");
 
         // 2. 토큰이 있는 경우 처리
         if (StringUtils.hasText(token)) {
@@ -83,7 +75,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     }
                 }
             } catch (Exception e) {
-                log.error("❌ JWT 토큰 파싱 실패: {}", e.getMessage());
                 // 토큰 파싱 실패 시 인증 실패 처리
                 log.error("❌ JWT 토큰 파싱 실패: uri={}, error={}", request.getRequestURI(), e.getMessage(), e);
                 SecurityContextHolder.clearContext();
