@@ -96,6 +96,7 @@ public class AuthService {
                 .memberName(member.getMemberName())
                 .memberRole(member.getMemberRole())
                 .agencyNo(agencyNo)
+                .memberProfileImage(member.getMemberProfileImage())  // 프로필 이미지 추가
                 .build();
     }
 

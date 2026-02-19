@@ -17,4 +17,5 @@ public class LoginResponse {
     private String memberName;
     private String memberRole;
     private Long agencyNo;
+    private String memberProfileImage;  // 프로필 이미지 추가
 }
