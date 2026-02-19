@@ -70,7 +70,8 @@ public class  SecurityConfig {
                 
                 auth
                     .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**",
-                                     "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기는 인증 없이 접근 가능
+                                     "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password",
+                                     "/api/holidays/**").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기, 공휴일 API는 인증 없이 접근 가능
                     .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
                     .requestMatchers("/api/**").authenticated() // API는 인증 필요
                     .anyRequest().permitAll(); // 프론트엔드 라우팅을 위해 나머지는 허용
