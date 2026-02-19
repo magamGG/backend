@@ -538,6 +538,7 @@ public class MemberServiceImpl implements MemberService {
         if (todayWorkStatus != null) {
             builder.todayWorkStatus(todayWorkStatus);
         }
+        
         return builder.build();
     }
 

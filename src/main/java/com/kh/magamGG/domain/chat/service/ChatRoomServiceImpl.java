@@ -9,7 +9,10 @@ import com.kh.magamGG.domain.chat.repository.ChatRoomMemberRepository;
 import com.kh.magamGG.domain.chat.repository.ChatRoomRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
+import com.kh.magamGG.domain.project.entity.Project;
+import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
+import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -31,6 +36,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
     private final ChatMessageRepository chatMessageRepository;
     private final MemberRepository memberRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final ProjectRepository projectRepository;
 
     @Override
     @Transactional
@@ -237,8 +243,6 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 System.out.println("🔍 [DEBUG] 쿼리 조건: chatRoom=" + chatRoom.getChatRoomNo() + ", lastReadChatNo > " + lastReadChatNo);
                 
                 // 실제 메시지들 확인
-                System.out.println("🔍 [DEBUG] 채팅방 " + chatRoomNo + "의 최근 메시지들 확인 중...");
-                // 최근 5개 메시지 조회해서 chat_no 확인
                 try {
                     var recentMessages = chatMessageRepository.findTop5ByChatRoomOrderByChatMessageCreatedAtDesc(chatRoom);
                     System.out.println("🔍 [DEBUG] 최근 " + recentMessages.size() + "개 메시지의 chat_no:");
@@ -262,7 +266,6 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             return unreadCount;
         } else {
             // 채팅방 멤버가 아니면 읽지 않은 메시지 개수는 0
-            System.out.println("🔍 [DEBUG] 채팅방 멤버가 아님: chatRoomNo=" + chatRoomNo + ", memberNo=" + memberNo);
             return 0;
         }
     }
@@ -281,6 +284,124 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             Member member = memberRepository.findById(memberNo)
                     .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
             saveChatRoomMemberIfAbsent(projectRoom, member);
+        }
+    }
+
+    /**
+     * 특정 채팅방의 참여자 목록 조회
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getChatRoomMembers(Long chatRoomNo) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomNo)
+                .orElseThrow(() -> new RuntimeException("채팅방을 찾을 수 없습니다: " + chatRoomNo));
+        
+        List<ChatRoomMember> roomMembers = chatRoomMemberRepository.findAllByChatRoom(chatRoom);
+        List<Map<String, Object>> result = new ArrayList<>();
+        
+        for (ChatRoomMember roomMember : roomMembers) {
+            Member member = roomMember.getMember();
+            String profileImage = member.getMemberProfileImage();
+            
+            Map<String, Object> memberInfo = new HashMap<>();
+            memberInfo.put("memberNo", member.getMemberNo());
+            memberInfo.put("memberName", member.getMemberName());
+            memberInfo.put("memberRole", member.getMemberRole());
+            memberInfo.put("profileImage", profileImage);
+            memberInfo.put("joinedAt", roomMember.getChatRoomMemberJoinedAt());
+            
+            result.add(memberInfo);
+        }
+        
+        return result;
+    }
+
+    /**
+     * 채팅 버튼 클릭 시 자동으로 채팅방 생성 및 참여자 초대
+     * 마지막 chatRoom을 만들 때, chat Room의 type이 all이면 전체 채팅방을 project면 project를 조회해서 채팅방을 만든다.
+     */
+    @Override
+    @Transactional
+    public void ensureChatRoomsAndInviteMembers(Long memberNo) {
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
+        
+        Long agencyNo = member.getAgency() != null ? member.getAgency().getAgencyNo() : null;
+        
+        if (agencyNo == null) {
+            return;
+        }
+        
+        // 1. 에이전시 전체 채팅방 생성 및 참여 (type = "ALL")
+        ensureAgencyChatRoom(member, agencyNo);
+        
+        // 2. 참여 중인 프로젝트 채팅방들 생성 및 참여 (type = "PROJECT")
+        ensureProjectChatRooms(member, agencyNo);
+    }
+
+    /**
+     * 에이전시 전체 채팅방 생성 및 참여
+     */
+    private void ensureAgencyChatRoom(Member member, Long agencyNo) {
+        // 에이전시 전체 채팅방 조회 또는 생성
+        ChatRoom agencyRoom = chatRoomRepository.findByAgencyNoAndChatRoomTypeAndChatRoomStatus(agencyNo, "ALL", "Y")
+                .orElseGet(() -> createAgencyTotalRoom(agencyNo));
+        
+        // 해당 에이전시의 모든 활성 멤버들을 채팅방에 추가
+        List<Member> agencyMembers = memberRepository.findByAgency_AgencyNoAndMemberStatusActive(agencyNo);
+        
+        for (Member agencyMember : agencyMembers) {
+            saveChatRoomMemberIfAbsent(agencyRoom, agencyMember);
+        }
+    }
+
+    /**
+     * 참여 중인 프로젝트 채팅방들 생성 및 참여
+     */
+    private void ensureProjectChatRooms(Member member, Long agencyNo) {
+        // 해당 멤버가 참여 중인 프로젝트들 조회
+        List<ProjectMember> projectMembers = projectMemberRepository.findByMember_MemberNo(member.getMemberNo());
+        
+        for (ProjectMember projectMember : projectMembers) {
+            Project project = projectMember.getProject();
+            Long projectNo = project.getProjectNo();
+            String projectName = project.getProjectName();
+            
+            // 프로젝트 채팅방 조회 또는 생성
+            ChatRoom projectRoom = chatRoomRepository.findByAgencyNoAndProjectNoAndChatRoomTypeAndChatRoomStatus(
+                            agencyNo, projectNo, "PROJECT", "Y")
+                    .orElseGet(() -> createNewProjectRoom(agencyNo, projectNo, projectName));
+            
+            // 해당 프로젝트의 모든 멤버들을 채팅방에 추가
+            List<ProjectMember> allProjectMembers = projectMemberRepository.findByProject_ProjectNo(projectNo);
+            
+            for (ProjectMember pm : allProjectMembers) {
+                Member projectMemberEntity = pm.getMember();
+                saveChatRoomMemberIfAbsent(projectRoom, projectMemberEntity);
+            }
+        }
+    }
+
+    /**
+     * 간단한 채팅방 멤버 로그 출력 (프로필 정보)
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public void logChatRoomMembers(Long chatRoomNo) {
+        try {
+            ChatRoom chatRoom = chatRoomRepository.findById(chatRoomNo)
+                    .orElseThrow(() -> new RuntimeException("채팅방을 찾을 수 없습니다: " + chatRoomNo));
+            
+            List<ChatRoomMember> roomMembers = chatRoomMemberRepository.findAllByChatRoom(chatRoom);
+            
+            for (ChatRoomMember roomMember : roomMembers) {
+                Member member = roomMember.getMember();
+                // 로그 제거됨 - 필요시 디버깅 목적으로만 사용
+            }
+            
+        } catch (Exception e) {
+            // 에러 발생 시에만 로그 출력
+            System.err.println("채팅방 멤버 조회 실패: " + e.getMessage());
         }
     }
 
@@ -418,7 +539,6 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 }
             } else {
                 // 채팅방 멤버가 아니면 읽지 않은 메시지 개수는 0
-                System.out.println("🔍 [DEBUG] 채팅방 멤버가 아님: chatRoomNo=" + room.getChatRoomNo() + ", memberNo=" + memberNo);
             }
         }
         
