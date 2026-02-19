@@ -11,6 +11,7 @@ import com.kh.magamGG.domain.chat.repository.ChatRoomRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true) // 기본 조회용, 저장 메서드만 @Transactional 따로 부여
@@ -34,24 +36,48 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     @Override
     @Transactional
     public ChatMessageResponseDto saveMessage(ChatMessageRequestDto chatMessageRequestDto) {
-        ChatRoom room = chatRoomRepository.findById(chatMessageRequestDto.getChatRoomNo())
-                .orElseThrow(() -> new RuntimeException("채팅방을 찾을 수 없습니다. ID: " + chatMessageRequestDto.getChatRoomNo()));
+        log.info("🔍 메시지 저장 서비스 시작");
+        log.info("🔍 요청 DTO: chatRoomNo={}, memberNo={}, message='{}'", 
+            chatMessageRequestDto.getChatRoomNo(), 
+            chatMessageRequestDto.getMemberNo(), 
+            chatMessageRequestDto.getChatMessage());
+        
+        try {
+            log.info("🔍 채팅방 조회 시작 - ID: {}", chatMessageRequestDto.getChatRoomNo());
+            ChatRoom room = chatRoomRepository.findById(chatMessageRequestDto.getChatRoomNo())
+                    .orElseThrow(() -> new RuntimeException("채팅방을 찾을 수 없습니다. ID: " + chatMessageRequestDto.getChatRoomNo()));
+            log.info("✅ 채팅방 조회 성공 - 이름: '{}'", room.getChatRoomName());
 
-        Member member = memberRepository.findById(chatMessageRequestDto.getMemberNo())
-                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다. ID: " + chatMessageRequestDto.getMemberNo()));
+            log.info("🔍 회원 조회 시작 - ID: {}", chatMessageRequestDto.getMemberNo());
+            Member member = memberRepository.findById(chatMessageRequestDto.getMemberNo())
+                    .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다. ID: " + chatMessageRequestDto.getMemberNo()));
+            log.info("✅ 회원 조회 성공 - 이름: '{}'", member.getMemberName());
 
-        ChatMessage message = ChatMessage.builder()
-                .chatRoom(room)
-                .member(member)
-                .chatMessage(chatMessageRequestDto.getChatMessage())
-                .chatMessageType(chatMessageRequestDto.getChatMessageType() != null ? chatMessageRequestDto.getChatMessageType() : "TEXT")
-                .chatStatus("Y")
-                .chatMessageCreatedAt(LocalDateTime.now())
-                .build();
+            log.info("🔍 메시지 엔티티 생성 시작");
+            ChatMessage message = ChatMessage.builder()
+                    .chatRoom(room)
+                    .member(member)
+                    .chatMessage(chatMessageRequestDto.getChatMessage())
+                    .chatMessageType(chatMessageRequestDto.getChatMessageType() != null ? chatMessageRequestDto.getChatMessageType() : "TEXT")
+                    .chatStatus("Y")
+                    .chatMessageCreatedAt(LocalDateTime.now())
+                    .build();
+            log.info("✅ 메시지 엔티티 생성 완료");
 
-        ChatMessage saved = chatMessageRepository.save(message);
+            log.info("🔍 메시지 저장 시작");
+            ChatMessage saved = chatMessageRepository.save(message);
+            log.info("✅ 메시지 저장 성공 - ID: {}", saved.getChatNo());
 
-        return ChatMessageResponseDto.from(saved);
+            log.info("🔍 응답 DTO 변환 시작");
+            ChatMessageResponseDto response = ChatMessageResponseDto.from(saved);
+            log.info("✅ 메시지 저장 서비스 완료 - 응답 ID: {}", response.getChatNo());
+            
+            return response;
+        } catch (Exception e) {
+            log.error("❌ 메시지 저장 실패 - 에러 타입: {}, 메시지: {}", e.getClass().getSimpleName(), e.getMessage());
+            log.error("❌ 스택 트레이스:", e);
+            throw e;
+        }
     }
 
     /**

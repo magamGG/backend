@@ -1,0 +1,4 @@
+-- TOTAL 타입 채팅방을 ALL 타입으로 변경하는 마이그레이션
+UPDATE CHAT_ROOM 
+SET CHAT_ROOM_TYPE = 'ALL' 
+WHERE CHAT_ROOM_TYPE = 'TOTAL';

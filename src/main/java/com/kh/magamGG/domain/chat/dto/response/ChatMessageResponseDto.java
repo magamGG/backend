@@ -20,14 +20,18 @@ public class ChatMessageResponseDto {
 
     // 엔티티를 DTO로 변환하는 정적 팩토리 메서드
     public static ChatMessageResponseDto from(ChatMessage entity) {
+        String profileImage = entity.getMember().getMemberProfileImage();
+        System.out.println("🖼️ 프로필 이미지 정보 - 회원: " + entity.getMember().getMemberName() + ", 이미지: " + profileImage);
+        
         return ChatMessageResponseDto.builder()
                 .chatNo(entity.getChatNo())
                 .chatRoomNo(entity.getChatRoom().getChatRoomNo())
                 .memberNo(entity.getMember().getMemberNo())
                 .senderName(entity.getMember().getMemberName())
+                .senderProfile(profileImage) // 프로필 이미지 추가
                 .chatMessage(entity.getChatMessage())
                 .chatMessageType(entity.getChatMessageType())
-                .createdAt(entity.getChatMessageCreatedAt().format(DateTimeFormatter.ofPattern("a h:mm"))) // "오후 2:30" 형식
+                .createdAt(entity.getChatMessageCreatedAt().toString()) // ISO 형식으로 변경
                 .build();
     }
 }
