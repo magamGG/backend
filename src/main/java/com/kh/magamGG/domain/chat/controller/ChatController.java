@@ -15,6 +15,8 @@ import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 @RequiredArgsConstructor
@@ -93,10 +95,7 @@ public class ChatController {
             @PathVariable Long chatRoomNo,
             @RequestParam Long lastChatNo,
             @RequestHeader("X-Member-No") Long memberNo) {
-        System.out.println("🔵 [API] updateLastReadMessage 요청 수신: chatRoomNo=" + chatRoomNo + 
-                          ", lastChatNo=" + lastChatNo + ", memberNo=" + memberNo);
         chatRoomService.updateLastReadMessage(chatRoomNo, memberNo, lastChatNo);
-        System.out.println("✅ [API] updateLastReadMessage 완료");
         return ResponseEntity.ok().build();
     }
 
@@ -107,10 +106,37 @@ public class ChatController {
     public ResponseEntity<Long> getUnreadCount(
             @PathVariable Long chatRoomNo,
             @RequestHeader("X-Member-No") Long memberNo) {
-        System.out.println("🔵 [API] getUnreadCount 요청 수신: chatRoomNo=" + chatRoomNo + ", memberNo=" + memberNo);
-        
         long unreadCount = chatRoomService.getUnreadCount(chatRoomNo, memberNo);
-        System.out.println("✅ [API] getUnreadCount 완료: " + unreadCount);
         return ResponseEntity.ok(unreadCount);
+    }
+
+    /**
+     * 8. 특정 채팅방의 참여자 목록 조회 (HTTP GET)
+     */
+    @GetMapping("/api/chat/rooms/{chatRoomNo}/members")
+    public ResponseEntity<List<Map<String, Object>>> getChatRoomMembers(
+            @PathVariable Long chatRoomNo) {
+        List<Map<String, Object>> members = chatRoomService.getChatRoomMembers(chatRoomNo);
+        return ResponseEntity.ok(members);
+    }
+
+    /**
+     * 9. 채팅 버튼 클릭 시 자동으로 채팅방 생성 및 참여자 초대 (HTTP POST)
+     */
+    @PostMapping("/api/chat/ensure-rooms")
+    public ResponseEntity<Void> ensureChatRooms(
+            @RequestHeader("X-Member-No") Long memberNo) {
+        chatRoomService.ensureChatRoomsAndInviteMembers(memberNo);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 10. 간단한 채팅방 멤버 조회 (HTTP GET) - 프로필 정보 로그용
+     */
+    @GetMapping("/api/chat/rooms/{chatRoomNo}/members/simple")
+    public ResponseEntity<Void> getSimpleChatRoomMembers(
+            @PathVariable Long chatRoomNo) {
+        chatRoomService.logChatRoomMembers(chatRoomNo);
+        return ResponseEntity.ok().build();
     }
 }
