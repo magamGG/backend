@@ -5,6 +5,7 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Base64;
 import java.util.Date;
 
+@Slf4j
 @Component
 public class JwtTokenProvider {
 
@@ -177,6 +179,8 @@ public class JwtTokenProvider {
         }
         
         try {
+            log.debug("🔍 JWT 토큰 검증 시작: {}...", token.substring(0, Math.min(token.length(), 30)));
+            
             Claims claims = Jwts.parser()
                     .verifyWith(getAccessSigningKey())
                     .build()
@@ -185,10 +189,22 @@ public class JwtTokenProvider {
             
             // type 클레임 검증: access 토큰인지 확인
             String tokenType = claims.get("type", String.class);
+            Date expiration = claims.getExpiration();
+            Date now = new Date();
+            
+            log.debug("📋 토큰 정보 - 타입: {}, 만료시간: {}, 현재시간: {}", tokenType, expiration, now);
+            
             if (!"access".equals(tokenType)) {
+                log.warn("❌ 토큰 타입 불일치: {}", tokenType);
                 return false; // access 타입이 아니면 false
             }
             
+            if (expiration.before(now)) {
+                log.warn("⏰ 토큰 만료됨: 만료시간={}, 현재시간={}", expiration, now);
+                return false;
+            }
+            
+            log.debug("✅ JWT 토큰 검증 성공");
             return true;
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
             // 만료된 토큰
@@ -206,6 +222,7 @@ public class JwtTokenProvider {
             // 빈 문자열 또는 null
             return false;
         } catch (Exception e) {
+            log.error("❌ JWT 토큰 검증 실패: {} - {}", e.getClass().getSimpleName(), e.getMessage());
             // 기타 예외
             return false;
         }

@@ -4,6 +4,10 @@ import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.agency.service.AgencyService;
 import com.kh.magamGG.domain.agency.util.AgencyCodeGenerator;
+import com.kh.magamGG.domain.chat.entity.ChatRoom;
+import com.kh.magamGG.domain.chat.entity.ChatRoomMember;
+import com.kh.magamGG.domain.chat.repository.ChatRoomMemberRepository;
+import com.kh.magamGG.domain.chat.repository.ChatRoomRepository;
 import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
@@ -72,6 +76,8 @@ public class MemberServiceImpl implements MemberService {
     private final AttendanceRepository attendanceRepository;
     private final HealthSurveyRepository healthSurveyRepository;
     private final EmailVerificationService emailVerificationService;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -79,7 +85,7 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse register(MemberRequest request) {
-        // 이메일 인증 완료 여부 확인
+        // 이메일 인증 여부 확인
         if (!emailVerificationService.isEmailVerified(request.getMemberEmail())) {
             throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
         }
@@ -91,7 +97,7 @@ public class MemberServiceImpl implements MemberService {
 
         // 이름에 초성이 포함되어 있는지 검증
         if (hasHangulJamo(request.getMemberName())) {
-            throw new IllegalArgumentException("이름을 완성해주세요. 초성을 포함할 수 없습니다.");
+            throw new IllegalArgumentException("이름이 완성되지 않았습니다. 초성이 포함되어 있습니다.");
         }
 
         // 에이전시 처리
@@ -112,10 +118,10 @@ public class MemberServiceImpl implements MemberService {
                 .build();
             agency = agencyRepository.save(agency);
 
-            // 에이전시 생성 시 해당 에이전시용 HEALTH_SURVEY 4종 생성 (설문기간·주기 디폴트: 15일, 30일)
+            // 에이전시 생성 시 해당 에이전시에 HEALTH_SURVEY 4종 생성 (주기기간·주기 기본값 15일 30일)
             createDefaultHealthSurveysForAgency(agency);
         } else if (request.getAgencyCode() != null && !request.getAgencyCode().trim().isEmpty()) {
-            // 담당자인 경우: 에이전시 코드로 기존 에이전시 찾기
+            // 매니저인 경우: 에이전시 코드로 기존 에이전시 찾기
             agency = agencyService.getAgencyByCode(request.getAgencyCode());
             agencyCode = agency.getAgencyCode();
         } else if (request.getAgencyNo() != null) {
@@ -144,8 +150,8 @@ public class MemberServiceImpl implements MemberService {
 
         Member savedMember = memberRepository.save(member);
 
-        // 담당자 역할인 경우 MANAGER 테이블에 자동 등록
-        if ("담당자".equals(savedMember.getMemberRole())) {
+        // 매니저 역할인 경우 MANAGER 테이블에 자동 등록
+        if ("매니저".equals(savedMember.getMemberRole())) {
             try {
                 // 이미 등록되어 있는지 확인
                 Optional<Manager> existingManager = managerRepository.findByMember_MemberNo(savedMember.getMemberNo());
@@ -154,13 +160,61 @@ public class MemberServiceImpl implements MemberService {
                         .member(savedMember)
                         .build();
                     managerRepository.save(manager);
-                    log.info("담당자 자동 등록 완료: memberNo={}, memberName={}", savedMember.getMemberNo(), savedMember.getMemberName());
+                    log.info("매니저 자동 등록 완료: memberNo={}, memberName={}", savedMember.getMemberNo(), savedMember.getMemberName());
                 } else {
-                    log.debug("이미 MANAGER 테이블에 등록된 담당자: memberNo={}", savedMember.getMemberNo());
+                    log.debug("이미 MANAGER 테이블에 등록된 매니저: memberNo={}", savedMember.getMemberNo());
                 }
             } catch (Exception e) {
-                log.error("담당자 MANAGER 테이블 등록 실패: memberNo={}, error={}", savedMember.getMemberNo(), e.getMessage(), e);
-                // MANAGER 등록 실패해도 회원가입은 성공 처리 (나중에 수동으로 등록 가능)
+                log.error("매니저 MANAGER 테이블 등록 실패: memberNo={}, error={}", savedMember.getMemberNo(), e.getMessage(), e);
+                // MANAGER 등록 실패해도 회원가입은 정상 처리 (나중에 수동으로 등록 가능)
+            }
+        }
+
+        // 에이전시 관리자인 경우 채팅방 생성
+        if ("에이전시 관리자".equals(savedMember.getMemberRole()) && agency != null) {
+            try {
+                // 에이전시 전체 채팅방이 이미 있는지 확인
+                Optional<ChatRoom> existingRoom = chatRoomRepository.findByAgencyNoAndChatRoomTypeAndChatRoomStatus(
+                    agency.getAgencyNo(), "ALL", "Y");
+                
+                if (existingRoom.isEmpty()) {
+                    // 에이전시 전체 채팅방 생성
+                    ChatRoom agencyChatRoom = ChatRoom.builder()
+                        .chatRoomName(agency.getAgencyName() + " 전체 채팅방")
+                        .chatRoomType("ALL")  // "ALL" 타입으로 설정
+                        .agencyNo(agency.getAgencyNo())  // agencyNo 설정
+                        .chatRoomStatus("Y")  // 활성 상태로 설정
+                        .chatRoomCreatedAt(LocalDateTime.now())
+                        .build();
+                    ChatRoom savedChatRoom = chatRoomRepository.save(agencyChatRoom);
+
+                    // 에이전시 관리자를 채팅방 멤버로 추가
+                    ChatRoomMember chatRoomMember = ChatRoomMember.builder()
+                        .chatRoom(savedChatRoom)
+                        .member(savedMember)
+                        .chatRoomMemberJoinedAt(LocalDateTime.now())
+                        .build();
+                    chatRoomMemberRepository.save(chatRoomMember);
+
+                    log.info("에이전시 전체 채팅방 생성 완료: agencyNo={}, chatRoomNo={}", 
+                        agency.getAgencyNo(), savedChatRoom.getChatRoomNo());
+                } else {
+                    // 기존 채팅방에 관리자 추가
+                    ChatRoom existingChatRoom = existingRoom.get();
+                    if (!chatRoomMemberRepository.existsByChatRoomAndMember(existingChatRoom, savedMember)) {
+                        ChatRoomMember chatRoomMember = ChatRoomMember.builder()
+                            .chatRoom(existingChatRoom)
+                            .member(savedMember)
+                            .chatRoomMemberJoinedAt(LocalDateTime.now())
+                            .build();
+                        chatRoomMemberRepository.save(chatRoomMember);
+                    }
+                    log.info("기존 에이전시 전체 채팅방에 관리자 추가: agencyNo={}, chatRoomNo={}", 
+                        agency.getAgencyNo(), existingChatRoom.getChatRoomNo());
+                }
+            } catch (Exception e) {
+                log.error("에이전시 채팅방 생성 실패: agencyNo={}, error={}", agency.getAgencyNo(), e.getMessage(), e);
+                // 채팅방 생성 실패해도 회원가입은 정상 처리
             }
         }
 
@@ -213,10 +267,10 @@ public class MemberServiceImpl implements MemberService {
 
         // 이름에 초성이 포함되어 있는지 검증
         if (requestDto.getMemberName() != null && hasHangulJamo(requestDto.getMemberName())) {
-            throw new IllegalArgumentException("이름을 완성해주세요. 초성을 포함할 수 없습니다.");
+            throw new IllegalArgumentException("이름이 완성되지 않았습니다. 초성이 포함되어 있습니다.");
         }
 
-        // 이메일은 변경하지 않음 (로그인 ID이므로)
+        // 이메일은 변경하지 않음 (로그인 ID로 사용)
         member.updateProfile(
             requestDto.getMemberName(),
             member.getMemberEmail(), // 기존 이메일 유지
@@ -224,7 +278,7 @@ public class MemberServiceImpl implements MemberService {
             requestDto.getMemberAddress()
         );
 
-        // 비밀번호 변경 (제공된 경우에만)
+        // 비밀번호 변경 (제공된 경우만)
         if (requestDto.getMemberPassword() != null && !requestDto.getMemberPassword().trim().isEmpty()) {
             String encodedPassword = passwordEncoder.encode(requestDto.getMemberPassword());
             member.updatePassword(encodedPassword);
@@ -240,7 +294,6 @@ public class MemberServiceImpl implements MemberService {
             }
         }
     }
-
     @Override
     @Transactional
     public String uploadProfileImage(Long memberNo, MultipartFile file) {
@@ -295,7 +348,6 @@ public class MemberServiceImpl implements MemberService {
             .totalCount(totalCount)
             .build();
     }
-
     @Override
     @Transactional(readOnly = true)
     public List<MemberResponse> getMembersByAgencyNo(Long agencyNo) {
@@ -311,22 +363,22 @@ public class MemberServiceImpl implements MemberService {
     }
 
     /**
-     * 오늘 ATTENDANCE 마지막 기록 기준 작업 상태 반환.
-     * 출근만 있으면 근무중, 퇴근이 마지막이면 작업 종료, 기록 없으면 작업 시작전.
+     * 오늘 ATTENDANCE 마지막 기록 기준 업무 상태 반환.
+     * 출근만 있으면 근무중, 퇴근이 마지막이면 업무 종료, 기록 없으면 업무 시작전
      */
     private String resolveTodayWorkStatus(Long memberNo, LocalDate today) {
         List<Attendance> list = attendanceRepository.findTodayLastAttendanceByMemberNo(memberNo, today);
         if (list == null || list.isEmpty()) {
-            return "작업 시작전";
+            return "업무 시작전";
         }
         String lastType = list.get(0).getAttendanceType();
         if ("출근".equals(lastType)) {
             return "근무중";
         }
         if ("퇴근".equals(lastType)) {
-            return "작업 종료";
+            return "업무 종료";
         }
-        return "작업 시작전";
+        return "업무 시작전";
     }
 
     @Override
@@ -340,7 +392,7 @@ public class MemberServiceImpl implements MemberService {
             throw new IllegalArgumentException("이미 탈퇴 처리된 회원입니다.");
         }
 
-        // 1. PROJECT_MEMBER 정리: 칸반 카드 재배치 후 제거
+        // 1. PROJECT_MEMBER 정리: 칸반 카드 소유권 이전 후 제거
         List<ProjectMember> myProjectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
         for (ProjectMember pm : myProjectMembers) {
             List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_ProjectMemberNo(pm.getProjectMemberNo());
@@ -355,22 +407,21 @@ public class MemberServiceImpl implements MemberService {
                 }
                 projectMemberRepository.delete(pm);
             } else {
-                log.warn("프로젝트 {}에 탈퇴 회원 {} 외 다른 멤버 없음. PROJECT_MEMBER 유지", pm.getProject().getProjectNo(), memberNo);
+                log.warn("프로젝트 {}의 탈퇴 회원 {} 외 다른 멤버 없음. PROJECT_MEMBER 유지", pm.getProject().getProjectNo(), memberNo);
             }
         }
 
-        // 2. ARTIST_ASSIGNMENT 정리 (작가/담당자 배정 해제)
+        // 2. ARTIST_ASSIGNMENT 정리 (아티스트/매니저 배정 제거)
         artistAssignmentRepository.deleteByArtist_MemberNo(memberNo);
         artistAssignmentRepository.deleteByManager_Member_MemberNo(memberNo);
 
-        // 3. agency_no 외래키 끊기 (탈퇴 회원을 에이전시 목록에서 제외)
+        // 3. agency_no 끊어내기 (탈퇴 회원을 에이전시 목록에서 제외)
         member.setAgency(null);
 
         // 4. 상태를 BLOCKED로 변경
         member.updateStatus("BLOCKED");
         memberRepository.save(member);
     }
-
     @Override
     public MemberDetailResponse getMemberDetails(Long memberNo) {
         Member member = memberRepository.findById(memberNo)
@@ -381,20 +432,20 @@ public class MemberServiceImpl implements MemberService {
         List<String> currentProjects = projectMembers.stream()
             .map(pm -> pm.getProject().getProjectName())
             .collect(Collectors.toList());
-        List<String> participatedProjects = currentProjects; // 현재는 동일하게 설정
+        List<String> participatedProjects = currentProjects; // 현재와 동일하게 설정
 
-        // 작가의 작품 정보 (현재는 프로젝트와 동일하게 설정)
+        // 아티스트 작품 정보 (현재는 프로젝트와 동일하게 설정)
         List<String> myWorks = currentProjects;
         List<String> serializingWorks = projectMembers.stream()
             .filter(pm -> "연재".equals(pm.getProject().getProjectStatus()))
             .map(pm -> pm.getProject().getProjectName())
             .collect(Collectors.toList());
 
-        // 담당자의 담당 작가 목록 (ARTIST_ASSIGNMENT 테이블에서 조회)
+        // 매니저의 담당 아티스트 목록 (ARTIST_ASSIGNMENT 테이블에서 조회)
         List<MemberDetailResponse.ManagedArtistInfo> managedArtists = List.of();
-        if (("담당자".equals(member.getMemberRole()) || "에이전시 관리자".equals(member.getMemberRole()) || "관리자".equals(member.getMemberRole()))
+        if (("매니저".equals(member.getMemberRole()) || "에이전시 관리자".equals(member.getMemberRole()) || "관리자".equals(member.getMemberRole()))
             && member.getAgency() != null) {
-            // MANAGER 테이블에서 해당 멤버의 MANAGER_NO 찾기
+            // MANAGER 테이블에서 매니저 멤버의 MANAGER_NO 찾기
             Optional<Manager> managerOpt = managerRepository.findByMember_MemberNo(member.getMemberNo());
             if (managerOpt.isPresent()) {
                 List<ArtistAssignment> assignments = artistAssignmentRepository.findByManagerNo(managerOpt.get().getManagerNo());
@@ -414,7 +465,7 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
-        // 해당 회원의 오늘 날짜 데일리 체크만 조회 (오늘 체크한 것만)
+        // 해당 회원의 오늘 최신 데일리체크만 조회 (오늘 체크한 것만)
         MemberDetailResponse.HealthCheckInfo healthCheck = null;
         java.time.LocalDate today = java.time.LocalDate.now();
         java.time.LocalDateTime dayStart = today.atStartOfDay();
@@ -443,15 +494,14 @@ public class MemberServiceImpl implements MemberService {
             .healthCheck(healthCheck)
             .build();
     }
-
     @Override
     @Transactional(readOnly = true)
     public List<MemberResponse> getManagersByAgencyNo(Long agencyNo) {
         try {
-            log.debug("담당자 목록 조회 시작: agencyNo={}", agencyNo);
+            log.debug("매니저 목록 조회 시작: agencyNo={}", agencyNo);
             // MANAGER 테이블에서 조회
             List<Manager> managers = managerRepository.findByAgencyNo(agencyNo);
-            log.debug("조회된 담당자 수: {}", managers.size());
+            log.debug("조회된 매니저 수: {}", managers.size());
 
             if (managers.isEmpty()) {
                 return List.of();
@@ -462,21 +512,21 @@ public class MemberServiceImpl implements MemberService {
                     try {
                         Member member = manager.getMember();
                         if (member == null) {
-                            log.warn("담당자의 멤버 정보가 null입니다: managerNo={}", manager.getManagerNo());
+                            log.warn("매니저의 멤버 정보가 null입니다: managerNo={}", manager.getManagerNo());
                             return null;
                         }
                         return convertToResponseWithManagerNo(member, manager.getManagerNo());
                     } catch (Exception e) {
-                        log.error("담당자 정보 변환 실패: managerNo={}, error={}", manager.getManagerNo(), e.getMessage(), e);
+                        log.error("매니저 정보 변환 실패: managerNo={}, error={}", manager.getManagerNo(), e.getMessage(), e);
                         return null;
                     }
                 })
                 .filter(response -> response != null)
                 .collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("담당자 목록 조회 실패: agencyNo={}, error={}", agencyNo, e.getMessage(), e);
-            log.error("스택 트레이스:", e);
-            throw new RuntimeException("담당자 목록 조회 중 오류가 발생했습니다: " + e.getMessage(), e);
+            log.error("매니저 목록 조회 실패: agencyNo={}, error={}", agencyNo, e.getMessage(), e);
+            log.error("전체 스택트레이스:", e);
+            throw new RuntimeException("매니저 목록 조회 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
     }
 
@@ -504,14 +554,13 @@ public class MemberServiceImpl implements MemberService {
         }
         return builder.build();
     }
-
     @Override
     @Transactional(readOnly = true)
     public List<MemberResponse> getArtistsByAgencyNo(Long agencyNo) {
         try {
             List<Member> artists = memberRepository.findArtistsByAgencyNo(agencyNo);
 
-            // 각 작가의 배정된 담당자 정보 조회
+            // 각 아티스트 배정된 매니저 정보 조회
             return artists.stream()
                 .map(artist -> {
                     // ARTIST_ASSIGNMENT에서 배정 조회하여 managerNo 설정
@@ -521,37 +570,36 @@ public class MemberServiceImpl implements MemberService {
                 })
                 .collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("작가 목록 조회 실패: agencyNo={}, error={}", agencyNo, e.getMessage(), e);
-            throw new RuntimeException("작가 목록 조회 중 오류가 발생했습니다.", e);
+            log.error("아티스트 목록 조회 실패: agencyNo={}, error={}", agencyNo, e.getMessage(), e);
+            throw new RuntimeException("아티스트 목록 조회 중 오류가 발생했습니다.", e);
         }
     }
-
 
     @Override
     @Transactional
     public void assignArtistToManager(Long artistNo, Long managerNo) {
-        log.info("작가 배정 시작: artistNo={}, managerNo={} (MANAGER 테이블의 MANAGER_NO)", artistNo, managerNo);
+        log.info("아티스트 배정 시작: artistNo={}, managerNo={} (MANAGER 테이블의 MANAGER_NO)", artistNo, managerNo);
 
         Member artist = memberRepository.findById(artistNo)
-            .orElseThrow(() -> new IllegalArgumentException("작가를 찾을 수 없습니다."));
+            .orElseThrow(() -> new IllegalArgumentException("아티스트를 찾을 수 없습니다."));
 
-        // managerNo는 MANAGER 테이블의 MANAGER_NO이므로 Manager 엔티티 조회
+        // managerNo는 MANAGER 테이블의 MANAGER_NO로 Manager 엔티티 조회
         Manager manager = managerRepository.findById(managerNo)
-            .orElseThrow(() -> new IllegalArgumentException("담당자를 찾을 수 없습니다."));
+            .orElseThrow(() -> new IllegalArgumentException("매니저를 찾을 수 없습니다."));
 
-        log.debug("작가 정보: memberNo={}, name={}, role={}", artist.getMemberNo(), artist.getMemberName(), artist.getMemberRole());
-        log.debug("담당자 정보: managerNo={}, memberNo={}, name={}, role={}",
+        log.debug("아티스트 정보: memberNo={}, name={}, role={}", artist.getMemberNo(), artist.getMemberName(), artist.getMemberRole());
+        log.debug("매니저 정보: managerNo={}, memberNo={}, name={}, role={}",
             manager.getManagerNo(), manager.getMember().getMemberNo(),
             manager.getMember().getMemberName(), manager.getMember().getMemberRole());
 
-        // 작가 역할 확인
-        if (!artist.getMemberRole().equals("웹툰 작가") && !artist.getMemberRole().equals("웹소설 작가")) {
-            throw new IllegalArgumentException("작가만 배정할 수 있습니다.");
+        // 아티스트 역할 확인
+        if (!artist.getMemberRole().equals("웹툰 아티스트") && !artist.getMemberRole().equals("소설 아티스트")) {
+            throw new IllegalArgumentException("아티스트만 배정할 수 있습니다.");
         }
 
-        // 담당자 역할 확인
-        if (!manager.getMember().getMemberRole().equals("담당자")) {
-            throw new IllegalArgumentException("담당자에게만 배정할 수 있습니다.");
+        // 매니저 역할 확인
+        if (!manager.getMember().getMemberRole().equals("매니저")) {
+            throw new IllegalArgumentException("매니저에게만 배정할 수 있습니다.");
         }
 
         // 같은 에이전시인지 확인
@@ -560,96 +608,95 @@ public class MemberServiceImpl implements MemberService {
             throw new IllegalArgumentException("같은 에이전시 소속이 아닙니다.");
         }
 
-        // 기존 배정이 있으면 삭제
+        // 기존 배정이 있으면 제거
         Optional<ArtistAssignment> existingAssignment = artistAssignmentRepository.findByArtistMemberNo(artistNo);
         if (existingAssignment.isPresent()) {
-            log.info("기존 배정 삭제: artistNo={}, 기존 managerNo={}", artistNo, existingAssignment.get().getManager().getManagerNo());
+            log.info("기존 배정 제거: artistNo={}, 기존 managerNo={}", artistNo, existingAssignment.get().getManager().getManagerNo());
             artistAssignmentRepository.delete(existingAssignment.get());
         }
 
         // 새 배정 생성 - ARTIST_ASSIGNMENT 테이블에 등록
-        // MANAGER_NO 컬럼에는 선택된 담당자의 MANAGER_NO가 저장됨
+        // MANAGER_NO 컬럼에는 선택된 매니저의 MANAGER_NO가 들어감
         ArtistAssignment assignment = ArtistAssignment.builder()
-            .manager(manager)  // MANAGER 테이블의 MANAGER_NO가 ARTIST_ASSIGNMENT.MANAGER_NO에 저장됨
-            .artist(artist)    // MEMBER 테이블의 MEMBER_NO가 ARTIST_ASSIGNMENT.ARTIST_MEMBER_NO에 저장됨
+            .manager(manager)  // MANAGER 테이블의 MANAGER_NO가 ARTIST_ASSIGNMENT.MANAGER_NO에 들어감
+            .artist(artist)    // MEMBER 테이블의 MEMBER_NO가 ARTIST_ASSIGNMENT.ARTIST_MEMBER_NO에 들어감
             .build();
 
         ArtistAssignment savedAssignment = artistAssignmentRepository.save(assignment);
-        log.info("작가 배정 완료: ARTIST_ASSIGNMENT_NO={}, ARTIST_MEMBER_NO={}, MANAGER_NO={}",
+        log.info("아티스트 배정 완료: ARTIST_ASSIGNMENT_NO={}, ARTIST_MEMBER_NO={}, MANAGER_NO={}",
             savedAssignment.getArtistAssignmentNo(),
             savedAssignment.getArtist().getMemberNo(),
             savedAssignment.getManager().getManagerNo());
 
-        // 담당자가 없지만 연재/휴재 상태인 작가의 프로젝트에 새 담당자를 PROJECT_MEMBER로 자동 추가
+        // 매니저가 없던 연재/예재 상태의 아티스트 프로젝트에 매니저를 PROJECT_MEMBER로 자동 추가
         List<ProjectMember> artistProjectMembers = projectMemberRepository.findByMember_MemberNo(artistNo);
         Member managerMember = manager.getMember();
         for (ProjectMember artistPm : artistProjectMembers) {
             var proj = artistPm.getProject();
             String status = proj.getProjectStatus();
-            if (!"연재".equals(status) && !"휴재".equals(status)) {
+            if (!"연재".equals(status) && !"예재".equals(status)) {
                 continue;
             }
-            Optional<ProjectMember> existingManager = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(proj.getProjectNo(), "담당자");
+            Optional<ProjectMember> existingManager = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(proj.getProjectNo(), "매니저");
             if (existingManager.isEmpty()) {
                 ProjectMember newManagerPm = ProjectMember.builder()
                     .member(managerMember)
                     .project(proj)
-                    .projectMemberRole("담당자")
+                    .projectMemberRole("매니저")
                     .build();
                 projectMemberRepository.save(newManagerPm);
-                log.info("작가 프로젝트(연재/휴재)에 담당자 자동 배치: projectNo={}, projectName={}", proj.getProjectNo(), proj.getProjectName());
+                log.info("아티스트 프로젝트(연재/예재)에 매니저 자동 배치: projectNo={}, projectName={}", proj.getProjectNo(), proj.getProjectName());
             }
         }
 
-        // 알림 생성 (LAZY 로딩을 위해 트랜잭션 내에서 접근)
+        // 알림 생성 (LAZY 로딩을 위해 트랜잭션 안에서 실행)
         String notificationType = "ASSIGNMENT";
 
         createNotificationSafely(
             managerMember.getMemberNo(),
-            "작가 배정 알림",
-            artist.getMemberName() + "님이 배정되었습니다",
+            "아티스트 배정 알림",
+            artist.getMemberName() + "님이 배정되었습니다.",
             notificationType
         );
 
         createNotificationSafely(
             artist.getMemberNo(),
-            "담당자 배정 알림",
-            managerMember.getMemberName() + " 담당자가 배정되었습니다",
+            "매니저 배정 알림",
+            managerMember.getMemberName() + " 매니저가 배정되었습니다.",
             notificationType
         );
     }
-
     @Override
     @Transactional
     public void unassignArtistFromManager(Long artistNo) {
-        log.info("작가 배정 해제 시작: artistNo={}", artistNo);
+        log.info("아티스트 배정 제거 시작: artistNo={}", artistNo);
 
         Optional<ArtistAssignment> assignment = artistAssignmentRepository.findByArtistMemberNo(artistNo);
 
         if (assignment.isEmpty()) {
-            log.warn("배정된 담당자가 없음: artistNo={}", artistNo);
-            throw new IllegalArgumentException("배정된 담당자가 없습니다.");
+            log.warn("배정된 매니저가 없음: artistNo={}", artistNo);
+            throw new IllegalArgumentException("배정된 매니저가 없습니다.");
         }
 
         ArtistAssignment assignmentToDelete = assignment.get();
 
-        // 삭제 전에 담당자와 작가 정보 가져오기 (LAZY 로딩을 위해 트랜잭션 내에서 접근)
+        // 제거 전에 매니저와 아티스트 정보 가져오기 (LAZY 로딩을 위해 트랜잭션 안에서 실행)
         Member artist = assignmentToDelete.getArtist();
         Manager manager = assignmentToDelete.getManager();
         Member managerMember = manager.getMember();
 
-        log.info("배정 해제: ARTIST_ASSIGNMENT_NO={}, ARTIST_MEMBER_NO={}, MANAGER_NO={}",
+        log.info("배정 제거: ARTIST_ASSIGNMENT_NO={}, ARTIST_MEMBER_NO={}, MANAGER_NO={}",
             assignmentToDelete.getArtistAssignmentNo(),
             artist.getMemberNo(),
             manager.getManagerNo());
 
-        // 담당자가 없어진 작가의 프로젝트에서 PROJECT_MEMBER의 담당자만 제거 (칸반 카드는 작가에게 재배치)
+        // 매니저가 없어진 아티스트 프로젝트에서 PROJECT_MEMBER의 매니저만 제거 (칸반 카드는 아티스트에게 소유권 이전)
         List<ProjectMember> artistProjectMembers = projectMemberRepository.findByMember_MemberNo(artist.getMemberNo());
         for (ProjectMember artistPm : artistProjectMembers) {
             Long projectNo = artistPm.getProject().getProjectNo();
             List<ProjectMember> allInProject = projectMemberRepository.findByProject_ProjectNo(projectNo);
             Optional<ProjectMember> managerPmOpt = allInProject.stream()
-                .filter(pm -> "담당자".equals(pm.getProjectMemberRole())
+                .filter(pm -> "매니저".equals(pm.getProjectMemberRole())
                     && pm.getMember().getMemberNo().equals(managerMember.getMemberNo()))
                 .findFirst();
             if (managerPmOpt.isPresent()) {
@@ -659,44 +706,44 @@ public class MemberServiceImpl implements MemberService {
                     card.setProjectMember(artistPm);
                 }
                 projectMemberRepository.delete(managerPm);
-                log.info("프로젝트 {} 에서 담당자 PROJECT_MEMBER 제거 완료: projectMemberNo={}", projectNo, managerPm.getProjectMemberNo());
+                log.info("프로젝트 {} 에서 매니저 PROJECT_MEMBER 제거 완료: projectMemberNo={}", projectNo, managerPm.getProjectMemberNo());
             }
         }
 
-        // 배정 해제 전에 알림 생성
+        // 배정 제거 전에 알림 생성
         String notificationType = "ASSIGNMENT";
 
         createNotificationSafely(
             managerMember.getMemberNo(),
-            "작가 배정 해제 알림",
-            artist.getMemberName() + "님의 배정이 해제되었습니다",
+            "아티스트 배정 제거 알림",
+            artist.getMemberName() + "님의 배정이 제거되었습니다.",
             notificationType
         );
 
         createNotificationSafely(
             artist.getMemberNo(),
-            "담당자 배정 해제 알림",
-            managerMember.getMemberName() + " 담당자의 배정이 해제되었습니다",
+            "매니저 배정 제거 알림",
+            managerMember.getMemberName() + " 매니저의 배정이 제거되었습니다.",
             notificationType
         );
 
-        // 배정 해제 실행
+        // 배정 제거 실행
         artistAssignmentRepository.delete(assignmentToDelete);
-        log.info("작가 배정 해제 완료: artistNo={}", artistNo);
+        log.info("아티스트 배정 제거 완료: artistNo={}", artistNo);
     }
 
-    private static final List<String> ARTIST_ROLES = List.of("웹툰 작가", "웹소설 작가");
+    private static final List<String> ARTIST_ROLES = List.of("웹툰 아티스트", "소설 아티스트");
 
     /**
-     * 담당자(MANAGER_NO)에게 배정된 작가만 반환.
-     * MANAGER 테이블의 manager_no로 ARTIST_ASSIGNMENT에서 해당 manager_no와 관계 있는 member_no를 조회하고,
-     * 그 회원의 MEMBER_ROLE이 '웹툰 작가', '웹소설 작가'인 경우만 포함.
+     * 매니저(MANAGER_NO)에게 배정된 아티스트만 반환.
+     * MANAGER 테이블의 manager_no로 ARTIST_ASSIGNMENT에서 해당 manager_no와 관계있는 member_no를 조회하고,
+     * 그 회원의 MEMBER_ROLE이 '웹툰 아티스트', '소설 아티스트'인 경우만 포함.
      */
     @Override
     @Transactional(readOnly = true)
     public List<MemberResponse> getArtistsByManagerNo(Long managerNo) {
         try {
-            log.debug("담당자별 작가 목록 조회 시작: managerNo={}", managerNo);
+            log.debug("매니저별 아티스트 목록 조회 시작: managerNo={}", managerNo);
             List<ArtistAssignment> assignments = artistAssignmentRepository.findByManagerNo(managerNo);
             log.debug("조회된 배정 수: {}", assignments.size());
 
@@ -707,15 +754,14 @@ public class MemberServiceImpl implements MemberService {
                 .map(artist -> convertToResponseWithManagerNo(artist, managerNo))
                 .collect(Collectors.toList());
         } catch (Exception e) {
-            log.error("담당자별 작가 목록 조회 실패: managerNo={}, error={}", managerNo, e.getMessage(), e);
-            throw new RuntimeException("담당자별 작가 목록 조회 중 오류가 발생했습니다: " + e.getMessage(), e);
+            log.error("매니저별 아티스트 목록 조회 실패: managerNo={}, error={}", managerNo, e.getMessage(), e);
+            throw new RuntimeException("매니저별 아티스트 목록 조회 중 오류가 발생했습니다: " + e.getMessage(), e);
         }
     }
-
     /**
-     * 현재 로그인한 담당자(member)의 manager_no를 MANAGER 테이블에서 찾고,
-     * ARTIST_ASSIGNMENT에서 그 manager_no와 관계 있는 member_no 중 MEMBER_ROLE이 '웹툰 작가', '웹소설 작가'인 회원만 반환.
-     * 배정된 작가가 없으면 빈 목록 반환.
+     * 현재 로그인한 매니저(member)의 manager_no를 MANAGER 테이블에서 찾고,
+     * ARTIST_ASSIGNMENT에서 그 manager_no와 관계있는 member_no 중 MEMBER_ROLE이 '웹툰 아티스트', '소설 아티스트'인 회원만 반환.
+     * 배정된 아티스트가 없으면 빈 목록 반환.
      */
     @Override
     @Transactional(readOnly = true)
@@ -726,26 +772,26 @@ public class MemberServiceImpl implements MemberService {
     }
 
     /**
-     * 담당자(manager_no)에게 배정된 작가(ARTIST_ASSIGNMENT.ARTIST_MEMBER_NO) 중,
-     * 오늘 ATTENDANCE 마지막 이력이 '출근'인 사람만 반환. (로그인한 담당자 본인 출근 여부는 조회하지 않음)
+     * 매니저(manager_no)에게 배정된 아티스트(ARTIST_ASSIGNMENT.ARTIST_MEMBER_NO) 중
+     * 오늘 ATTENDANCE 마지막 이력이 '출근'인 사람만 반환. (로그인한 매니저 본인 출근 여부는 조회하지 않음)
      */
     @Override
     @Transactional(readOnly = true)
     public List<WorkingArtistResponse> getWorkingArtistsByManagerNo(Long managerNo) {
         LocalDate today = LocalDate.now();
         List<ArtistAssignment> assignments = artistAssignmentRepository.findByManagerNo(managerNo);
-        log.info("현재 작업중인 작가 조회: managerNo={}, 오늘={}, 배정 수={}", managerNo, today, assignments.size());
+        log.info("현재 업무중인 아티스트 조회: managerNo={}, 오늘={}, 배정 수:{}", managerNo, today, assignments.size());
         List<WorkingArtistResponse> result = assignments.stream()
             .map(ArtistAssignment::getArtist)  // ARTIST_MEMBER_NO 해당 회원
             .map(artist -> {
                 List<Attendance> todayAttendances = attendanceRepository.findTodayLastAttendanceByMemberNo(artist.getMemberNo(), today);
                 if (todayAttendances.isEmpty()) {
-                    log.trace("작가 memberNo={} 오늘 출퇴근 기록 없음", artist.getMemberNo());
+                    log.trace("아티스트 memberNo={} 오늘 출퇴근 기록 없음", artist.getMemberNo());
                     return null;
                 }
                 Attendance last = todayAttendances.get(0);
                 if (!"출근".equals(last.getAttendanceType())) {
-                    log.trace("작가 memberNo={} 마지막 타입={} (출근만 포함)", artist.getMemberNo(), last.getAttendanceType());
+                    log.trace("아티스트 memberNo={} 마지막 기록:{} (출근만 포함)", artist.getMemberNo(), last.getAttendanceType());
                     return null;
                 }
                 return WorkingArtistResponse.builder()
@@ -756,7 +802,7 @@ public class MemberServiceImpl implements MemberService {
             })
             .filter(r -> r != null)
             .collect(Collectors.toList());
-        log.info("현재 작업중인 작가 조회 완료: managerNo={}, 반환 수={}", managerNo, result.size());
+        log.info("현재 업무중인 아티스트 조회 완료: managerNo={}, 반환 수:{}", managerNo, result.size());
         return result;
     }
 
@@ -783,10 +829,9 @@ public class MemberServiceImpl implements MemberService {
     private MemberResponse convertToResponse(Member member) {
         return convertToResponseWithManagerNo(member, null, null);
     }
-
     /**
-     * 에이전시 생성 시 해당 에이전시에 연결된 HEALTH_SURVEY 1건 생성.
-     * HEALTH_SURVEY_PERIOD 15일, HEALTH_SURVEY_CYCLE 30일 디폴트 적용.
+     * 에이전시 생성 시 해당 에이전시에 기본 HEALTH_SURVEY 1건 생성.
+     * HEALTH_SURVEY_PERIOD 15일 HEALTH_SURVEY_CYCLE 30일 기본값 적용.
      */
     private void createDefaultHealthSurveysForAgency(Agency agency) {
         int defaultPeriod = 15;
@@ -806,7 +851,7 @@ public class MemberServiceImpl implements MemberService {
     }
 
     /**
-     * 알림 생성 헬퍼 메서드 (실패해도 트랜잭션 롤백 방지)
+     * 알림 생성 안전 메서드 (실패해도 트랜잭션 롤백 방지)
      */
     private void createNotificationSafely(Long memberNo, String name, String text, String type) {
         try {
@@ -850,7 +895,7 @@ public class MemberServiceImpl implements MemberService {
                 Files.delete(filePath);
             }
         } catch (IOException e) {
-            log.error("파일 삭제 실패: {}", e.getMessage());
+            log.error("파일 제거 실패: {}", e.getMessage());
         }
     }
 
@@ -863,7 +908,7 @@ public class MemberServiceImpl implements MemberService {
         if (text == null || text.isEmpty()) {
             return false;
         }
-        // 한글 자모가 있는지 확인 (ㄱ~ㅎ, ㅏ~ㅣ)
+        // 한글 자모가 있는지 확인 (ㄱ-ㅎ ㅏ-ㅣ)
         return text.matches(".*[ㄱ-ㅎㅏ-ㅣ].*");
     }
 }
