@@ -37,6 +37,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     private final KanbanBoardRepository kanbanBoardRepository;
     private final KanbanCardRepository kanbanCardRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final NotionSyncService notionSyncService;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ISO_LOCAL_DATE;
 
@@ -247,6 +248,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             card.setKanbanCardEndedAt(LocalDate.parse(request.getDueDate(), DATE_FMT));
         }
         KanbanCard saved = kanbanCardRepository.save(card);
+        notionSyncService.syncCardCreate(saved, project);
         return toCardResponse(saved);
     }
 
@@ -261,6 +263,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         if (request.getStatus() != null && "D".equalsIgnoreCase(request.getStatus())) {
             card.setKanbanCardStatus("D");
             kanbanCardRepository.save(card);
+            notionSyncService.syncCardArchive(card, card.getKanbanBoard().getProject());
             return toCardResponse(card);
         }
         if (request.getTitle() != null) card.setKanbanCardName(request.getTitle());
@@ -282,6 +285,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             card.setKanbanCardEndedAt(LocalDate.parse(request.getDueDate(), DATE_FMT));
         }
         KanbanCard saved = kanbanCardRepository.save(card);
+        notionSyncService.syncCardUpdate(saved, saved.getKanbanBoard().getProject());
         return toCardResponse(saved);
     }
 
