@@ -15,7 +15,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         // 프론트엔드에서 SockJS로 연결할 엔드포인트 설정
         registry.addEndpoint("/ws-stomp")
                 .setAllowedOriginPatterns("*") // 테스트 단계에서는 모두 허용
-                .setAllowedOrigins("http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173") // 명시적으로 허용할 Origin 추가
                 .withSockJS();
     }
 
