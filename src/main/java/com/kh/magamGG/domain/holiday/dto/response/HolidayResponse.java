@@ -16,4 +16,3 @@ public class HolidayResponse {
     private Integer year;
     private List<HolidayItem> holidays;
 }
-

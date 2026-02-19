@@ -19,4 +19,3 @@ public class HolidayController {
         return ResponseEntity.ok(response);
     }
 }
-

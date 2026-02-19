@@ -41,30 +41,13 @@ public class  SecurityConfig {
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
             // 엔드포인트별 인증 요구사항 설정
-<<<<<<< HEAD
-            .authorizeHttpRequests(auth -> {
-                log.info("🛡️ Security 규칙 설정:");
-                log.info("  - /api/auth/login, /api/auth/refresh, /api/members: 인증 불필요");
-                log.info("  - /uploads/**: 인증 불필요");
-                log.info("  - /api/**: 인증 필요");
-                log.info("  - 나머지: 허용 (프론트엔드)");
-                
-                auth
-                    .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**",
-                                     "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password",
-                                     "/api/holidays/**").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기, 공휴일 API는 인증 없이 접근 가능
-                    .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
-                    .requestMatchers("/api/**").authenticated() // API는 인증 필요
-                    .anyRequest().permitAll(); // 프론트엔드 라우팅을 위해 나머지는 허용
-            });
-=======
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/login", "/api/auth/refresh", "/api/members", "/api/auth/email/**",
-                                 "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기는 인증 없이 접근 가능
+                                 "/api/auth/forgot-password", "/api/auth/verify-reset-code", "/api/auth/reset-password",
+                                 "/api/holidays/**").permitAll() // 로그인, 토큰 갱신, 회원가입, 이메일 인증, 비밀번호 찾기, 공휴일 API는 인증 없이 접근 가능
                 .requestMatchers("/uploads/**").permitAll() // 정적 리소스 허용
                 .anyRequest().authenticated() // 나머지는 인증 필요
             );
->>>>>>> bb1380338dafb03e688ae92bec5daea24726aa8f
 
         return http.build();
     }

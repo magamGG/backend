@@ -23,4 +23,3 @@ public class HolidayItem {
     @JsonProperty("isSunday")
     private Boolean isSunday;
 }
-
