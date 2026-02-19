@@ -4,7 +4,6 @@ logging:
     org.hibernate.orm.jdbc.bind: TRACE
     com.kh.magamGG.global.security.JwtAuthenticationFilter: INFO
     com.kh.magamGG.domain.notification: INFO
-    com.kh.magamGG.global.security: DEBUG  # JWT 관련 디버그 로그 활성화
 
 spring:
   application:
@@ -34,10 +33,6 @@ spring:
     properties:
       hibernate:
         format_sql: true
-
-  sql:
-    init:
-      mode: never  # 스키마 파일 실행하지 않음
 
   # 캐싱 설정 (최적화)
   cache:
