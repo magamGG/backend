@@ -3,6 +3,7 @@ package com.kh.magamGG.domain.project.service;
 import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
 import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
 import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository;
+import com.kh.magamGG.domain.chat.service.ChatRoomService;
 import com.kh.magamGG.domain.member.entity.Manager;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.ArtistAssignmentRepository;
@@ -49,6 +50,7 @@ public class ProjectServiceImpl implements ProjectService {
     private final KanbanCardRepository kanbanCardRepository;
     private final ProjectLeaveRequestRepository projectLeaveRequestRepository;
     private final AttendanceRepository attendanceRepository;
+    private final ChatRoomService chatRoomService;
 
     private static final int DEADLINE_WARNING_DAYS = 7;
     private static final int PROGRESS_WARNING_THRESHOLD = 70;
@@ -393,6 +395,19 @@ public class ProjectServiceImpl implements ProjectService {
         }
 
         List<ProjectMember> members = projectMemberRepository.findByProject_ProjectNo(saved.getProjectNo());
+        
+        // 프로젝트 채팅방 생성 및 멤버 추가
+        List<Long> memberNos = members.stream()
+                .map(pm -> pm.getMember().getMemberNo())
+                .collect(Collectors.toList());
+        
+        chatRoomService.createProjectChatRoom(
+                saved.getProjectNo(), 
+                saved.getProjectName(), 
+                agencyNo, 
+                memberNos
+        );
+        
         return toProjectListResponse(saved, members);
     }
 

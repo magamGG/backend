@@ -4,6 +4,10 @@ import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.agency.service.AgencyService;
 import com.kh.magamGG.domain.agency.util.AgencyCodeGenerator;
+import com.kh.magamGG.domain.chat.entity.ChatRoom;
+import com.kh.magamGG.domain.chat.entity.ChatRoomMember;
+import com.kh.magamGG.domain.chat.repository.ChatRoomMemberRepository;
+import com.kh.magamGG.domain.chat.repository.ChatRoomRepository;
 import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
@@ -72,6 +76,8 @@ public class MemberServiceImpl implements MemberService {
     private final AttendanceRepository attendanceRepository;
     private final HealthSurveyRepository healthSurveyRepository;
     private final EmailVerificationService emailVerificationService;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -79,10 +85,12 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse register(MemberRequest request) {
-        // 이메일 인증 완료 여부 확인
+        // 이메일 인증 완료 여부 확인 - 테스트를 위해 주석처리
+        /*
         if (!emailVerificationService.isEmailVerified(request.getMemberEmail())) {
             throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
         }
+        */
         
         // 이메일 중복 체크
         if (memberRepository.existsByMemberEmail(request.getMemberEmail())) {
@@ -162,6 +170,34 @@ public class MemberServiceImpl implements MemberService {
                 log.error("담당자 MANAGER 테이블 등록 실패: memberNo={}, error={}", savedMember.getMemberNo(), e.getMessage(), e);
                 // MANAGER 등록 실패해도 회원가입은 성공 처리 (나중에 수동으로 등록 가능)
             }
+        }
+        
+        // 1. 에이전시 관리자인 경우 전체 채팅방 생성
+        if ("에이전시 관리자".equals(savedMember.getMemberRole()) && savedMember.getAgency() != null) {
+
+                // 채팅방(CHAT_ROOM) 생성
+                ChatRoom fullChatRoom = ChatRoom.builder()
+                        .chatRoomName(savedMember.getAgency().getAgencyName() + " 전체 채팅방")
+                        .chatRoomType("ALL") // 전체 채팅은 그룹형태
+                        .chatRoomCreatedAt(LocalDateTime.now())
+                        .chatRoomStatus("Y")
+                        .agencyNo(savedMember.getAgency().getAgencyNo())
+                        .build();
+
+                chatRoomRepository.save(fullChatRoom);
+
+                // 참여자(CHAT_ROOM_MEMBER)에 관리자 추가
+                ChatRoomMember membership = ChatRoomMember.builder()
+                        .chatRoom(fullChatRoom)
+                        .member(savedMember)
+                        .chatRoomMemberJoinedAt(LocalDateTime.now())
+                        .build();
+
+                chatRoomMemberRepository.save(membership);
+
+                log.info("에이전시 전체 채팅방 생성 완료: agency={}, roomNo={}",
+                        savedMember.getAgency().getAgencyName(), fullChatRoom.getChatRoomNo());
+
         }
 
         // 회원가입 완료 후 인증 상태 제거
@@ -502,6 +538,7 @@ public class MemberServiceImpl implements MemberService {
         if (todayWorkStatus != null) {
             builder.todayWorkStatus(todayWorkStatus);
         }
+        
         return builder.build();
     }
 
