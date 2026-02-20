@@ -41,6 +41,8 @@ public class CorsConfig {
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
+        // WebSocket 엔드포인트도 CORS 허용
+        source.registerCorsConfiguration("/ws-stomp/**", configuration);
 
         return source;
     }
