@@ -35,5 +35,16 @@ public interface HealthSurveyResponseItemRepository extends JpaRepository<Health
            "WHERE m.agency.agencyNo = :agencyNo " +
            "ORDER BY i.healthSurveyQuestionItemCreatedAt DESC")
     List<HealthSurveyResponseItem> findByAgencyNoWithSurvey(@Param("agencyNo") Long agencyNo);
+
+    @Query("SELECT i FROM HealthSurveyResponseItem i " +
+           "JOIN FETCH i.healthSurveyQuestion q " +
+           "WHERE i.member.memberNo = :memberNo " +
+           "AND q.healthSurveyQuestionType = :type " +
+           "AND q.healthSurveyOrder BETWEEN :minOrder AND :maxOrder")
+    List<HealthSurveyResponseItem> findByMemberNoAndTypeAndOrderRange(
+        @Param("memberNo") Long memberNo,
+        @Param("type") String type,
+        @Param("minOrder") int minOrder,
+        @Param("maxOrder") int maxOrder);
 }
 

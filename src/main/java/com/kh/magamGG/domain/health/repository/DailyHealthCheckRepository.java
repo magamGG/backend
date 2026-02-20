@@ -25,4 +25,9 @@ public interface DailyHealthCheckRepository extends JpaRepository<DailyHealthChe
      * 회원의 최근 N건 건강 체크 조회 (최신순)
      */
     List<DailyHealthCheck> findTop10ByMember_MemberNoOrderByHealthCheckCreatedAtDesc(Long memberNo);
+
+    /**
+     * 회원의 최근 30건 건강 체크 조회 (담당자 AI 일일 건강 분석용, 최신순)
+     */
+    List<DailyHealthCheck> findTop30ByMember_MemberNoOrderByHealthCheckCreatedAtDesc(Long memberNo);
 }

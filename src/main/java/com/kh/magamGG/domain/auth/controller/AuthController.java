@@ -9,20 +9,22 @@ import com.kh.magamGG.domain.auth.service.GoogleOAuthService;
 import com.kh.magamGG.domain.auth.service.PasswordResetService;
 import com.kh.magamGG.domain.auth.service.RefreshTokenService;
 import com.kh.magamGG.global.security.JwtTokenProvider;
+import com.kh.magamGG.global.exception.OAuthRegistrationRequiredException;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import com.kh.magamGG.global.exception.OAuthRegistrationRequiredException;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
+import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * 인증 컨트롤러
