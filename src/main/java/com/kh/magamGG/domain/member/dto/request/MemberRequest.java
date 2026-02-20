@@ -23,7 +23,7 @@ public class MemberRequest {
     @Pattern(regexp = "^\\S*$", message = "이메일에는 공백을 사용할 수 없습니다.")
     private String memberEmail;
     
-    @NotBlank(message = "비밀번호는 필수입니다.")
+    // OAuth 모드에서는 선택적, 일반 모드에서는 필수 (MemberServiceImpl에서 검증)
     @Size(max = 100, message = "비밀번호는 100자 이하여야 합니다.")
     @Pattern(regexp = "^\\S*$", message = "비밀번호에는 공백을 사용할 수 없습니다.")
     private String memberPassword;
@@ -48,4 +48,7 @@ public class MemberRequest {
 
     // 아티스트 회원가입 시 선택사항 (에이전시 번호)
     private Long agencyNo;
+    
+    // OAuth 회원가입 시 사용 (비밀번호 없이 회원가입)
+    private String oauthProvider;
 }
