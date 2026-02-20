@@ -8,11 +8,13 @@ logging:
 spring:
   application:
     name: magamgg
+  profiles:
+    include: local   # application-local.yaml 로드 (파일 없으면 무시)
 
   datasource:
     url: jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: magam_user
-    password: asdf1234!
+    username: ${SPRING_DATASOURCE_USERNAME:}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 30
@@ -39,11 +41,12 @@ spring:
     type: simple
     cache-names: leaveBalance, agencyInfo
 
+  # 메일 비밀번호 등 시크릿은 application-local.yaml 에서 덮어쓰기 (해당 파일은 .gitignore)
   mail:
     host: smtp.gmail.com
     port: 587
-    username: magamgglocalservice@gmail.com
-    password: gniy mzoy ewjw lqna  # 앱 비밀번호
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -55,9 +58,19 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
+  # OpenAI API Key: application-local.yaml 또는 OPENAI_API_KEY 환경변수로 설정
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY:sk-placeholder-set-in-application-local-yaml}
+      chat:
+        options:
+          model: gpt-4o-mini
+          temperature: 0.7
+
+# JWT 시크릿: application-local.yaml 또는 JWT_ACCESS_SECRET, JWT_REFRESH_SECRET 환경변수로 설정
 jwt:
-  access-secret: ${JWT_ACCESS_SECRET:dev-access-secret-key-12345678901234567890123456789012}
-  refresh-secret: ${JWT_REFRESH_SECRET:dev-refresh-secret-key-98765432109876543210987654321098}
+  access-secret: ${JWT_ACCESS_SECRET:}
+  refresh-secret: ${JWT_REFRESH_SECRET:}
   access-expiration: 900000      # 15분 (밀리초)
   refresh-expiration: 604800000  # 7일 (밀리초)
 
@@ -73,14 +86,14 @@ server:
 file:
   upload-dir: uploads
 
-# 공공데이터 API 설정
+# 공공데이터 API: application-local.yaml 또는 PUBLIC_DATA_HOLIDAY_API_KEY 환경변수로 설정
 public-data:
   holiday:
-    api-key: pFg7%2B9ZuBDORVUL2Qy9DA9FffkmHzyemVbSPIN0trHBQjjgZp%2FfruTLqscT7swt3tdGf1Wi0tjZ6Lehba3YeHg%3D%3D
+    api-key: ${PUBLIC_DATA_HOLIDAY_API_KEY:}
     base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
     data-dir: holidays  # uploads/holidays 디렉토리에 저장
 
-# Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+# Notion: application-local.yaml 또는 NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정
 notion:
   client-id: ${NOTION_CLIENT_ID:}
   client-secret: ${NOTION_CLIENT_SECRET:}

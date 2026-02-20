@@ -1,0 +1,44 @@
+# 로컬 전용 시크릿 설정 예시
+# 1. 이 파일을 복사해서 application-local.yaml 로 저장하세요.
+# 2. 아래 값들을 실제 값으로 채우세요.
+# 3. application-local.yaml 은 .gitignore 에 포함되어 있어 커밋되지 않습니다.
+# 4. application.yaml 의 spring.profiles.include: local 로 로드됩니다.
+
+spring:
+  datasource:
+    username: your-db-user
+    password: your-db-password
+
+  mail:
+    username: your-gmail@gmail.com
+    password: your-app-password
+
+  ai:
+    openai:
+      api-key: "sk-proj-..."
+
+jwt:
+  access-secret: "32자 이상 access 시크릿"
+  refresh-secret: "32자 이상 refresh 시크릿"
+
+public-data:
+  holiday:
+    api-key: "공공데이터포털에서 발급한 API 키"
+
+notion:
+  client-id: "your-notion-client-id"
+  client-secret: "your-notion-client-secret"
+
+google:
+  oauth:
+    client-id: "your-google-client-id"
+    client-secret: "your-google-client-secret"
+
+naver:
+  oauth:
+    client-id: "your-naver-client-id"
+    client-secret: "your-naver-client-secret"
+
+kakao:
+  oauth:
+    rest-api-key: "your-kakao-rest-api-key"
