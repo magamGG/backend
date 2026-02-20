@@ -34,7 +34,7 @@ public class CorsConfig {
         configuration.setAllowCredentials(true);
         
         // 클라이언트가 읽을 수 있는 응답 헤더
-        configuration.setExposedHeaders(Arrays.asList("Authorization", "Content-Type", "Last-Event-ID"));
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie", "Content-Type", "Last-Event-ID"));
         
         // Preflight 요청 캐시 시간 (초)
         configuration.setMaxAge(3600L);
