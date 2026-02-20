@@ -13,8 +13,8 @@ spring:
 
   datasource:
     url: jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ${SPRING_DATASOURCE_USERNAME:}
-    password: ${SPRING_DATASOURCE_PASSWORD:}
+    username: root
+    password: magam01
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 30
@@ -58,7 +58,6 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-<<<<<<< HEAD
   # OpenAI API Key: application-local.yaml 또는 OPENAI_API_KEY 환경변수로 설정
   ai:
     openai:
@@ -87,18 +86,17 @@ server:
 file:
   upload-dir: uploads
 
-<<<<<<< HEAD
-# 공공데이터 API: application-local.yaml 또는 PUBLIC_DATA_HOLIDAY_API_KEY 환경변수로 설정
+# 공공데이터 API 설정
 public-data:
   holiday:
-    api-key: ${PUBLIC_DATA_HOLIDAY_API_KEY:}
+    api-key: ${PUBLIC_DATA_HOLIDAY_API_KEY:pFg7%2B9ZuBDORVUL2Qy9DA9FffkmHzyemVbSPIN0trHBQjjgZp%2FfruTLqscT7swt3tdGf1Wi0tjZ6Lehba3YeHg%3D%3D}
     base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
     data-dir: holidays  # uploads/holidays 디렉토리에 저장
 
-# Notion: application-local.yaml 또는 NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정
+# Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
 notion:
-  client-id: ${NOTION_CLIENT_ID:}
-  client-secret: ${NOTION_CLIENT_SECRET:}
+  client-id: ${NOTION_CLIENT_ID:your-notion-client-id}
+  client-secret: ${NOTION_CLIENT_SECRET:your-notion-client-secret}
   redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
   api-version: "2022-06-28"
 
@@ -131,17 +129,3 @@ kakao:
     authorization-url: https://kauth.kakao.com/oauth/authorize
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
-
-# 공공데이터 API 설정
-public-data:
-  holiday:
-    api-key: ${PUBLIC_DATA_HOLIDAY_API_KEY:pFg7%2B9ZuBDORVUL2Qy9DA9FffkmHzyemVbSPIN0trHBQjjgZp%2FfruTLqscT7swt3tdGf1Wi0tjZ6Lehba3YeHg%3D%3D}
-    base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
-    data-dir: holidays  # uploads/holidays 디렉토리에 저장
-
-# Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
-notion:
-  client-id: ${NOTION_CLIENT_ID:your-notion-client-id}
-  client-secret: ${NOTION_CLIENT_SECRET:your-notion-client-secret}
-  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
-  api-version: "2022-06-28"
