@@ -134,8 +134,22 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
+        // 비밀번호 처리: OAuth 모드일 경우 랜덤 비밀번호 생성, 일반 모드일 경우 사용자 입력 비밀번호 사용
+        String passwordToEncode;
+        if (request.getOauthProvider() != null && !request.getOauthProvider().isEmpty()) {
+            // OAuth 모드: 랜덤 비밀번호 생성
+            passwordToEncode = "OAUTH_" + request.getOauthProvider().toUpperCase() + "_" + UUID.randomUUID().toString();
+            log.info("OAuth 회원가입: provider={}, email={}", request.getOauthProvider(), request.getMemberEmail());
+        } else {
+            // 일반 모드: 사용자 입력 비밀번호 사용
+            if (request.getMemberPassword() == null || request.getMemberPassword().trim().isEmpty()) {
+                throw new IllegalArgumentException("비밀번호는 필수입니다.");
+            }
+            passwordToEncode = request.getMemberPassword();
+        }
+        
         // 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(request.getMemberPassword());
+        String encodedPassword = passwordEncoder.encode(passwordToEncode);
 
         // Member 엔티티 생성
         Member member = new Member();
