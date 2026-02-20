@@ -41,6 +41,18 @@ spring:
     type: simple
     cache-names: leaveBalance, agencyInfo
 
+  # Valkey(Redis 호환) 설정 - Refresh Token 저장용
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
   # 메일 비밀번호 등 시크릿은 application-local.yaml 에서 덮어쓰기 (해당 파일은 .gitignore)
   mail:
     host: smtp.gmail.com

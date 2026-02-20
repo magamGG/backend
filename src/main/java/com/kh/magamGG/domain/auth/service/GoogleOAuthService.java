@@ -3,8 +3,6 @@ package com.kh.magamGG.domain.auth.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kh.magamGG.domain.auth.dto.response.LoginResponse;
-import com.kh.magamGG.domain.auth.entity.RefreshToken;
-import com.kh.magamGG.domain.auth.repository.RefreshTokenRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.global.exception.OAuthRegistrationRequiredException;
@@ -23,10 +21,13 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
-import java.util.UUID;
 
+/**
+ * Google OAuth 서비스 (Valkey 기반)
+ * 
+ * RefreshTokenService (Valkey)를 사용하여 Refresh Token 관리
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,7 +37,7 @@ public class GoogleOAuthService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final MemberRepository memberRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokenService;  // Valkey 기반
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     
@@ -93,29 +94,10 @@ public class GoogleOAuthService {
             // 5. Refresh Token 발급
             String refreshTokenJwt = jwtTokenProvider.generateRefreshToken(member.getMemberNo());
             
-            // 6. Refresh Token 해시 생성
-            String tokenHash = jwtTokenProvider.hashToken(refreshTokenJwt);
+            // 6. Refresh Token을 Valkey에 저장 (이메일을 키로 사용)
+            refreshTokenService.saveRefreshToken(member.getMemberEmail(), refreshTokenJwt);
             
-            // 7. Token Family UUID 생성
-            String tokenFamily = UUID.randomUUID().toString();
-            
-            // 8. 만료 시간 계산
-            LocalDateTime expiryDate = LocalDateTime.now()
-                .plusSeconds(jwtTokenProvider.getRefreshExpiration() / 1000);
-            
-            // 9. Refresh Token DB 저장 (해시만 저장) - AuthService와 동일한 로직
-            RefreshToken refreshTokenEntity = RefreshToken.builder()
-                .memberNo(member.getMemberNo())
-                .refreshTokenHash(tokenHash)
-                .refreshTokenFamily(tokenFamily)
-                .refreshTokenIsRevoked("F")
-                .refreshTokenExpiresAt(expiryDate)
-                .refreshTokenCreatedAt(LocalDateTime.now())
-                .build();
-            
-            refreshTokenRepository.save(refreshTokenEntity);
-            
-            log.info("Google 로그인 성공: {} ({})", member.getMemberName(), member.getMemberEmail());
+            log.info("✅ Google 로그인 성공 (Valkey): {} ({})", member.getMemberName(), member.getMemberEmail());
             
             // 10. Agency 번호 추출
             Long agencyNo = member.getAgency() != null ? member.getAgency().getAgencyNo() : null;

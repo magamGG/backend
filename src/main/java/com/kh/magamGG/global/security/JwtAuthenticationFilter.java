@@ -65,12 +65,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     log.warn("❌ JWT 토큰 검증 실패: uri={}", request.getRequestURI());
                     SecurityContextHolder.clearContext();
                     
-                    // 인증이 필요한 요청인 경우에만 401 반환
+                    // 인증이 필요한 요청인 경우 401 반환 (프론트엔드가 재발급 로직 실행)
                     if (requiresAuthentication(request)) {
                         log.warn("인증 실패로 401 반환: {}", request.getRequestURI());
                         response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                         response.setContentType("application/json;charset=UTF-8");
-                        response.getWriter().write("{\"message\":\"토큰이 만료되었거나 유효하지 않습니다.\"}");
+                        
+                        // 명확한 에러 메시지 (프론트엔드가 재발급 로직을 태울 수 있도록)
+                        String errorMessage = "{\"error\":\"UNAUTHORIZED\",\"message\":\"토큰이 만료되었거나 유효하지 않습니다.\",\"code\":401}";
+                        response.getWriter().write(errorMessage);
                         return;
                     }
                 }
@@ -82,7 +85,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (requiresAuthentication(request)) {
                     response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                     response.setContentType("application/json;charset=UTF-8");
-                    response.getWriter().write("{\"message\":\"유효하지 않은 토큰입니다.\"}");
+                    String errorMessage = "{\"error\":\"UNAUTHORIZED\",\"message\":\"유효하지 않은 토큰입니다.\",\"code\":401}";
+                    response.getWriter().write(errorMessage);
                     return;
                 }
             }
@@ -136,7 +140,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // permitAll 엔드포인트 목록
         return !uri.startsWith("/api/auth/login") 
             && !uri.startsWith("/api/auth/refresh")
+            && !uri.startsWith("/api/auth/reissue")  // 재발급 엔드포인트 추가
             && !uri.startsWith("/api/members")
-            && !uri.startsWith("/uploads/");
+            && !uri.startsWith("/uploads/")
+            && !uri.startsWith("/login/oauth2");  // OAuth2 엔드포인트 추가
     }
 }
