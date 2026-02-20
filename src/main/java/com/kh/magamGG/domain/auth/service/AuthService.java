@@ -115,7 +115,7 @@ public class AuthService {
      * Refresh Token으로 Access Token 갱신 (Valkey 기반)
      * Token Rotation 방식 적용
      */
-    @Transactional
+    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
         log.info("🔄 [토큰 갱신] refreshToken() 메서드 호출 시작 (Valkey)");
         String refreshTokenValue = request.getRefreshToken();

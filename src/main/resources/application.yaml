@@ -167,62 +167,34 @@ spring:
           timeout: 5000
           writetimeout: 5000
 
-# 로깅 설정 (local)
-logging:
-  level:
-    root: INFO
-    com.kh.magamGG: DEBUG
-    org.springframework.data.redis: DEBUG
-    org.springframework.retry: DEBUG
 
----
-# ============================================
-# prod 프로파일 (운영 환경)
-# ============================================
-spring:
-  config:
-    activate:
-      on-profile: prod
 
-  # 데이터베이스 설정
-  datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8}
-    username: ${DB_USERNAME:magam_user}
-    password: ${DB_PASSWORD:default_password}
-    driver-class-name: com.mysql.cj.jdbc.Driver
+# Google OAuth: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+google:
+  oauth:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8888/api/auth/google/callback}
+    scope: ${GOOGLE_SCOPE:openid profile email}
 
-  # JPA 설정
-  jpa:
-    hibernate:
-      ddl-auto: validate
-    show-sql: false
-    properties:
-      hibernate:
-        format_sql: false
+# Naver OAuth: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+naver:
+  oauth:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
+    redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8888/api/auth/naver/callback}
+    # Naver API 엔드포인트
+    authorization-url: https://nid.naver.com/oauth2.0/authorize
+    token-url: https://nid.naver.com/oauth2.0/token
+    user-info-url: https://openapi.naver.com/v1/nid/me
 
-  # 메일 설정
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:default_mail_user}
-    password: ${MAIL_PASSWORD:default_mail_password}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
-
-# 로깅 설정 (prod)
-logging:
-  level:
-    root: WARN
-    com.kh.magamGG: INFO
-    org.springframework.data.redis: WARN
-    org.springframework.retry: WARN
-    org.hibernate.SQL: WARN
-    org.hibernate.orm.jdbc.bind: WARN
+# Kakao OAuth: KAKAO_REST_API_KEY 환경변수로 설정 (시크릿 노출 방지)
+# Kakao는 client-secret이 없고 REST API Key만 사용
+kakao:
+  oauth:
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8888/api/auth/kakao/callback}
+    # Kakao API 엔드포인트
+    authorization-url: https://kauth.kakao.com/oauth/authorize
+    token-url: https://kauth.kakao.com/oauth/token
+    user-info-url: https://kapi.kakao.com/v2/user/me
