@@ -86,3 +86,33 @@ notion:
   client-secret: ${NOTION_CLIENT_SECRET:}
   redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
   api-version: "2022-06-28"
+
+# Google OAuth: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+google:
+  oauth:
+    client-id: ${GOOGLE_CLIENT_ID:}
+    client-secret: ${GOOGLE_CLIENT_SECRET:}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8888/api/auth/google/callback}
+    scope: ${GOOGLE_SCOPE:openid profile email}
+
+# Naver OAuth: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+naver:
+  oauth:
+    client-id: ${NAVER_CLIENT_ID:}
+    client-secret: ${NAVER_CLIENT_SECRET:}
+    redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8888/api/auth/naver/callback}
+    # Naver API 엔드포인트
+    authorization-url: https://nid.naver.com/oauth2.0/authorize
+    token-url: https://nid.naver.com/oauth2.0/token
+    user-info-url: https://openapi.naver.com/v1/nid/me
+
+# Kakao OAuth: KAKAO_REST_API_KEY 환경변수로 설정 (시크릿 노출 방지)
+# Kakao는 client-secret이 없고 REST API Key만 사용
+kakao:
+  oauth:
+    rest-api-key: ${KAKAO_REST_API_KEY:}
+    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8888/api/auth/kakao/callback}
+    # Kakao API 엔드포인트
+    authorization-url: https://kauth.kakao.com/oauth/authorize
+    token-url: https://kauth.kakao.com/oauth/token
+    user-info-url: https://kapi.kakao.com/v2/user/me
