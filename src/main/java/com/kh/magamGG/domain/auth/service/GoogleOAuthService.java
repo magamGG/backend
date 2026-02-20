@@ -3,8 +3,6 @@ package com.kh.magamGG.domain.auth.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kh.magamGG.domain.auth.dto.response.LoginResponse;
-import com.kh.magamGG.domain.auth.entity.RefreshToken;
-import com.kh.magamGG.domain.auth.repository.RefreshTokenRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.global.exception.OAuthRegistrationRequiredException;
@@ -36,7 +34,6 @@ public class GoogleOAuthService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final MemberRepository memberRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
     private final JwtTokenProvider jwtTokenProvider;
     private final PasswordEncoder passwordEncoder;
     

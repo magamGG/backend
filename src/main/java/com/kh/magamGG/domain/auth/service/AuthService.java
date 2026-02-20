@@ -4,8 +4,6 @@ import com.kh.magamGG.domain.auth.dto.request.LoginRequest;
 import com.kh.magamGG.domain.auth.dto.request.RefreshTokenRequest;
 import com.kh.magamGG.domain.auth.dto.response.LoginResponse;
 import com.kh.magamGG.domain.auth.dto.response.RefreshTokenResponse;
-import com.kh.magamGG.domain.auth.entity.RefreshToken;
-import com.kh.magamGG.domain.auth.repository.RefreshTokenRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.global.exception.*;
