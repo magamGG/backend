@@ -54,6 +54,15 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
     long countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(@Param("memberNo") Long memberNo);
 
     /**
+     * 회원의 마감일이 이미 지난 카드 중 상태별 건수 (마감 준수율 계산용: endedAt <= before, status = Y/N)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardEndedAt IS NOT NULL " +
+           "AND kc.kanbanCardEndedAt <= :before AND kc.kanbanCardStatus = :status")
+    long countByProjectMember_Member_MemberNoAndKanbanCardEndedAtBeforeAndKanbanCardStatus(
+            @Param("memberNo") Long memberNo, @Param("before") LocalDate before, @Param("status") String status);
+
+    /**
      * 여러 회원의 특정 기간 내 마감 칸반 카드 조회 (담당자/에이전시 대시보드 마감 임박 현황용)
      * memberNo IN (...) AND kanbanCardEndedAt BETWEEN :fromDate AND :toDate
      * 완료(Y), 삭제(D) 제외
