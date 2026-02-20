@@ -10,16 +10,20 @@ import com.kh.magamGG.global.exception.*;
 import com.kh.magamGG.global.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
+/**
+ * 인증 서비스 (Valkey 기반)
+ * 
+ * 주요 기능:
+ * - RefreshTokenService (Valkey)를 사용하여 Refresh Token 관리
+ * - Valkey의 TTL 기능으로 자동 만료 처리
+ * - Refresh Token Rotation 방식 적용
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -27,12 +31,12 @@ import java.util.UUID;
 public class AuthService {
 
     private final MemberRepository memberRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
+    private final RefreshTokenService refreshTokenService;  // Valkey 기반
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
 
     /**
-     * 로그인 처리
+     * 로그인 처리 (Valkey 기반)
      */
     @Transactional
     public LoginResponse login(LoginRequest request) {
@@ -50,45 +54,55 @@ public class AuthService {
             throw new InvalidCredentialsException("비활성화된 계정입니다.");
         }
 
+        log.info("🔐 [로그인] 회원 검증 완료: memberNo={}, email={}", member.getMemberNo(), member.getMemberEmail());
+
         // Access Token 발급
+        log.info("🎫 [로그인] Access Token 발급 시작: memberNo={}", member.getMemberNo());
         String accessToken = jwtTokenProvider.generateAccessToken(
                 member.getMemberNo(), 
                 member.getMemberEmail()
         );
+        log.info("✅ [로그인] Access Token 발급 완료: memberNo={}, tokenLength={}", 
+                member.getMemberNo(), accessToken != null ? accessToken.length() : 0);
 
         // Refresh Token 발급
+        log.info("🎫 [로그인] Refresh Token 발급 시작: memberNo={}", member.getMemberNo());
         String refreshToken = jwtTokenProvider.generateRefreshToken(member.getMemberNo());
+        log.info("✅ [로그인] Refresh Token 발급 완료: memberNo={}, tokenLength={}", 
+                member.getMemberNo(), refreshToken != null ? refreshToken.length() : 0);
 
-        // Refresh Token 해시 생성
-        String tokenHash = jwtTokenProvider.hashToken(refreshToken);
+        // Refresh Token을 Valkey에 저장 (이메일을 키로 사용)
+        log.info("💾 [로그인] Valkey에 Refresh Token 저장 시작: email={}", member.getMemberEmail());
+        try {
+            refreshTokenService.saveRefreshToken(member.getMemberEmail(), refreshToken);
+            
+            // 저장 확인 (검증)
+            String savedTokenHash = refreshTokenService.getRefreshToken(member.getMemberEmail());
+            if (savedTokenHash != null) {
+                log.info("✅ [로그인] Valkey 저장 확인 완료: email={}, key=RT:{}", 
+                        member.getMemberEmail(), member.getMemberEmail());
+            } else {
+                log.error("❌ [로그인] Valkey 저장 실패: email={} (저장 후 조회 시 null)", member.getMemberEmail());
+                throw new RuntimeException("Refresh Token 저장 실패: Valkey에 저장되지 않았습니다.");
+            }
+        } catch (Exception e) {
+            log.error("❌ [로그인] Valkey 저장 중 예외 발생: email={}, error={}", 
+                    member.getMemberEmail(), e.getMessage(), e);
+            throw new RuntimeException("Refresh Token 저장 실패", e);
+        }
 
-        // Token Family UUID 생성
-        String tokenFamily = UUID.randomUUID().toString();
-
-        // 만료 시간 계산 (application.yaml의 refreshExpiration 값 사용)
-        LocalDateTime expiryDate = LocalDateTime.now()
-                .plusSeconds(jwtTokenProvider.getRefreshExpiration() / 1000);
-
-        // Refresh Token DB 저장 (해시만 저장)
-        RefreshToken refreshTokenEntity = RefreshToken.builder()
-                .memberNo(member.getMemberNo())
-                .refreshTokenHash(tokenHash)
-                .refreshTokenFamily(tokenFamily)
-                .refreshTokenIsRevoked("F")
-                .refreshTokenExpiresAt(expiryDate)
-                .refreshTokenCreatedAt(LocalDateTime.now())
-                .build();
-
-        refreshTokenRepository.save(refreshTokenEntity);
-
-        log.info("로그인 성공: {} ({})", member.getMemberName(), member.getMemberEmail());
+        log.info("✅ [로그인] 로그인 성공 (Valkey): {} ({}), memberNo={}", 
+                member.getMemberName(), member.getMemberEmail(), member.getMemberNo());
+        
+        // 사용자 로그인 성공 로그 (콘솔 출력용)
+        log.info("사용자 {} 로그인 성공 - 시각: {}", member.getMemberEmail(), LocalDateTime.now());
 
         // Agency 번호 추출
         Long agencyNo = member.getAgency() != null ? member.getAgency().getAgencyNo() : null;
 
         return LoginResponse.builder()
-                .token(accessToken)  // 기존 프론트엔드와 호환성 유지
-                .accessToken(accessToken)  // 새 필드 추가
+                .token(accessToken)
+                .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .memberNo(member.getMemberNo())
                 .memberName(member.getMemberName())
@@ -98,12 +112,12 @@ public class AuthService {
     }
 
     /**
-     * Refresh Token으로 Access Token 갱신
+     * Refresh Token으로 Access Token 갱신 (Valkey 기반)
      * Token Rotation 방식 적용
      */
-    @Transactional(noRollbackFor = DataIntegrityViolationException.class)
+    @Transactional
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
-        log.info("🔄 [토큰 갱신] refreshToken() 메서드 호출 시작");
+        log.info("🔄 [토큰 갱신] refreshToken() 메서드 호출 시작 (Valkey)");
         String refreshTokenValue = request.getRefreshToken();
 
         // 1. Refresh 토큰 검증
@@ -111,132 +125,37 @@ public class AuthService {
             throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
         }
 
-        // 2. 토큰 해시 생성
-        String tokenHash = jwtTokenProvider.hashToken(refreshTokenValue);
-        log.debug("🔄 [토큰 갱신] 토큰 해시 생성 완료: {}", tokenHash.substring(0, 16) + "...");
-
-        // 3. DB 조회 (활성 토큰만 조회)
-        log.debug("🔄 [토큰 갱신] DB에서 활성 토큰 조회 시작");
-        RefreshToken refreshToken = refreshTokenRepository
-                .findActiveByRefreshTokenHash(tokenHash)
-                .orElse(null);
-
-        // 3-1. revoked된 토큰 재사용 감지
-        if (refreshToken == null) {
-            // revoked된 토큰인지 확인
-            Optional<RefreshToken> revokedTokenOpt = refreshTokenRepository
-                    .findRevokedByRefreshTokenHash(tokenHash);
-            
-            if (revokedTokenOpt.isPresent()) {
-                // revoked된 토큰이 다시 사용됨 → token_family 전체 revoke
-                RefreshToken revokedToken = revokedTokenOpt.get();
-                List<RefreshToken> familyTokens = refreshTokenRepository
-                        .findByRefreshTokenFamily(revokedToken.getRefreshTokenFamily());
-                
-                familyTokens.forEach(RefreshToken::revoke);
-                refreshTokenRepository.saveAll(familyTokens);
-                refreshTokenRepository.flush(); // 즉시 DB 반영 (재사용 공격 방어)
-                
-                // 보안 로그: 재사용 공격 감지
-                log.error("🔒 [보안 경고] revoked된 토큰 재사용 감지: tokenFamily={}, memberNo={}, IP={}", 
-                        revokedToken.getRefreshTokenFamily(), revokedToken.getMemberNo(), 
-                        "IP 추적 필요"); // TODO: HttpServletRequest에서 IP 추출
-                throw new TokenReuseDetectedException("이미 사용된 토큰입니다. 모든 세션이 차단되었습니다.");
-            }
-            
-            // 토큰이 DB에 아예 없음 (재사용 공격 가능성)
-            Long memberNo = jwtTokenProvider.getMemberIdFromRefreshToken(refreshTokenValue);
-            handleTokenReuse(memberNo, refreshTokenValue);
-            throw new TokenNotFoundException("Refresh Token을 찾을 수 없습니다.");
-        }
-
-        // 6. expiryDate 지났으면 ExpiredTokenException
-        if (refreshToken.isExpired()) {
-            throw new ExpiredTokenException("만료된 Refresh Token입니다.");
-        }
-
-        // 7. 재사용 감지 로직
-        List<RefreshToken> familyTokens = refreshTokenRepository
-                .findByRefreshTokenFamily(refreshToken.getRefreshTokenFamily());
-
-        // 현재 토큰을 제외한 다른 토큰이 활성 상태면 재사용 공격
-        boolean reuseDetected = familyTokens.stream()
-                .filter(token -> !token.getRefreshTokenId().equals(refreshToken.getRefreshTokenId()))
-                .anyMatch(token -> !token.isRevoked() && !token.isExpired());
-
-        if (reuseDetected) {
-            // 같은 tokenFamily 전부 revoked 처리
-            familyTokens.forEach(RefreshToken::revoke);
-            refreshTokenRepository.saveAll(familyTokens);
-            refreshTokenRepository.flush(); // 즉시 DB 반영 (재사용 공격 방어)
-
-            // 보안 로그: 재사용 공격 감지
-            log.error("🔒 [보안 경고] 토큰 재사용 공격 감지: tokenFamily={}, memberNo={}, IP={}", 
-                    refreshToken.getRefreshTokenFamily(), refreshToken.getMemberNo(),
-                    "IP 추적 필요"); // TODO: HttpServletRequest에서 IP 추출
-            throw new TokenReuseDetectedException("토큰 재사용이 감지되었습니다. 모든 세션이 차단되었습니다.");
-        }
-
-        // 8. 기존 refresh revoked 처리 (중요!)
-        log.debug("🔄 [토큰 갱신] 기존 토큰 revoked 처리: tokenFamily={}", refreshToken.getRefreshTokenFamily());
-        refreshToken.revoke();
-        refreshTokenRepository.save(refreshToken);
-
-        // 9. 새로운 Access Token 발급
-        Long memberNo = refreshToken.getMemberNo();
+        // 2. Refresh Token에서 회원번호 추출
+        Long memberNo = jwtTokenProvider.getMemberIdFromRefreshToken(refreshTokenValue);
+        
+        // 3. 회원 정보 조회 (이메일 가져오기)
         Member member = memberRepository.findById(memberNo)
                 .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+        
+        String email = member.getMemberEmail();
 
-        log.debug("🔄 [토큰 갱신] 새 Access Token 발급 시작: memberNo={}", memberNo);
+        // 4. 새 Access Token 발급
         String newAccessToken = jwtTokenProvider.generateAccessToken(
                 member.getMemberNo(),
                 member.getMemberEmail()
         );
 
-        // 10. 새로운 Refresh Token 발급
-        log.debug("🔄 [토큰 갱신] 새 Refresh Token 발급 시작");
+        // 5. 새 Refresh Token 발급
         String newRefreshToken = jwtTokenProvider.generateRefreshToken(member.getMemberNo());
-        String newTokenHash = jwtTokenProvider.hashToken(newRefreshToken);
 
-        // 11. 새로운 Refresh Token DB 저장 (같은 tokenFamily 유지)
-        log.debug("🔄 [토큰 갱신] 새 Refresh Token DB 저장: tokenFamily={}", refreshToken.getRefreshTokenFamily());
-        
-        // 🔒 동시성 문제 방지: 새 토큰 해시가 이미 존재하는지 확인
-        Optional<RefreshToken> existingTokenOpt = refreshTokenRepository
-                .findByRefreshTokenHashAndRefreshTokenIsRevoked(newTokenHash, "F");
-        if (existingTokenOpt.isPresent()) {
-            // 이미 존재하는 토큰 (동시 요청으로 인한 중복)
-            log.warn("⚠️ [토큰 갱신] 새 토큰 해시가 이미 존재함 (동시 요청 감지): tokenHash={}, tokenFamily={}", 
-                    newTokenHash.substring(0, 16) + "...", existingTokenOpt.get().getRefreshTokenFamily());
-            // 기존 토큰이 이미 있으므로 정상 응답 반환
-        } else {
-            // 새 토큰 저장
-            RefreshToken newRefreshTokenEntity = RefreshToken.builder()
-                    .memberNo(member.getMemberNo())
-                    .refreshTokenHash(newTokenHash)
-                    .refreshTokenFamily(refreshToken.getRefreshTokenFamily()) // 같은 패밀리 유지
-                    .refreshTokenIsRevoked("F")
-                    .refreshTokenExpiresAt(LocalDateTime.now()
-                            .plusSeconds(jwtTokenProvider.getRefreshExpiration() / 1000))
-                    .refreshTokenCreatedAt(LocalDateTime.now())
-                    .build();
-
-            try {
-                refreshTokenRepository.save(newRefreshTokenEntity);
-                refreshTokenRepository.flush(); // 즉시 DB 반영
-                log.debug("🔄 [토큰 갱신] 새 토큰 저장 완료");
-            } catch (DataIntegrityViolationException e) {
-                // UNIQUE 제약 위반 (동시 요청으로 인한 중복 저장)
-                log.warn("⚠️ [토큰 갱신] UNIQUE 제약 위반 감지 (동시 요청): tokenHash={}, error={}", 
-                        newTokenHash.substring(0, 16) + "...", e.getMessage());
-                // 이미 저장된 것으로 간주하고 정상 응답 반환
-                // (다른 요청이 이미 저장했으므로)
-            }
+        // 6. Refresh Token Rotation (Valkey 기반)
+        // validateAndRotate: 기존 토큰 검증 → 삭제 → 새 토큰 저장 (원자적 연산)
+        try {
+            refreshTokenService.validateAndRotate(email, refreshTokenValue, newRefreshToken);
+        } catch (InvalidTokenException e) {
+            // 토큰 불일치 또는 없음 → 탈취된 토큰으로 간주
+            log.error("🔒 [보안 경고] Refresh Token 검증 실패: email={}", email);
+            throw e;
         }
 
-        log.info("✅ [토큰 갱신] 성공: memberNo={}, tokenFamily={}", memberNo, refreshToken.getRefreshTokenFamily());
+        log.info("✅ [토큰 갱신] 성공 (Valkey): email={}", email);
 
-        // 12. 응답 반환
+        // 7. 응답 반환
         return RefreshTokenResponse.builder()
                 .accessToken(newAccessToken)
                 .refreshToken(newRefreshToken)
@@ -244,33 +163,30 @@ public class AuthService {
     }
 
     /**
-     * 로그아웃 처리
+     * 로그아웃 처리 (Valkey 기반)
      */
     @Transactional
     public void logout(String refreshTokenValue) {
-        // Refresh Token 해시 생성
-        String tokenHash = jwtTokenProvider.hashToken(refreshTokenValue);
-
-        // 해당 토큰 조회 (활성 토큰만)
-        RefreshToken refreshToken = refreshTokenRepository
-                .findActiveByRefreshTokenHash(tokenHash)
+        // Refresh Token에서 회원번호 추출
+        Long memberNo = jwtTokenProvider.getMemberIdFromRefreshToken(refreshTokenValue);
+        
+        // 회원 정보 조회 (이메일 가져오기)
+        Member member = memberRepository.findById(memberNo)
                 .orElse(null);
-
-        if (refreshToken != null) {
-            // 해당 토큰 revoked=true 처리
-            refreshToken.revoke();
-            refreshTokenRepository.save(refreshToken);
-            log.info("로그아웃 처리: memberNo={}", refreshToken.getMemberNo());
+        
+        if (member != null) {
+            // Valkey에서 Refresh Token 삭제
+            refreshTokenService.deleteRefreshToken(member.getMemberEmail());
+            log.info("✅ 로그아웃 처리 (Valkey): email={}", member.getMemberEmail());
         }
     }
 
     /**
-     * 토큰 재사용 공격 처리
+     * 회원번호로 이메일 조회 (토큰 재발급 시 사용)
      */
-    private void handleTokenReuse(Long memberNo, String tokenValue) {
-        // 보안 로그: 토큰 재사용 의심
-        log.error("🔒 [보안 경고] 토큰 재사용 의심: memberNo={}, tokenHash={}", 
-                memberNo, jwtTokenProvider.hashToken(tokenValue).substring(0, 16) + "...");
-        // 필요시 추가 보안 조치 (예: 회원 알림, 관리자 알림 등)
+    public String getMemberEmail(Long memberNo) {
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+        return member.getMemberEmail();
     }
 }
