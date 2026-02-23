@@ -95,12 +95,7 @@ public class SecurityConfig {
                     "/api/auth/reset-password",
                     "/api/holidays/**",
                     "/login/oauth2/**",               // Spring Security OAuth2 엔드포인트
-<<<<<<< HEAD
-                    "/oauth2/**"                      // OAuth2 관련 추가 엔드포인트
-=======
-                    "/oauth2/**",                     // OAuth2 관련 추가 엔드포인트
-                    "/api/chat/**"                    // 채팅 API 임시 허용 (테스트용)
->>>>>>> 812016b (fix: dev pull 후 수정)
+                    "/oauth2/**"                  // OAuth2 관련 추가 엔드포인트
                 ).permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/ws-stomp/**").permitAll()
