@@ -105,5 +105,33 @@ public class AttendanceController {
 				.build();
 		return ResponseEntity.ok(response);
 	}
+
+	/**
+	 * 관리자 캘린더 조회 - 에이전시 소속 직원들의 근무 유형별 일정
+	 * GET /api/attendance/admin-calendar/{agencyNo}
+	 * 
+	 * @param agencyNo 에이전시 번호
+	 * @param year 조회 년도 (기본값: 현재 년도)
+	 * @param month 조회 월 (기본값: 현재 월)
+	 * @return 캘린더 이벤트 목록 (재택근무: 주황색, 휴가: 회색, 워케이션: 보라색)
+	 */
+	@GetMapping("/admin-calendar/{agencyNo}")
+	public ResponseEntity<AttendanceStatisticsResponseDto> getAdminCalendar(
+			@PathVariable Long agencyNo,
+			@RequestParam(required = false) Integer year,
+			@RequestParam(required = false) Integer month) {
+		
+		log.info("관리자 캘린더 조회: 에이전시={}, 년월={}-{}", agencyNo, year, month);
+		
+		// year와 month가 없으면 현재 년월 사용
+		int currentYear = year != null ? year : java.time.LocalDate.now().getYear();
+		int currentMonth = month != null ? month : java.time.LocalDate.now().getMonthValue();
+		
+		AttendanceStatisticsResponseDto response = attendanceService.getAdminCalendar(
+			agencyNo, currentYear, currentMonth
+		);
+		
+		return ResponseEntity.ok(response);
+	}
 }
 

@@ -1,6 +1,7 @@
 package com.kh.magamGG.domain.notification.service;
 
 import com.kh.magamGG.domain.notification.entity.Notification;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 
@@ -8,6 +9,21 @@ import java.util.List;
  * 알림 서비스 인터페이스
  */
 public interface NotificationService {
+
+    /**
+     * SSE 구독 (클라이언트 연결)
+     * @param memberNo 회원 번호
+     * @param lastEventId Last-Event-ID 헤더 (유실 알림 재전송용, 선택)
+     * @return SseEmitter
+     */
+    SseEmitter subscribe(Long memberNo, String lastEventId);
+
+    /**
+     * 해당 회원의 SSE Emitter로 알림 Push
+     * @param memberNo 회원 번호
+     * @param notification 전송할 알림
+     */
+    void pushToClient(Long memberNo, Notification notification);
     
     /**
      * 알림 생성

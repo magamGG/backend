@@ -37,3 +37,11 @@ out/
 .vscode/
 # User Uploads
 uploads/
+
+### Environment Variables ###
+.env
+.env.local
+.env.*.local
+*.env
+application-local.yaml
+application-prod.yaml

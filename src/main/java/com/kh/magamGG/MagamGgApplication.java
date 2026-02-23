@@ -2,6 +2,7 @@ package com.kh.magamGG;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+<<<<<<< HEAD
 import org.springframework.ai.autoconfigure.chat.client.ChatClientAutoConfiguration;
 import org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration;
 
@@ -13,6 +14,12 @@ import org.springframework.ai.autoconfigure.openai.OpenAiAutoConfiguration;
 		OpenAiAutoConfiguration.class,
 		ChatClientAutoConfiguration.class
 })
+=======
+import org.springframework.scheduling.annotation.EnableAsync;
+
+@SpringBootApplication
+@EnableAsync
+>>>>>>> 39738473765f00b36bd36a2e90596fa334192bee
 public class MagamGgApplication {
 
 	public static void main(String[] args) {

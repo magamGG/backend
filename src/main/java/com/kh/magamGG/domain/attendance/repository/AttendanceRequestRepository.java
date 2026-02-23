@@ -89,6 +89,22 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
            "AND ar.attendanceRequestStatus = 'APPROVED' " +
            "ORDER BY ar.attendanceRequestCreatedAt DESC")
     List<AttendanceRequest> findApprovedByMemberNo(@Param("memberNo") Long memberNo);
+
+    /**
+     * 근태 통계용: 특정 회원의 승인된 근태 신청 중, 해당 기간과 하루라도 겹치는 건만 조회
+     * (해당 월 1일 00:00 ~ periodEnd 23:59 사이에 start~end가 겹치는 APPROVED 건)
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "WHERE m.memberNo = :memberNo " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "AND ar.attendanceRequestStartDate <= :periodEnd " +
+           "AND ar.attendanceRequestEndDate >= :periodStart " +
+           "ORDER BY ar.attendanceRequestStartDate ASC")
+    List<AttendanceRequest> findApprovedByMemberNoAndDateRange(
+            @Param("memberNo") Long memberNo,
+            @Param("periodStart") java.time.LocalDateTime periodStart,
+            @Param("periodEnd") java.time.LocalDateTime periodEnd);
     
     /**
      * 특정 근태 신청 번호로 조회 (프로젝트 정보 포함, N+1 방지)
@@ -99,6 +115,24 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
            "LEFT JOIN FETCH plr.project " +
            "WHERE ar.attendanceRequestNo = :attendanceRequestNo")
     java.util.Optional<AttendanceRequest> findByIdWithProject(@Param("attendanceRequestNo") Long attendanceRequestNo);
+
+    /**
+     * 관리자 캘린더용 - 에이전시 소속 회원들의 승인된 근태 신청 조회 (특정 기간)
+     * 캘린더 표시를 위해 날짜 범위로 필터링
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
+           "WHERE m.agency.agencyNo = :agencyNo " +
+           "AND ar.attendanceRequestStatus = 'APPROVED' " +
+           "AND ar.attendanceRequestStartDate <= :endDate " +
+           "AND ar.attendanceRequestEndDate >= :startDate " +
+           "ORDER BY ar.attendanceRequestStartDate ASC")
+    List<AttendanceRequest> findApprovedByAgencyNoAndDateRange(
+            @Param("agencyNo") Long agencyNo,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }
 
 

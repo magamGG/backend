@@ -5,6 +5,7 @@ import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
 import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
+import com.kh.magamGG.domain.project.dto.response.AssignableManagerResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
 
@@ -72,4 +73,14 @@ public interface ProjectService {
     void removeProjectMember(Long projectNo, Long projectMemberNo);
 
     List<ProjectMemberResponse> getAddableMembers(Long projectNo);
+
+    /**
+     * 프로젝트에 담당자로 배치 가능한 담당자 목록 (프로젝트 작가들이 ARTIST_ASSIGNMENT로 연결된 담당자만)
+     */
+    List<AssignableManagerResponse> getAssignableManagers(Long projectNo);
+
+    /**
+     * 프로젝트 담당자 배치: 지정한 담당자로 PROJECT_MEMBER 및 KANBAN_CARD 업데이트
+     */
+    void assignManagerToProject(Long projectNo, Long managerNo);
 }

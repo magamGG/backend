@@ -4,6 +4,10 @@ import com.kh.magamGG.domain.agency.entity.Agency;
 import com.kh.magamGG.domain.agency.repository.AgencyRepository;
 import com.kh.magamGG.domain.agency.service.AgencyService;
 import com.kh.magamGG.domain.agency.util.AgencyCodeGenerator;
+import com.kh.magamGG.domain.chat.entity.ChatRoom;
+import com.kh.magamGG.domain.chat.entity.ChatRoomMember;
+import com.kh.magamGG.domain.chat.repository.ChatRoomMemberRepository;
+import com.kh.magamGG.domain.chat.repository.ChatRoomRepository;
 import com.kh.magamGG.domain.member.dto.EmployeeStatisticsResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberMyPageResponseDto;
 import com.kh.magamGG.domain.member.dto.MemberUpdateRequestDto;
@@ -23,9 +27,12 @@ import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.health.entity.HealthSurvey;
 import com.kh.magamGG.domain.health.repository.DailyHealthCheckRepository;
 import com.kh.magamGG.domain.health.repository.HealthSurveyRepository;
+import com.kh.magamGG.domain.project.entity.KanbanCard;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
+import com.kh.magamGG.domain.project.repository.KanbanCardRepository;
 import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.notification.service.NotificationService;
+import com.kh.magamGG.domain.auth.service.EmailVerificationService;
 import com.kh.magamGG.global.exception.AgencyNotFoundException;
 import com.kh.magamGG.global.exception.DuplicateAgencyCodeException;
 import com.kh.magamGG.global.exception.DuplicateEmailException;
@@ -61,12 +68,16 @@ public class MemberServiceImpl implements MemberService {
     private final PasswordEncoder passwordEncoder;
     private final AgencyCodeGenerator agencyCodeGenerator;
     private final ProjectMemberRepository projectMemberRepository;
+    private final KanbanCardRepository kanbanCardRepository;
     private final DailyHealthCheckRepository dailyHealthCheckRepository;
     private final ManagerRepository managerRepository;
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final NotificationService notificationService;
     private final AttendanceRepository attendanceRepository;
     private final HealthSurveyRepository healthSurveyRepository;
+    private final EmailVerificationService emailVerificationService;
+    private final ChatRoomRepository chatRoomRepository;
+    private final ChatRoomMemberRepository chatRoomMemberRepository;
 
     @Value("${file.upload-dir:uploads}")
     private String uploadDir;
@@ -74,9 +85,21 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional
     public MemberResponse register(MemberRequest request) {
+        // 이메일 인증 완료 여부 확인 - 테스트를 위해 주석처리
+        /*
+        if (!emailVerificationService.isEmailVerified(request.getMemberEmail())) {
+            throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
+        }
+        */
+        
         // 이메일 중복 체크
         if (memberRepository.existsByMemberEmail(request.getMemberEmail())) {
             throw new DuplicateEmailException("이미 사용 중인 이메일입니다.");
+        }
+
+        // 이름에 초성이 포함되어 있는지 검증
+        if (hasHangulJamo(request.getMemberName())) {
+            throw new IllegalArgumentException("이름을 완성해주세요. 초성을 포함할 수 없습니다.");
         }
 
         // 에이전시 처리
@@ -111,8 +134,22 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
+        // 비밀번호 처리: OAuth 모드일 경우 랜덤 비밀번호 생성, 일반 모드일 경우 사용자 입력 비밀번호 사용
+        String passwordToEncode;
+        if (request.getOauthProvider() != null && !request.getOauthProvider().isEmpty()) {
+            // OAuth 모드: 랜덤 비밀번호 생성
+            passwordToEncode = "OAUTH_" + request.getOauthProvider().toUpperCase() + "_" + UUID.randomUUID().toString();
+            log.info("OAuth 회원가입: provider={}, email={}", request.getOauthProvider(), request.getMemberEmail());
+        } else {
+            // 일반 모드: 사용자 입력 비밀번호 사용
+            if (request.getMemberPassword() == null || request.getMemberPassword().trim().isEmpty()) {
+                throw new IllegalArgumentException("비밀번호는 필수입니다.");
+            }
+            passwordToEncode = request.getMemberPassword();
+        }
+        
         // 비밀번호 암호화
-        String encodedPassword = passwordEncoder.encode(request.getMemberPassword());
+        String encodedPassword = passwordEncoder.encode(passwordToEncode);
 
         // Member 엔티티 생성
         Member member = new Member();
@@ -120,6 +157,7 @@ public class MemberServiceImpl implements MemberService {
         member.setMemberEmail(request.getMemberEmail());
         member.setMemberPassword(encodedPassword);
         member.setMemberPhone(request.getMemberPhone());
+        member.setMemberAddress(request.getMemberAddress() != null ? request.getMemberAddress().trim() : null);
         member.setMemberRole(request.getMemberRole());
         member.setMemberStatus("ACTIVE");
         member.setAgency(agency);
@@ -147,7 +185,38 @@ public class MemberServiceImpl implements MemberService {
                 // MANAGER 등록 실패해도 회원가입은 성공 처리 (나중에 수동으로 등록 가능)
             }
         }
+        
+        // 1. 에이전시 관리자인 경우 전체 채팅방 생성
+        if ("에이전시 관리자".equals(savedMember.getMemberRole()) && savedMember.getAgency() != null) {
 
+                // 채팅방(CHAT_ROOM) 생성
+                ChatRoom fullChatRoom = ChatRoom.builder()
+                        .chatRoomName(savedMember.getAgency().getAgencyName() + " 전체 채팅방")
+                        .chatRoomType("ALL") // 전체 채팅은 그룹형태
+                        .chatRoomCreatedAt(LocalDateTime.now())
+                        .chatRoomStatus("Y")
+                        .agencyNo(savedMember.getAgency().getAgencyNo())
+                        .build();
+
+                chatRoomRepository.save(fullChatRoom);
+
+                // 참여자(CHAT_ROOM_MEMBER)에 관리자 추가
+                ChatRoomMember membership = ChatRoomMember.builder()
+                        .chatRoom(fullChatRoom)
+                        .member(savedMember)
+                        .chatRoomMemberJoinedAt(LocalDateTime.now())
+                        .build();
+
+                chatRoomMemberRepository.save(membership);
+
+                log.info("에이전시 전체 채팅방 생성 완료: agency={}, roomNo={}",
+                        savedMember.getAgency().getAgencyName(), fullChatRoom.getChatRoomNo());
+
+        }
+
+        // 회원가입 완료 후 인증 상태 제거
+        emailVerificationService.removeVerifiedEmail(request.getMemberEmail());
+        
         return MemberResponse.builder()
             .memberNo(savedMember.getMemberNo())
             .memberName(savedMember.getMemberName())
@@ -191,6 +260,11 @@ public class MemberServiceImpl implements MemberService {
     public void updateProfile(Long memberNo, MemberUpdateRequestDto requestDto) {
         Member member = memberRepository.findById(memberNo)
             .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다."));
+
+        // 이름에 초성이 포함되어 있는지 검증
+        if (requestDto.getMemberName() != null && hasHangulJamo(requestDto.getMemberName())) {
+            throw new IllegalArgumentException("이름을 완성해주세요. 초성을 포함할 수 없습니다.");
+        }
 
         // 이메일은 변경하지 않음 (로그인 ID이므로)
         member.updateProfile(
@@ -316,7 +390,33 @@ public class MemberServiceImpl implements MemberService {
             throw new IllegalArgumentException("이미 탈퇴 처리된 회원입니다.");
         }
 
-        // 실제 삭제 대신 상태를 BLOCKED로 변경
+        // 1. PROJECT_MEMBER 정리: 칸반 카드 재배치 후 제거
+        List<ProjectMember> myProjectMembers = projectMemberRepository.findByMember_MemberNo(memberNo);
+        for (ProjectMember pm : myProjectMembers) {
+            List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_ProjectMemberNo(pm.getProjectMemberNo());
+            List<ProjectMember> othersInProject = projectMemberRepository.findByProject_ProjectNo(pm.getProject().getProjectNo())
+                    .stream()
+                    .filter(p -> !p.getProjectMemberNo().equals(pm.getProjectMemberNo()))
+                    .toList();
+            if (!othersInProject.isEmpty()) {
+                ProjectMember fallback = othersInProject.get(0);
+                for (KanbanCard card : cards) {
+                    card.setProjectMember(fallback);
+                }
+                projectMemberRepository.delete(pm);
+            } else {
+                log.warn("프로젝트 {}에 탈퇴 회원 {} 외 다른 멤버 없음. PROJECT_MEMBER 유지", pm.getProject().getProjectNo(), memberNo);
+            }
+        }
+
+        // 2. ARTIST_ASSIGNMENT 정리 (작가/담당자 배정 해제)
+        artistAssignmentRepository.deleteByArtist_MemberNo(memberNo);
+        artistAssignmentRepository.deleteByManager_Member_MemberNo(memberNo);
+
+        // 3. agency_no 외래키 끊기 (탈퇴 회원을 에이전시 목록에서 제외)
+        member.setAgency(null);
+
+        // 4. 상태를 BLOCKED로 변경
         member.updateStatus("BLOCKED");
         memberRepository.save(member);
     }
@@ -364,15 +464,19 @@ public class MemberServiceImpl implements MemberService {
             }
         }
 
-        // 해당 회원의 가장 최근 데일리 체크 1건만 조회
+        // 해당 회원의 오늘 날짜 데일리 체크만 조회 (오늘 체크한 것만)
         MemberDetailResponse.HealthCheckInfo healthCheck = null;
-        Optional<DailyHealthCheck> latestOpt = dailyHealthCheckRepository.findFirstByMember_MemberNoOrderByHealthCheckCreatedAtDesc(memberNo);
-        if (latestOpt.isPresent()) {
-            DailyHealthCheck latest = latestOpt.get();
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDateTime dayStart = today.atStartOfDay();
+        java.time.LocalDateTime dayEnd = today.atTime(23, 59, 59, 999_999_999);
+        Optional<DailyHealthCheck> todayOpt = dailyHealthCheckRepository
+                .findFirstByMember_MemberNoAndHealthCheckCreatedAtBetweenOrderByHealthCheckCreatedAtDesc(memberNo, dayStart, dayEnd);
+        if (todayOpt.isPresent()) {
+            DailyHealthCheck latest = todayOpt.get();
             healthCheck = MemberDetailResponse.HealthCheckInfo.builder()
                 .date(latest.getHealthCheckCreatedAt() != null
                     ? latest.getHealthCheckCreatedAt().toLocalDate().toString()
-                    : java.time.LocalDate.now().toString())
+                    : today.toString())
                 .condition(latest.getHealthCondition() != null ? latest.getHealthCondition() : "보통")
                 .sleepHours(latest.getSleepHours() != null ? latest.getSleepHours() : 0)
                 .discomfortLevel(latest.getDiscomfortLevel() != null ? latest.getDiscomfortLevel() : 0)
@@ -448,6 +552,7 @@ public class MemberServiceImpl implements MemberService {
         if (todayWorkStatus != null) {
             builder.todayWorkStatus(todayWorkStatus);
         }
+        
         return builder.build();
     }
 
@@ -526,8 +631,28 @@ public class MemberServiceImpl implements MemberService {
             savedAssignment.getArtist().getMemberNo(),
             savedAssignment.getManager().getManagerNo());
 
-        // 알림 생성 (LAZY 로딩을 위해 트랜잭션 내에서 접근)
+        // 담당자가 없지만 연재/휴재 상태인 작가의 프로젝트에 새 담당자를 PROJECT_MEMBER로 자동 추가
+        List<ProjectMember> artistProjectMembers = projectMemberRepository.findByMember_MemberNo(artistNo);
         Member managerMember = manager.getMember();
+        for (ProjectMember artistPm : artistProjectMembers) {
+            var proj = artistPm.getProject();
+            String status = proj.getProjectStatus();
+            if (!"연재".equals(status) && !"휴재".equals(status)) {
+                continue;
+            }
+            Optional<ProjectMember> existingManager = projectMemberRepository.findFirstByProject_ProjectNoAndProjectMemberRole(proj.getProjectNo(), "담당자");
+            if (existingManager.isEmpty()) {
+                ProjectMember newManagerPm = ProjectMember.builder()
+                    .member(managerMember)
+                    .project(proj)
+                    .projectMemberRole("담당자")
+                    .build();
+                projectMemberRepository.save(newManagerPm);
+                log.info("작가 프로젝트(연재/휴재)에 담당자 자동 배치: projectNo={}, projectName={}", proj.getProjectNo(), proj.getProjectName());
+            }
+        }
+
+        // 알림 생성 (LAZY 로딩을 위해 트랜잭션 내에서 접근)
         String notificationType = "ASSIGNMENT";
 
         createNotificationSafely(
@@ -568,6 +693,26 @@ public class MemberServiceImpl implements MemberService {
             assignmentToDelete.getArtistAssignmentNo(),
             artist.getMemberNo(),
             manager.getManagerNo());
+
+        // 담당자가 없어진 작가의 프로젝트에서 PROJECT_MEMBER의 담당자만 제거 (칸반 카드는 작가에게 재배치)
+        List<ProjectMember> artistProjectMembers = projectMemberRepository.findByMember_MemberNo(artist.getMemberNo());
+        for (ProjectMember artistPm : artistProjectMembers) {
+            Long projectNo = artistPm.getProject().getProjectNo();
+            List<ProjectMember> allInProject = projectMemberRepository.findByProject_ProjectNo(projectNo);
+            Optional<ProjectMember> managerPmOpt = allInProject.stream()
+                .filter(pm -> "담당자".equals(pm.getProjectMemberRole())
+                    && pm.getMember().getMemberNo().equals(managerMember.getMemberNo()))
+                .findFirst();
+            if (managerPmOpt.isPresent()) {
+                ProjectMember managerPm = managerPmOpt.get();
+                List<KanbanCard> cards = kanbanCardRepository.findByProjectMember_ProjectMemberNo(managerPm.getProjectMemberNo());
+                for (KanbanCard card : cards) {
+                    card.setProjectMember(artistPm);
+                }
+                projectMemberRepository.delete(managerPm);
+                log.info("프로젝트 {} 에서 담당자 PROJECT_MEMBER 제거 완료: projectMemberNo={}", projectNo, managerPm.getProjectMemberNo());
+            }
+        }
 
         // 배정 해제 전에 알림 생성
         String notificationType = "ASSIGNMENT";
@@ -758,5 +903,18 @@ public class MemberServiceImpl implements MemberService {
         } catch (IOException e) {
             log.error("파일 삭제 실패: {}", e.getMessage());
         }
+    }
+
+    /**
+     * 한글 자모(초성, 중성)가 포함되어 있는지 검증
+     * @param text 검증할 텍스트
+     * @return 한글 자모가 포함되어 있으면 true
+     */
+    private boolean hasHangulJamo(String text) {
+        if (text == null || text.isEmpty()) {
+            return false;
+        }
+        // 한글 자모가 있는지 확인 (ㄱ~ㅎ, ㅏ~ㅣ)
+        return text.matches(".*[ㄱ-ㅎㅏ-ㅣ].*");
     }
 }
