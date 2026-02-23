@@ -141,3 +141,17 @@ kakao:
     authorization-url: https://kauth.kakao.com/oauth/authorize
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
+
+# 공공데이터 API 설정
+public-data:
+  holiday:
+    api-key: ${PUBLIC_DATA_HOLIDAY_API_KEY:pFg7%2B9ZuBDORVUL2Qy9DA9FffkmHzyemVbSPIN0trHBQjjgZp%2FfruTLqscT7swt3tdGf1Wi0tjZ6Lehba3YeHg%3D%3D}
+    base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
+    data-dir: holidays  # uploads/holidays 디렉토리에 저장
+
+# Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+notion:
+  client-id: ${NOTION_CLIENT_ID:your-notion-client-id}
+  client-secret: ${NOTION_CLIENT_SECRET:your-notion-client-secret}
+  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
+  api-version: "2022-06-28"
