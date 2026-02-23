@@ -17,8 +17,9 @@ public interface ChatRoomService {
 
     /**
      * 마지막으로 읽은 메시지 업데이트
+     * @return 실제로 DB가 갱신되면 true, 같은 값으로 건너뛴 경우 false
      */
-    void updateLastReadMessage(Long chatRoomNo, Long memberNo, Long lastChatNo);
+    boolean updateLastReadMessage(Long chatRoomNo, Long memberNo, Long lastChatNo);
 
     /**
      * 특정 채팅방의 읽지 않은 메시지 개수 조회
@@ -51,4 +52,10 @@ public interface ChatRoomService {
      * 사용자의 마지막 읽은 메시지 번호 조회
      */
     Long getLastReadChatNo(Long chatRoomNo, Long memberNo);
+
+    /**
+     * 특정 메시지를 아직 읽지 않은 참여 중인 멤버 수 (카카오톡 스타일)
+     * @param senderMemberNo 발신자 제외 시 해당 멤버 번호, 제외하지 않으면 null
+     */
+    long getUnreadMemberCount(Long chatRoomNo, Long chatNo, Long senderMemberNo);
 }

@@ -116,8 +116,32 @@ public class ChatController {
             @PathVariable Long chatRoomNo,
             @RequestParam Long lastChatNo,
             @RequestHeader("X-Member-No") Long memberNo) {
-        chatRoomService.updateLastReadMessage(chatRoomNo, memberNo, lastChatNo);
+        boolean updated = chatRoomService.updateLastReadMessage(chatRoomNo, memberNo, lastChatNo);
+        // 읽음 실시간 반영: 실제로 DB가 갱신된 경우에만 해당 방 구독자에게 브로드캐스트
+        if (updated) {
+            Map<String, Object> readUpdate = new HashMap<>();
+            readUpdate.put("type", "READ_UPDATE");
+            readUpdate.put("memberNo", memberNo);
+            readUpdate.put("lastChatNo", lastChatNo);
+            messagingTemplate.convertAndSend("/topic/room/" + chatRoomNo, readUpdate);
+            System.out.println("[READ_UPDATE] 브로드캐스트 room=" + chatRoomNo + " memberNo=" + memberNo + " lastChatNo=" + lastChatNo);
+        }
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     * 6-1. 특정 메시지를 읽지 않은 참여 중인 멤버 수 (카카오톡 스타일)
+     * senderMemberNo: 발신자 제외 시 전달 (제외하지 않으면 생략)
+     */
+    @GetMapping("/api/chat/rooms/{chatRoomNo}/messages/{chatNo}/read-status")
+    public ResponseEntity<Map<String, Object>> getMessageReadStatus(
+            @PathVariable Long chatRoomNo,
+            @PathVariable Long chatNo,
+            @RequestParam(required = false) Long senderMemberNo) {
+        long unreadMemberCount = chatRoomService.getUnreadMemberCount(chatRoomNo, chatNo, senderMemberNo);
+        Map<String, Object> body = new HashMap<>();
+        body.put("unreadMemberCount", unreadMemberCount);
+        return ResponseEntity.ok(body);
     }
 
     /**

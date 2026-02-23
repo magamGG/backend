@@ -36,6 +36,7 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatRoomMemberRepository chatRoomMemberRepository;
     private final MemberRepository memberRepository;
+    private final ChatRoomService chatRoomService;
     
     @Value("${file.upload-dir:uploads}")
     private String uploadPath;
@@ -63,7 +64,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         ChatMessage saved = chatMessageRepository.save(message);
 
-        return ChatMessageResponseDto.from(saved);
+        long unreadCount = chatRoomService.getUnreadMemberCount(
+                room.getChatRoomNo(), saved.getChatNo(), member.getMemberNo());
+        return ChatMessageResponseDto.from(saved, unreadCount);
     }
 
     /**
@@ -89,8 +92,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .findAllByChatRoomAndChatStatusAndChatMessageCreatedAtGreaterThanEqualOrderByChatMessageCreatedAtDesc(
                         room, "Y", roomMember.getChatRoomMemberJoinedAt(), pageable);
 
-        // 엔티티 Slice를 DTO Slice로 변환하여 반환
-        return messages.map(ChatMessageResponseDto::from);
+        // 엔티티 Slice를 DTO Slice로 변환 (참여 중인 멤버 기준 읽지 않은 사람 수 포함)
+        return messages.map(msg -> ChatMessageResponseDto.from(msg,
+                chatRoomService.getUnreadMemberCount(chatRoomNo, msg.getChatNo(), msg.getMember().getMemberNo())));
     }
 
 
@@ -261,8 +265,9 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         try {
             ChatMessage savedMessage = chatMessageRepository.save(message);
-            // ResponseDto로 변환하여 반환
-            return ChatMessageResponseDto.from(savedMessage);
+            long unreadCount = chatRoomService.getUnreadMemberCount(
+                    room.getChatRoomNo(), savedMessage.getChatNo(), member.getMemberNo());
+            return ChatMessageResponseDto.from(savedMessage, unreadCount);
         } catch (Exception e) {
             // 메시지 저장 실패 시 업로드된 파일 삭제
             try {

@@ -4,6 +4,8 @@ import com.kh.magamGG.domain.chat.entity.ChatRoom;
 import com.kh.magamGG.domain.chat.entity.ChatRoomMember;
 import com.kh.magamGG.domain.member.entity.Member;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -29,4 +31,17 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
 
     // 5. 특정 채팅방에서 유저 탈퇴/강퇴 처리
     void deleteByChatRoomAndMember(ChatRoom chatRoom, Member member);
+
+    /**
+     * 특정 메시지를 아직 읽지 않은 참여 중인 멤버 수 (참여 중 = joined_at IS NOT NULL)
+     * 발신자 제외 시 senderMemberNo 전달, 제외하지 않으면 null
+     */
+    @Query("SELECT COUNT(crm) FROM ChatRoomMember crm WHERE crm.chatRoom.chatRoomNo = :chatRoomNo " +
+           "AND (crm.chatRoomMemberJoinedAt IS NOT NULL) " +
+           "AND (crm.lastReadChatNo IS NULL OR crm.lastReadChatNo < :chatNo) " +
+           "AND (:senderMemberNo IS NULL OR crm.member.memberNo != :senderMemberNo)")
+    long countUnreadMembersInRoomByChatNo(
+            @Param("chatRoomNo") Long chatRoomNo,
+            @Param("chatNo") Long chatNo,
+            @Param("senderMemberNo") Long senderMemberNo);
 }

@@ -180,7 +180,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
      */
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void updateLastReadMessage(Long chatRoomNo, Long memberNo, Long lastChatNo) {
+    public boolean updateLastReadMessage(Long chatRoomNo, Long memberNo, Long lastChatNo) {
         System.out.println("🔵 [DEBUG] updateLastReadMessage 시작: chatRoomNo=" + chatRoomNo + 
                           ", memberNo=" + memberNo + ", lastChatNo=" + lastChatNo);
         
@@ -207,7 +207,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             long currentUnreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
                     chatRoom, currentLastReadChatNo, roomMember.getChatRoomMemberJoinedAt());
             System.out.println("🔍 [DEBUG] 현재 unread count (입장 시간 이후): " + currentUnreadCount);
-            return;
+            return false;
         }
         
         // 마지막 읽은 메시지 번호 업데이트
@@ -240,6 +240,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         
         System.out.println("✅ [DEBUG] 마지막 읽은 메시지 업데이트 완료: chatRoomNo=" + chatRoomNo + 
                           ", memberNo=" + memberNo + ", 새로운 lastChatNo=" + lastChatNo);
+        return true;
     }
 
     /**
@@ -446,6 +447,12 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             // 채팅방 멤버가 아니면 null 반환
             return null;
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getUnreadMemberCount(Long chatRoomNo, Long chatNo, Long senderMemberNo) {
+        return chatRoomMemberRepository.countUnreadMembersInRoomByChatNo(chatRoomNo, chatNo, senderMemberNo);
     }
 
     // --- Private Helper Methods ---
