@@ -46,3 +46,7 @@ server:
 
 file:
   upload-dir: uploads
+
+# OpenAI (선택) - 포트폴리오 추출용. 키가 없어도 앱은 기동됨.
+# 키 설정 시 application-local.yaml에 추가:
+#   spring.ai.openai.api-key: your-openai-api-key

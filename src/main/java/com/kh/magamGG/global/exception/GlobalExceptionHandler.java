@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import java.util.Map;
+
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
@@ -179,6 +181,35 @@ public class GlobalExceptionHandler {
                 request.getDescription(false).replace("uri=", "")
         );
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+    }
+
+    /** 포트폴리오 추출 실패 → 200 + success: false (프론트에서 500 없이 안내 메시지 표시) */
+    @ExceptionHandler(PortfolioExtractException.class)
+    public ResponseEntity<Map<String, Object>> handlePortfolioExtractException(
+            PortfolioExtractException ex) {
+        log.warn("포트폴리오 추출 실패: {}", ex.getMessage());
+        return ResponseEntity.ok(Map.of(
+                "success", false,
+                "message", ex.getMessage() != null ? ex.getMessage() : "포트폴리오 정보를 추출하지 못했습니다.",
+                "data", (Object) null
+        ));
+    }
+
+    /** 포트폴리오 추출 실패 등 비즈니스 RuntimeException → 클라이언트에 메시지 전달 */
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ErrorResponse> handleRuntimeException(
+            RuntimeException ex, WebRequest request) {
+        log.error("RuntimeException: {}", ex.getMessage());
+        String message = ex.getMessage() != null && !ex.getMessage().isBlank()
+                ? ex.getMessage()
+                : "서버 오류가 발생했습니다.";
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "INTERNAL_SERVER_ERROR",
+                message,
+                request.getDescription(false).replace("uri=", "")
+        );
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 
     @ExceptionHandler(Exception.class)

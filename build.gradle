@@ -22,6 +22,17 @@ configurations {
 
 repositories {
 	mavenCentral()
+	maven { url 'https://repo.spring.io/milestone' }
+}
+
+ext {
+	set('springAiVersion', "1.0.0-M5")
+}
+
+dependencyManagement {
+	imports {
+		mavenBom 'org.springframework.ai:spring-ai-bom:1.1.2'
+	}
 }
 
 dependencies {
@@ -35,10 +46,31 @@ dependencies {
 	developmentOnly 'org.springframework.boot:spring-boot-devtools'
 	annotationProcessor 'org.projectlombok:lombok'
     runtimeOnly 'com.mysql:mysql-connector-j'
+	// Spring AI (포트폴리오 이미지/URL → Vision·LLM 구조화)
+	implementation 'org.springframework.ai:spring-ai-openai-spring-boot-starter'
+	// 포트폴리오 웹 페이지 URL → HTML 본문 텍스트 추출
+	implementation 'org.jsoup:jsoup:1.18.1'
+	// 포트폴리오 웹 페이지 URL → 전체 스크린샷 → Vision (SPA/Notion 대응)
+	implementation 'com.microsoft.playwright:playwright:1.49.0'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+	}
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// Playwright 브라우저 설치 (포트폴리오 스크린샷용). 실행: ./gradlew playwrightInstall
+tasks.register('playwrightInstall', JavaExec) {
+	group = 'playwright'
+	description = 'Install Playwright Chromium browser for from-page-screenshot'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.microsoft.playwright.CLI'
+	args = ['install', 'chromium']
 }
