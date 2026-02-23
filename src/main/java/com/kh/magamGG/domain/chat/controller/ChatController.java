@@ -49,9 +49,28 @@ public class ChatController {
     public ResponseEntity<List<ChatRoomResponseDto>> getChatRoomsByAgency(
             @PathVariable Long agencyNo,
             @RequestParam(defaultValue = "all") String type,
-            @RequestHeader("X-Member-No") Long memberNo) {
-        List<ChatRoomResponseDto> rooms = chatRoomService.getChatRoomsByAgency(agencyNo, type, memberNo);
-        return ResponseEntity.ok(rooms);
+            @RequestHeader(value = "X-Member-No", required = false) Long memberNo) {
+        
+        System.out.println("=== 채팅방 목록 조회 API 호출 ===");
+        System.out.println("agencyNo: " + agencyNo);
+        System.out.println("type: " + type);
+        System.out.println("memberNo: " + memberNo);
+        
+        // 테스트용: memberNo가 null이면 기본값 1 사용
+        if (memberNo == null) {
+            memberNo = 1L;
+            System.out.println("memberNo가 null이어서 기본값 1로 설정");
+        }
+        
+        try {
+            List<ChatRoomResponseDto> rooms = chatRoomService.getChatRoomsByAgency(agencyNo, type, memberNo);
+            System.out.println("조회된 채팅방 개수: " + (rooms != null ? rooms.size() : 0));
+            return ResponseEntity.ok(rooms);
+        } catch (Exception e) {
+            System.out.println("채팅방 조회 중 에러 발생: " + e.getMessage());
+            e.printStackTrace();
+            throw e;
+        }
     }
 
     /**

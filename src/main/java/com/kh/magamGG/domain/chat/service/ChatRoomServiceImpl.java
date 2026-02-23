@@ -98,29 +98,54 @@ public class ChatRoomServiceImpl implements ChatRoomService {
     @Override
     @Transactional
     public List<ChatRoomResponseDto> getChatRoomsByAgency(Long agencyNo, String type, Long memberNo) {
+        System.out.println("=== ChatRoomService.getChatRoomsByAgency 호출 ===");
+        System.out.println("agencyNo: " + agencyNo + ", type: " + type + ", memberNo: " + memberNo);
+        
         if ("all".equals(type)) {
-            Member member = memberRepository.findById(memberNo)
-                    .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
-            
-            // 1. 에이전시 전체 채팅방 조회 (ALL 타입)
-            List<ChatRoom> allRooms = new ArrayList<>();
-            chatRoomRepository.findByAgencyNoAndChatRoomTypeAndChatRoomStatus(agencyNo, "ALL", "Y")
-                    .ifPresent(allRooms::add);
-            
-            // 2. 내가 참여한 프로젝트의 채팅방들 조회 (PROJECT 타입)
-            List<ChatRoom> projectRooms = chatRoomRepository.findProjectChatRoomsByMember(agencyNo, memberNo);
-            
-            // 3. 두 리스트를 합치고 생성일 역순으로 정렬
-            List<ChatRoom> combinedRooms = new ArrayList<>();
-            combinedRooms.addAll(allRooms);
-            combinedRooms.addAll(projectRooms);
-            
-            combinedRooms.sort((a, b) -> b.getChatRoomCreatedAt().compareTo(a.getChatRoomCreatedAt()));
-            
-            return combinedRooms.stream()
-                    .map(room -> convertToDtoWithUnreadCount(room, memberNo))
-                    .collect(Collectors.toList());
+            try {
+                System.out.println("회원 조회 시작: memberNo = " + memberNo);
+                Member member = memberRepository.findById(memberNo)
+                        .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
+                System.out.println("회원 조회 성공: " + member.getMemberName());
+                
+                // 1. 에이전시 전체 채팅방 조회 (ALL 타입)
+                System.out.println("에이전시 전체 채팅방 조회 시작");
+                List<ChatRoom> allRooms = new ArrayList<>();
+                chatRoomRepository.findByAgencyNoAndChatRoomTypeAndChatRoomStatus(agencyNo, "ALL", "Y")
+                        .ifPresent(room -> {
+                            System.out.println("전체 채팅방 발견: " + room.getChatRoomName());
+                            allRooms.add(room);
+                        });
+                System.out.println("전체 채팅방 개수: " + allRooms.size());
+                
+                // 2. 내가 참여한 프로젝트의 채팅방들 조회 (PROJECT 타입)
+                System.out.println("프로젝트 채팅방 조회 시작");
+                List<ChatRoom> projectRooms = chatRoomRepository.findProjectChatRoomsByMember(agencyNo, memberNo);
+                System.out.println("프로젝트 채팅방 개수: " + projectRooms.size());
+                
+                // 3. 두 리스트를 합치고 생성일 역순으로 정렬
+                List<ChatRoom> combinedRooms = new ArrayList<>();
+                combinedRooms.addAll(allRooms);
+                combinedRooms.addAll(projectRooms);
+                
+                combinedRooms.sort((a, b) -> b.getChatRoomCreatedAt().compareTo(a.getChatRoomCreatedAt()));
+                
+                System.out.println("최종 채팅방 개수: " + combinedRooms.size());
+                
+                List<ChatRoomResponseDto> result = combinedRooms.stream()
+                        .map(room -> convertToDtoWithUnreadCount(room, memberNo))
+                        .collect(Collectors.toList());
+                
+                System.out.println("DTO 변환 완료, 반환할 채팅방 개수: " + result.size());
+                return result;
+                
+            } catch (Exception e) {
+                System.out.println("getChatRoomsByAgency 에러: " + e.getMessage());
+                e.printStackTrace();
+                throw e;
+            }
         } else {
+            System.out.println("type이 'all'이 아님: " + type);
             // 기본적으로는 빈 리스트 반환 (추후 다른 타입 추가 가능)
             return List.of();
         }
