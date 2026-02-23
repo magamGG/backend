@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -75,15 +76,16 @@ public class ChatController {
     }
 
     /**
-     * 5. 특정 방의 과거 대화 내역 조회 (HTTP GET, 페이징)
+     * 5. 특정 방의 과거 대화 내역 조회 (HTTP GET, 페이징) - 멤버 입장 시간 이후만
      * 예: /api/chat/rooms/1/messages?page=0&size=20
      */
     @GetMapping("/api/chat/rooms/{chatRoomNo}/messages")
     public ResponseEntity<Slice<ChatMessageResponseDto>> getChatHistory(
             @PathVariable Long chatRoomNo,
+            @RequestHeader("X-Member-No") Long memberNo,
             @PageableDefault(size = 20) Pageable pageable) {
 
-        Slice<ChatMessageResponseDto> history = chatMessageService.getChatHistory(chatRoomNo, pageable);
+        Slice<ChatMessageResponseDto> history = chatMessageService.getChatHistory(chatRoomNo, memberNo, pageable);
         return ResponseEntity.ok(history);
     }
 
@@ -131,12 +133,75 @@ public class ChatController {
     }
 
     /**
-     * 10. 간단한 채팅방 멤버 조회 (HTTP GET) - 프로필 정보 로그용
+     * 11. 사용자의 마지막 읽은 메시지 번호 조회 (HTTP GET)
      */
-    @GetMapping("/api/chat/rooms/{chatRoomNo}/members/simple")
-    public ResponseEntity<Void> getSimpleChatRoomMembers(
-            @PathVariable Long chatRoomNo) {
-        chatRoomService.logChatRoomMembers(chatRoomNo);
-        return ResponseEntity.ok().build();
+    @GetMapping("/api/chat/rooms/{chatRoomNo}/last-read")
+    public ResponseEntity<Map<String, Object>> getLastReadMessage(
+            @PathVariable Long chatRoomNo,
+            @RequestHeader("X-Member-No") Long memberNo) {
+        Long lastReadChatNo = chatRoomService.getLastReadChatNo(chatRoomNo, memberNo);
+        Map<String, Object> response = new HashMap<>();
+        response.put("lastReadChatNo", lastReadChatNo);
+        return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 12. 채팅 파일 업로드 (HTTP POST)
+     */
+    @PostMapping("/api/chat/rooms/{chatRoomNo}/upload")
+    public ResponseEntity<Map<String, Object>> uploadChatFile(
+            @PathVariable Long chatRoomNo,
+            @RequestParam("file") MultipartFile file,
+            @RequestHeader("X-Member-No") Long memberNo) {
+
+        try {
+            // 파일 크기 제한 (10MB)
+            if (file.getSize() > 10 * 1024 * 1024) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("error", "파일 크기는 10MB 이하만 업로드 가능합니다.");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            // 파일 업로드 처리 및 메시지 저장
+            ChatMessageResponseDto savedMessage = chatMessageService.uploadFileAndSaveMessage(file, chatRoomNo, memberNo);
+
+            // WebSocket을 통해 실시간으로 메시지 전송
+            messagingTemplate.convertAndSend("/topic/room/" + chatRoomNo, savedMessage);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("fileUrl", savedMessage.getAttachmentUrl());
+            response.put("fileName", file.getOriginalFilename());
+            response.put("fileSize", file.getSize());
+            response.put("message", savedMessage);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", "파일 업로드에 실패했습니다: " + e.getMessage());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    /**
+     * 13. 채팅 파일 다운로드 (HTTP GET)
+     */
+    @GetMapping("/api/chat/rooms/{chatRoomNo}/files/download/{fileName}")
+    public ResponseEntity<org.springframework.core.io.Resource> downloadChatFile(
+            @PathVariable Long chatRoomNo,
+            @PathVariable String fileName,
+            @RequestHeader(value = "X-Member-No", required = false) Long memberNo) {
+
+        System.out.println("=== 채팅 파일 다운로드 API 호출 ===");
+        System.out.println("chatRoomNo: " + chatRoomNo);
+        System.out.println("fileName: " + fileName);
+        System.out.println("memberNo: " + memberNo);
+
+        try {
+            return chatMessageService.downloadChatFile(fileName);
+        } catch (Exception e) {
+            System.out.println("다운로드 에러: " + e.getMessage());
+            return ResponseEntity.notFound().build();
+        }
     }
 }

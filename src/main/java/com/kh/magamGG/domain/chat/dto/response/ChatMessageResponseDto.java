@@ -16,6 +16,7 @@ public class ChatMessageResponseDto {
     private String senderProfile; // 화면에 띄울 프로필 이미지 경로 (선택)
     private String chatMessage;
     private String chatMessageType;
+    private String attachmentUrl; // 첨부파일 URL
     private String createdAt;     // 리액트에서 쓰기 좋게 포맷팅된 시간
 
     // 엔티티를 DTO로 변환하는 정적 팩토리 메서드
@@ -30,6 +31,7 @@ public class ChatMessageResponseDto {
                 .senderProfile(profileImage)
                 .chatMessage(entity.getChatMessage())
                 .chatMessageType(entity.getChatMessageType())
+                .attachmentUrl(entity.getAttachmentUrl())
                 .createdAt(entity.getChatMessageCreatedAt().format(DateTimeFormatter.ofPattern("a h:mm"))) // "오후 2:30" 형식
                 .build();
     }

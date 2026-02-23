@@ -47,4 +47,8 @@ public interface ChatRoomService {
      */
     void logChatRoomMembers(Long chatRoomNo);
 
+    /**
+     * 사용자의 마지막 읽은 메시지 번호 조회
+     */
+    Long getLastReadChatNo(Long chatRoomNo, Long memberNo);
 }

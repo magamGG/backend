@@ -67,8 +67,8 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         return myRoomMappings.stream()
                 .map(mapping -> {
                     ChatRoom room = mapping.getChatRoom();
-                    // 여기서 ChatRoomResponseDto.from(room, lastMessage, unreadCount) 등으로 변환
-                    return convertToDto(room, mapping.getLastReadChatNo());
+                    // ChatRoomMember 객체를 직접 전달하여 join_at 시점을 고려한 계산
+                    return convertToDto(room, mapping);
                 })
                 .collect(Collectors.toList());
     }
@@ -178,9 +178,10 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             System.out.println("⚠️ [DEBUG] 같은 값으로 업데이트 시도! 기존: " + currentLastReadChatNo + ", 새로운: " + lastChatNo);
             System.out.println("⚠️ [DEBUG] 업데이트를 건너뛰고 현재 unread count 확인");
             
-            // 현재 unread count 확인
-            long currentUnreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThan(chatRoom, currentLastReadChatNo);
-            System.out.println("🔍 [DEBUG] 현재 unread count: " + currentUnreadCount);
+            // 현재 unread count 확인 (입장 시간 이후만)
+            long currentUnreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                    chatRoom, currentLastReadChatNo, roomMember.getChatRoomMemberJoinedAt());
+            System.out.println("🔍 [DEBUG] 현재 unread count (입장 시간 이후): " + currentUnreadCount);
             return;
         }
         
@@ -207,9 +208,10 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             System.out.println("✅ [DEBUG] DB 업데이트 성공 확인");
         }
         
-        // 업데이트 후 unread count 재계산
-        long newUnreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThan(chatRoom, lastChatNo);
-        System.out.println("🔍 [DEBUG] 업데이트 후 새로운 unread count: " + newUnreadCount);
+        // 업데이트 후 unread count 재계산 (입장 시간 이후만)
+        long newUnreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                chatRoom, lastChatNo, roomMember.getChatRoomMemberJoinedAt());
+        System.out.println("🔍 [DEBUG] 업데이트 후 새로운 unread count (입장 시간 이후): " + newUnreadCount);
         
         System.out.println("✅ [DEBUG] 마지막 읽은 메시지 업데이트 완료: chatRoomNo=" + chatRoomNo + 
                           ", memberNo=" + memberNo + ", 새로운 lastChatNo=" + lastChatNo);
@@ -232,32 +234,26 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         Optional<ChatRoomMember> roomMemberOpt = chatRoomMemberRepository.findByChatRoomAndMember(chatRoom, member);
         
         if (roomMemberOpt.isPresent()) {
-            Long lastReadChatNo = roomMemberOpt.get().getLastReadChatNo();
+            ChatRoomMember roomMember = roomMemberOpt.get();
+            Long lastReadChatNo = roomMember.getLastReadChatNo();
             long unreadCount;
             
             System.out.println("🔍 [DEBUG] 현재 lastReadChatNo: " + lastReadChatNo);
+            System.out.println("🔍 [DEBUG] 멤버 입장 시간: " + roomMember.getChatRoomMemberJoinedAt());
             
             if (lastReadChatNo != null) {
-                unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThan(chatRoom, lastReadChatNo);
-                System.out.println("🔍 [DEBUG] countByChatRoomAndChatNoGreaterThan 쿼리 결과: " + unreadCount);
-                System.out.println("🔍 [DEBUG] 쿼리 조건: chatRoom=" + chatRoom.getChatRoomNo() + ", lastReadChatNo > " + lastReadChatNo);
-                
-                // 실제 메시지들 확인
-                try {
-                    var recentMessages = chatMessageRepository.findTop5ByChatRoomOrderByChatMessageCreatedAtDesc(chatRoom);
-                    System.out.println("🔍 [DEBUG] 최근 " + recentMessages.size() + "개 메시지의 chat_no:");
-                    for (var msg : recentMessages) {
-                        System.out.println("  - chat_no: " + msg.getChatNo() + ", 내용: " + msg.getChatMessage() + 
-                                         ", 작성자: " + msg.getMember().getMemberName() + 
-                                         ", 시간: " + msg.getChatMessageCreatedAt());
-                    }
-                } catch (Exception e) {
-                    System.out.println("🔍 [DEBUG] 최근 메시지 조회 실패: " + e.getMessage());
-                }
+                // 멤버 입장 시간 이후이면서 마지막 읽은 메시지 이후의 메시지 개수
+                unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                        chatRoom, lastReadChatNo, roomMember.getChatRoomMemberJoinedAt());
+                System.out.println("🔍 [DEBUG] countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual 쿼리 결과: " + unreadCount);
+                System.out.println("🔍 [DEBUG] 쿼리 조건: chatRoom=" + chatRoom.getChatRoomNo() + 
+                                 ", lastReadChatNo > " + lastReadChatNo + 
+                                 ", createdAt >= " + roomMember.getChatRoomMemberJoinedAt());
             } else {
-                // 한 번도 읽지 않았다면 모든 메시지가 읽지 않은 메시지
-                unreadCount = chatMessageRepository.countByChatRoom(chatRoom);
-                System.out.println("🔍 [DEBUG] countByChatRoom 쿼리 결과 (처음 입장): " + unreadCount);
+                // 한 번도 읽지 않았다면 멤버 입장 시간 이후의 모든 메시지가 읽지 않은 메시지
+                unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                        chatRoom, 0L, roomMember.getChatRoomMemberJoinedAt());
+                System.out.println("🔍 [DEBUG] 처음 입장 시 멤버 입장 이후 메시지 개수: " + unreadCount);
             }
             
             System.out.println("🔍 [DEBUG] getUnreadCount 결과: chatRoomNo=" + chatRoomNo + 
@@ -405,6 +401,28 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         }
     }
 
+    /**
+     * 사용자의 마지막 읽은 메시지 번호 조회
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public Long getLastReadChatNo(Long chatRoomNo, Long memberNo) {
+        ChatRoom chatRoom = chatRoomRepository.findById(chatRoomNo)
+                .orElseThrow(() -> new RuntimeException("채팅방을 찾을 수 없습니다: " + chatRoomNo));
+        
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
+        
+        Optional<ChatRoomMember> roomMemberOpt = chatRoomMemberRepository.findByChatRoomAndMember(chatRoom, member);
+        
+        if (roomMemberOpt.isPresent()) {
+            return roomMemberOpt.get().getLastReadChatNo();
+        } else {
+            // 채팅방 멤버가 아니면 null 반환
+            return null;
+        }
+    }
+
     // --- Private Helper Methods ---
 
     private ChatRoom createAgencyTotalRoom(Long agencyNo) {
@@ -439,7 +457,8 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         }
     }
 
-    // DTO 변환 로직 개선 - 실제 마지막 메시지와 시간 포함
+    // DTO 변환 로직 개선 - 실제 마지막 메시지와 시간 포함 (Deprecated: ChatRoomMember 버전 사용 권장)
+    @Deprecated
     private ChatRoomResponseDto convertToDto(ChatRoom room, Long lastReadNo) {
         // 마지막 메시지 조회
         Optional<ChatMessage> lastMessageOpt = chatMessageRepository.findFirstByChatRoomOrderByChatMessageCreatedAtDesc(room);
@@ -469,12 +488,13 @@ public class ChatRoomServiceImpl implements ChatRoomService {
             }
             
             // 읽지 않은 메시지 개수 계산 (lastReadNo가 있을 때만)
+            // 주의: 이 메서드는 join_at 정보가 없어서 정확하지 않을 수 있음
             if (lastReadNo != null) {
                 unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThan(room, lastReadNo);
-                System.out.println("🔍 [DEBUG] 읽지 않은 메시지 계산: chatRoomNo=" + room.getChatRoomNo() + 
+                System.out.println("⚠️ [DEPRECATED] 읽지 않은 메시지 계산 (join_at 미고려): chatRoomNo=" + room.getChatRoomNo() + 
                                  ", lastReadNo=" + lastReadNo + ", unreadCount=" + unreadCount);
             } else {
-                System.out.println("🔍 [DEBUG] lastReadNo가 null이므로 unreadCount 계산 안 함: chatRoomNo=" + room.getChatRoomNo());
+                System.out.println("⚠️ [DEPRECATED] lastReadNo가 null이므로 unreadCount 계산 안 함: chatRoomNo=" + room.getChatRoomNo());
             }
         }
         
@@ -491,16 +511,18 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 .build();
     }
 
-    // 사용자별 읽지 않은 메시지 개수를 포함한 DTO 변환
-    private ChatRoomResponseDto convertToDtoWithUnreadCount(ChatRoom room, Long memberNo) {
-        // 마지막 메시지 조회
-        Optional<ChatMessage> lastMessageOpt = chatMessageRepository.findFirstByChatRoomOrderByChatMessageCreatedAtDesc(room);
-        
+    // ChatRoomMember 객체를 받는 오버로드된 convertToDto 메서드 (join_at 시점 고려)
+    private ChatRoomResponseDto convertToDto(ChatRoom room, ChatRoomMember roomMember) {
         String lastMessage = "";
         String lastMessageTime = "";
         Long lastMessageSenderNo = null;
         String lastMessageSenderName = "";
         long unreadCount = 0;
+        
+        // 멤버 입장 시간 이후의 마지막 메시지만 조회
+        Optional<ChatMessage> lastMessageOpt = chatMessageRepository
+                .findFirstByChatRoomAndChatMessageCreatedAtGreaterThanEqualOrderByChatMessageCreatedAtDesc(
+                        room, roomMember.getChatRoomMemberJoinedAt());
         
         if (lastMessageOpt.isPresent()) {
             ChatMessage lastMsg = lastMessageOpt.get();
@@ -520,26 +542,111 @@ public class ChatRoomServiceImpl implements ChatRoomService {
                 lastMessageTime = msgTime.format(DateTimeFormatter.ofPattern("M월 d일"));
             }
             
-            // 사용자의 마지막 읽은 메시지 번호 조회
-            Member member = memberRepository.findById(memberNo)
-                    .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
+            System.out.println("🔍 [DEBUG] 입장 시간 이후 마지막 메시지: chatRoomNo=" + room.getChatRoomNo() + 
+                             ", memberNo=" + roomMember.getMember().getMemberNo() + ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt() + 
+                             ", lastMessage=" + lastMessage + ", lastMessageTime=" + lastMessageTime);
+        } else {
+            System.out.println("🔍 [DEBUG] 입장 시간 이후 메시지 없음: chatRoomNo=" + room.getChatRoomNo() + 
+                             ", memberNo=" + roomMember.getMember().getMemberNo() + ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt());
+        }
+        
+        // 읽지 않은 메시지 개수 계산 (join_at 시점 고려)
+        Long lastReadChatNo = roomMember.getLastReadChatNo();
+        if (lastReadChatNo != null) {
+            // 멤버 입장 시간 이후이면서 마지막 읽은 메시지 이후의 메시지 개수
+            unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                    room, lastReadChatNo, roomMember.getChatRoomMemberJoinedAt());
+            System.out.println("🔍 [DEBUG] 읽지 않은 메시지 계산 (입장 시간 이후): chatRoomNo=" + room.getChatRoomNo() + 
+                             ", memberNo=" + roomMember.getMember().getMemberNo() + ", lastReadChatNo=" + lastReadChatNo + 
+                             ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt() + ", unreadCount=" + unreadCount);
+        } else {
+            // 한 번도 읽지 않았다면 멤버 입장 시간 이후의 모든 메시지가 읽지 않은 메시지
+            unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                    room, 0L, roomMember.getChatRoomMemberJoinedAt());
+            System.out.println("🔍 [DEBUG] 처음 입장 - 입장 시간 이후 메시지만 계산: chatRoomNo=" + room.getChatRoomNo() + 
+                             ", memberNo=" + roomMember.getMember().getMemberNo() + ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt() + ", totalCount=" + unreadCount);
+        }
+        
+        return ChatRoomResponseDto.builder()
+                .chatRoomNo(room.getChatRoomNo())
+                .chatRoomName(room.getChatRoomName())
+                .chatRoomType(room.getChatRoomType())
+                .projectNo(room.getProjectNo())
+                .lastMessage(lastMessage)
+                .lastMessageTime(lastMessageTime)
+                .lastMessageSenderNo(lastMessageSenderNo)
+                .lastMessageSenderName(lastMessageSenderName)
+                .unreadCount(unreadCount)
+                .build();
+    }
+
+    // 사용자별 읽지 않은 메시지 개수를 포함한 DTO 변환
+    private ChatRoomResponseDto convertToDtoWithUnreadCount(ChatRoom room, Long memberNo) {
+        // 사용자의 채팅방 멤버 정보 먼저 조회 (join_at 시점 확인용)
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
+        
+        Optional<ChatRoomMember> roomMemberOpt = chatRoomMemberRepository.findByChatRoomAndMember(room, member);
+        
+        String lastMessage = "";
+        String lastMessageTime = "";
+        Long lastMessageSenderNo = null;
+        String lastMessageSenderName = "";
+        long unreadCount = 0;
+        
+        if (roomMemberOpt.isPresent()) {
+            ChatRoomMember roomMember = roomMemberOpt.get();
             
-            Optional<ChatRoomMember> roomMemberOpt = chatRoomMemberRepository.findByChatRoomAndMember(room, member);
-            if (roomMemberOpt.isPresent()) {
-                Long lastReadChatNo = roomMemberOpt.get().getLastReadChatNo();
-                if (lastReadChatNo != null) {
-                    unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThan(room, lastReadChatNo);
-                    System.out.println("🔍 [DEBUG] 사용자별 읽지 않은 메시지 계산: chatRoomNo=" + room.getChatRoomNo() + 
-                                     ", memberNo=" + memberNo + ", lastReadChatNo=" + lastReadChatNo + ", unreadCount=" + unreadCount);
+            // 멤버 입장 시간 이후의 마지막 메시지만 조회
+            Optional<ChatMessage> lastMessageOpt = chatMessageRepository
+                    .findFirstByChatRoomAndChatMessageCreatedAtGreaterThanEqualOrderByChatMessageCreatedAtDesc(
+                            room, roomMember.getChatRoomMemberJoinedAt());
+            
+            if (lastMessageOpt.isPresent()) {
+                ChatMessage lastMsg = lastMessageOpt.get();
+                lastMessage = lastMsg.getChatMessage();
+                lastMessageSenderNo = lastMsg.getMember().getMemberNo();
+                lastMessageSenderName = lastMsg.getMember().getMemberName();
+                
+                // 시간 포맷팅 (예: "오후 2:30" 또는 "2월 12일")
+                LocalDateTime msgTime = lastMsg.getChatMessageCreatedAt();
+                LocalDateTime now = LocalDateTime.now();
+                
+                if (msgTime.toLocalDate().equals(now.toLocalDate())) {
+                    // 오늘 메시지면 시간만 표시
+                    lastMessageTime = msgTime.format(DateTimeFormatter.ofPattern("HH:mm"));
                 } else {
-                    // 한 번도 읽지 않았다면 모든 메시지가 읽지 않은 메시지
-                    unreadCount = chatMessageRepository.countByChatRoom(room);
-                    System.out.println("🔍 [DEBUG] 처음 입장 - 모든 메시지가 읽지 않음: chatRoomNo=" + room.getChatRoomNo() + 
-                                     ", memberNo=" + memberNo + ", totalCount=" + unreadCount);
+                    // 다른 날이면 날짜 표시
+                    lastMessageTime = msgTime.format(DateTimeFormatter.ofPattern("M월 d일"));
                 }
+                
+                System.out.println("🔍 [DEBUG] 입장 시간 이후 마지막 메시지: chatRoomNo=" + room.getChatRoomNo() + 
+                                 ", memberNo=" + memberNo + ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt() + 
+                                 ", lastMessage=" + lastMessage + ", lastMessageTime=" + lastMessageTime);
             } else {
-                // 채팅방 멤버가 아니면 읽지 않은 메시지 개수는 0
+                System.out.println("🔍 [DEBUG] 입장 시간 이후 메시지 없음: chatRoomNo=" + room.getChatRoomNo() + 
+                                 ", memberNo=" + memberNo + ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt());
             }
+            
+            // 읽지 않은 메시지 개수 계산 (입장 시간 이후만)
+            Long lastReadChatNo = roomMember.getLastReadChatNo();
+            if (lastReadChatNo != null) {
+                // 멤버 입장 시간 이후이면서 마지막 읽은 메시지 이후의 메시지 개수
+                unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                        room, lastReadChatNo, roomMember.getChatRoomMemberJoinedAt());
+                System.out.println("🔍 [DEBUG] 사용자별 읽지 않은 메시지 계산 (입장 시간 이후): chatRoomNo=" + room.getChatRoomNo() + 
+                                 ", memberNo=" + memberNo + ", lastReadChatNo=" + lastReadChatNo + 
+                                 ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt() + ", unreadCount=" + unreadCount);
+            } else {
+                // 한 번도 읽지 않았다면 멤버 입장 시간 이후의 모든 메시지가 읽지 않은 메시지
+                unreadCount = chatMessageRepository.countByChatRoomAndChatNoGreaterThanAndChatMessageCreatedAtGreaterThanEqual(
+                        room, 0L, roomMember.getChatRoomMemberJoinedAt());
+                System.out.println("🔍 [DEBUG] 처음 입장 - 입장 시간 이후 메시지만 계산: chatRoomNo=" + room.getChatRoomNo() + 
+                                 ", memberNo=" + memberNo + ", joinedAt=" + roomMember.getChatRoomMemberJoinedAt() + ", totalCount=" + unreadCount);
+            }
+        } else {
+            // 채팅방 멤버가 아니면 읽지 않은 메시지 개수는 0
+            System.out.println("🔍 [DEBUG] 채팅방 멤버가 아님: chatRoomNo=" + room.getChatRoomNo() + ", memberNo=" + memberNo);
         }
         
         return ChatRoomResponseDto.builder()
