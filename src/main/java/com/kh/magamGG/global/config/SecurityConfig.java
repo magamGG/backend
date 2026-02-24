@@ -46,7 +46,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             // CORS 설정 (SSE를 포함한 모든 요청에 적용)
             .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -80,9 +80,24 @@ public class SecurityConfig {
 
             // 엔드포인트별 인증 요구사항 설정
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login", "/api/members").permitAll()
+                .requestMatchers(
+                    "/api/auth/login",
+                    "/api/auth/logout",
+                    "/api/auth/refresh",
+                    "/api/auth/reissue",
+                    "/api/auth/*/authorization-url",  // OAuth 인증 URL 조회
+                    "/api/auth/*/callback",           // OAuth 콜백 (커스텀)
+                    "/api/members",
+                    "/api/auth/email/**",
+                    "/api/auth/forgot-password",
+                    "/api/auth/verify-reset-code",
+                    "/api/auth/reset-password",
+                    "/api/holidays/**",
+                    "/login/oauth2/**",               // Spring Security OAuth2 엔드포인트
+                    "/oauth2/**"                  // OAuth2 관련 추가 엔드포인트
+                ).permitAll()
                 .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/api/**").permitAll()
+                .requestMatchers("/ws-stomp/**").permitAll()
                 .anyRequest().authenticated()
             );
 
@@ -98,4 +113,3 @@ public class SecurityConfig {
         return new org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService();
     }
 }
-

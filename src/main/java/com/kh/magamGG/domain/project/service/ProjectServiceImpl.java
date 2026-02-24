@@ -661,6 +661,9 @@ public class ProjectServiceImpl implements ProjectService {
                 managerMemberNo = pm.getMember().getMemberNo();
             }
         }
+        LocalDate nextSerialDate = computeNextSerialDateConsideringHiatus(project, LocalDate.now());
+        String nextDeadlineStr = nextSerialDate != null ? nextSerialDate.toString() : null;
+
         return ProjectListResponse.builder()
             .projectNo(project.getProjectNo())
             .projectName(project.getProjectName())
@@ -675,6 +678,7 @@ public class ProjectServiceImpl implements ProjectService {
             .projectStartedAt(project.getProjectStartedAt())
             .managerName(managerName)
             .managerMemberNo(managerMemberNo)
+            .nextDeadline(nextDeadlineStr)
             .build();
     }
 
