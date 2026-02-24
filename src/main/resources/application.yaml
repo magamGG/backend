@@ -98,11 +98,6 @@ server:
 file:
   upload-dir: uploads
 
-<<<<<<< HEAD
-# OpenAI (선택) - 포트폴리오 추출용. 키가 없어도 앱은 기동됨.
-# 키 설정 시 application-local.yaml에 추가:
-#   spring.ai.openai.api-key: your-openai-api-key
-=======
 # 공공데이터 API: application-local.yaml 또는 PUBLIC_DATA_HOLIDAY_API_KEY 환경변수로 설정
 public-data:
   holiday:
@@ -146,4 +141,3 @@ kakao:
     authorization-url: https://kauth.kakao.com/oauth/authorize
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
->>>>>>> 39738473765f00b36bd36a2e90596fa334192bee
