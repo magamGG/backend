@@ -6,10 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityCustomizer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 import org.springframework.security.web.SecurityFilterChain;
@@ -27,10 +25,7 @@ import org.springframework.web.cors.CorsConfigurationSource;
  */
 @Configuration
 @EnableWebSecurity
-<<<<<<< HEAD
-=======
 @Slf4j
->>>>>>> 39738473765f00b36bd36a2e90596fa334192bee
 public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
@@ -50,15 +45,7 @@ public class SecurityConfig {
         this.oAuth2SuccessHandler = oAuth2SuccessHandler;
     }
 
-    /** 포트폴리오 추출 API는 Spring Security 적용 대상에서 제외 (403 방지) */
     @Bean
-    public WebSecurityCustomizer webSecurityCustomizer() {
-        return web -> web.ignoring().requestMatchers("/api/portfolio/**");
-    }
-
-    /** 그 외 API/리소스용 체인 */
-    @Bean
-    @Order(1)
     public SecurityFilterChain defaultSecurityFilterChain(HttpSecurity http) throws Exception {
         http
             // CORS 설정 (SSE를 포함한 모든 요청에 적용)
@@ -93,30 +80,9 @@ public class SecurityConfig {
 
             // 엔드포인트별 인증 요구사항 설정
             .authorizeHttpRequests(auth -> auth
-<<<<<<< HEAD
                 .requestMatchers("/api/auth/login", "/api/members").permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/api/**").permitAll()
-=======
-                .requestMatchers(
-                    "/api/auth/login",
-                    "/api/auth/logout",
-                    "/api/auth/refresh",
-                    "/api/auth/reissue",
-                    "/api/auth/*/authorization-url",  // OAuth 인증 URL 조회
-                    "/api/auth/*/callback",           // OAuth 콜백 (커스텀)
-                    "/api/members",
-                    "/api/auth/email/**",
-                    "/api/auth/forgot-password",
-                    "/api/auth/verify-reset-code",
-                    "/api/auth/reset-password",
-                    "/api/holidays/**",
-                    "/login/oauth2/**",               // Spring Security OAuth2 엔드포인트
-                    "/oauth2/**"                      // OAuth2 관련 추가 엔드포인트
-                ).permitAll()
-                .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/ws-stomp/**").permitAll()
->>>>>>> 39738473765f00b36bd36a2e90596fa334192bee
                 .anyRequest().authenticated()
             );
 

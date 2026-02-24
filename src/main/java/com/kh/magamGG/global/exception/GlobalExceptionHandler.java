@@ -9,8 +9,6 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
-import java.util.Map;
-
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
@@ -205,20 +203,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
 
-<<<<<<< HEAD
-    /** 포트폴리오 추출 실패 → 200 + success: false (프론트에서 500 없이 안내 메시지 표시) */
-    @ExceptionHandler(PortfolioExtractException.class)
-    public ResponseEntity<Map<String, Object>> handlePortfolioExtractException(
-            PortfolioExtractException ex) {
-        log.warn("포트폴리오 추출 실패: {}", ex.getMessage());
-        return ResponseEntity.ok(Map.of(
-                "success", false,
-                "message", ex.getMessage() != null ? ex.getMessage() : "포트폴리오 정보를 추출하지 못했습니다.",
-                "data", (Object) null
-        ));
-    }
-
-    /** 포트폴리오 추출 실패 등 비즈니스 RuntimeException → 클라이언트에 메시지 전달 */
+    /** 비즈니스 RuntimeException → 클라이언트에 메시지 전달 */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(
             RuntimeException ex, WebRequest request) {
@@ -233,72 +218,6 @@ public class GlobalExceptionHandler {
                 request.getDescription(false).replace("uri=", "")
         );
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-=======
-    @ExceptionHandler(InvalidTokenException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidTokenException(
-            InvalidTokenException ex, WebRequest request) {
-        log.error("유효하지 않은 토큰: {}", ex.getMessage());
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(),
-                "UNAUTHORIZED",
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-    }
-
-    @ExceptionHandler(TokenNotFoundException.class)
-    public ResponseEntity<ErrorResponse> handleTokenNotFoundException(
-            TokenNotFoundException ex, WebRequest request) {
-        log.error("토큰을 찾을 수 없음: {}", ex.getMessage());
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(), // 404 → 401로 변경 (인증 관련 예외는 401이 적절)
-                "UNAUTHORIZED",
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-    }
-
-    @ExceptionHandler(RevokedTokenException.class)
-    public ResponseEntity<ErrorResponse> handleRevokedTokenException(
-            RevokedTokenException ex, WebRequest request) {
-        log.error("무효화된 토큰: {}", ex.getMessage());
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(),
-                "UNAUTHORIZED",
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-    }
-
-    @ExceptionHandler(ExpiredTokenException.class)
-    public ResponseEntity<ErrorResponse> handleExpiredTokenException(
-            ExpiredTokenException ex, WebRequest request) {
-        log.error("만료된 토큰: {}", ex.getMessage());
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(),
-                "UNAUTHORIZED",
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-    }
-
-    @ExceptionHandler(TokenReuseDetectedException.class)
-    public ResponseEntity<ErrorResponse> handleTokenReuseDetectedException(
-            TokenReuseDetectedException ex, WebRequest request) {
-        // 보안 로그: 재사용 공격 감지 (이미 AuthService에서 로깅됨)
-        log.error("🔒 [보안 경고] 토큰 재사용 감지: {}", ex.getMessage());
-        ErrorResponse errorResponse = new ErrorResponse(
-                HttpStatus.UNAUTHORIZED.value(),
-                "UNAUTHORIZED",
-                ex.getMessage(),
-                request.getDescription(false).replace("uri=", "")
-        );
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
->>>>>>> 39738473765f00b36bd36a2e90596fa334192bee
     }
 
     @ExceptionHandler(Exception.class)

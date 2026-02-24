@@ -67,7 +67,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
 
         CRITICAL: In careerItems put EVERY line—one string per line. Put date/period at the BEGINNING of each item when present (e.g. "2012년 - 2016년 IMC games / 사원", "2017 원화, UI 아이콘 제작"). Same for projects: date/period first when present (e.g. "2018~ 블랙시타델"). Do NOT merge lines.
 
-        You MUST respond with exactly one JSON object. Use ONLY these English keys: name, role, email, phone, projects, careerItems, career, workStyle, skills. Use "" or [] for missing. No markdown, no code fence, no explanation. Start with { and end with }.
+        Keys: name, role, email, phone, projects (array), careerItems (array), career (empty string), workStyle (array), skills (array). Use "" or [] for missing. Output ONLY the JSON, no markdown.
         """;
 
     private static final String EXTRACT_FROM_PAGE_PROMPT = """
@@ -115,6 +115,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
     private PageSections parseSections(String fullText) {
         if (fullText == null || fullText.isBlank()) return null;
         String[] lines = fullText.split("\n", -1);
+        // (lineIndex, sectionKey) 순서 유지, 키 중복 시 첫 번째만
         Map<Integer, String> sectionStarts = new LinkedHashMap<>();
         for (int i = 0; i < lines.length; i++) {
             String trimmed = lines[i].trim();
@@ -160,10 +161,16 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         return new PageSections(header.toString().trim(), career, projects, workStyle, skills);
     }
 
+    /** 웹 페이지 본문으로 인정할 최소 텍스트 길이 (그 미만이면 SPA/실패로 간주) */
     private static final int MIN_PAGE_TEXT_LENGTH = 50;
+    /** Playwright 텍스트 추출 시 이 길이 이상이면 텍스트 기반 LLM 사용 (그 미만이면 스크린샷 폴백) */
     private static final int MIN_TEXT_FOR_LLM = 150;
+
+    /** Vision 비용 절감용 스크린샷 최대 너비 (px) */
     private static final int SCREENSHOT_MAX_WIDTH = 1280;
+    /** 긴 페이지 분할: 청크당 최대 높이 (px). 작을수록 구간별로 잘 보여서 경력이 빠짐없이 나옴. */
     private static final int CHUNK_MAX_HEIGHT = 1400;
+    /** 청크 간 겹치는 높이 (px). 텍스트가 잘리지 않도록. */
     private static final int CHUNK_OVERLAP = 150;
 
     private final Optional<ChatClient.Builder> chatClientBuilder;
@@ -224,6 +231,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             throw new IllegalArgumentException("http 또는 https URL만 지원합니다.");
         }
         String url = pageUrl.trim();
+        // 1) Playwright로 페이지 열고 스크롤 후 DOM 텍스트 추출. 충분하면 텍스트 기반 LLM으로 추출 (경력 전체 안정적)
         String pageText = fetchPageTextWithPlaywright(url);
         if (pageText != null && pageText.trim().length() >= MIN_TEXT_FOR_LLM) {
             try {
@@ -233,6 +241,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
                 log.warn("텍스트 기반 추출 실패, 스크린샷 폴백: {}", e.getMessage());
             }
         }
+        // 2) 텍스트 부족 또는 LLM 실패 시 스크린샷 촬영 → 청크 분할 → Vision 추출 후 병합
         log.info("스크린샷+Vision 폴백 (텍스트 {}자)", pageText != null ? pageText.length() : 0);
         byte[] screenshotBytes = captureFullPageScreenshot(url);
         if (screenshotBytes == null || screenshotBytes.length == 0) {
@@ -255,21 +264,12 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             }
         }
         if (partials.isEmpty()) {
-            log.info("청크 추출 전부 실패 → 전체 스크린샷 1장으로 Vision 재시도");
-            PortfolioExtractDto fullResult = extractFromImageResourceQuiet(
-                    new ByteArrayResource(imageBytes), MimeTypeUtils.IMAGE_PNG_VALUE, EXTRACT_PROMPT);
-            if (fullResult != null && !isEmpty(fullResult)) {
-                log.info("전체 이미지 1장 추출 성공");
-                return fullResult;
-            }
-            throw new com.kh.magamGG.global.exception.PortfolioExtractException(
-                    "이미지에서 포트폴리오 정보를 추출하지 못했습니다. " +
-                    "페이지가 로그인/접근 제한이 있거나, AI가 내용을 인식하지 못했을 수 있습니다. " +
-                    "해당 페이지를 캡처한 이미지 파일을 직접 업로드(이미지 파일 선택)해 보세요.");
+            throw new RuntimeException("이미지에서 포트폴리오 정보를 추출하지 못했습니다.");
         }
         return mergeExtractResults(partials);
     }
 
+    /** Playwright로 페이지 로드·스크롤 후 화면에 보이는 텍스트 전체 추출 (SPA 대응). 실패 시 null. */
     private String fetchPageTextWithPlaywright(String pageUrl) {
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(
@@ -286,6 +286,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
                     Thread.currentThread().interrupt();
                     return null;
                 }
+                // 스크롤로 lazy-loaded 콘텐츠 DOM 로드
                 try {
                     Object heightObj = page.evaluate("() => document.body.scrollHeight");
                     long totalHeight = heightObj instanceof Number ? ((Number) heightObj).longValue() : 0L;
@@ -304,6 +305,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
                 } catch (Exception e) {
                     log.debug("스크롤 스킵: {}", e.getMessage());
                 }
+                // 본문(main/article) 우선, 없으면 body의 innerText
                 Object textObj = page.evaluate("() => { const el = document.querySelector('main') || document.querySelector('article') || document.querySelector('[role=\"main\"]') || document.body; return el ? el.innerText : ''; }");
                 String text = textObj != null ? textObj.toString().trim() : "";
                 return text.isEmpty() ? null : text;
@@ -316,6 +318,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         }
     }
 
+    /** Playwright로 URL 전체 페이지 스크린샷 (SPA/Notion 등 대응). 스크롤로 lazy load 트리거 후 캡처. */
     private byte[] captureFullPageScreenshot(String pageUrl) {
         try (Playwright playwright = Playwright.create()) {
             Browser browser = playwright.chromium().launch(
@@ -332,6 +335,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
                     Thread.currentThread().interrupt();
                     throw new RuntimeException("스크린샷 대기가 중단되었습니다.", ie);
                 }
+                // 스크롤을 내려서 lazy-loaded 콘텐츠가 DOM에 올라오게 함 (SPA/Notion 등)
                 try {
                     Object heightObj = page.evaluate("() => document.body.scrollHeight");
                     long totalHeight = heightObj instanceof Number ? ((Number) heightObj).longValue() : 0L;
@@ -369,6 +373,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         }
     }
 
+    /** 스크린샷을 세로로 잘라 여러 청크로 만든다. 긴 페이지를 구간별로 Vision에 보내기 위함. */
     private List<byte[]> splitImageIntoVerticalChunks(byte[] imageBytes, int maxChunkHeight, int overlap) {
         List<byte[]> result = new ArrayList<>();
         if (imageBytes == null || imageBytes.length == 0) return result;
@@ -402,6 +407,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         return result;
     }
 
+    /** 여러 청크 추출 결과를 하나의 DTO로 병합 (이름/직무는 첫 번째, careerItems·projects는 순서 유지·중복 제거) */
     private PortfolioExtractDto mergeExtractResults(List<PortfolioExtractDto> partials) {
         if (partials == null || partials.isEmpty()) return null;
         String name = null, role = null, email = null, phone = null, career = "";
@@ -434,6 +440,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         return new PortfolioExtractDto(name, role, email, phone, projects, careerItems, career, workStyle, skills);
     }
 
+    /** 이미지에서 추출 시도. 실패 또는 빈 결과면 null 반환 (예외 없음). promptText로 청크용/전체용 프롬프트 지정. */
     private PortfolioExtractDto extractFromImageResourceQuiet(Resource imageResource, String mediaType, String promptText) {
         if (chatClientBuilder.isEmpty() || imageResource == null || !imageResource.exists()) return null;
         try {
@@ -444,20 +451,14 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
                     .user(u -> u.text(promptText).media(mimeType, imageResource))
                     .call()
                     .content();
-            PortfolioExtractDto parsed = parseExtractResponse(response);
-            if (parsed == null && response != null && !response.isBlank()) {
-                log.warn("Vision 응답 파싱 실패. 응답 앞 500자: {}", response.length() > 500 ? response.substring(0, 500) + "..." : response);
-            }
-            return parsed;
+            return parseExtractResponse(response);
         } catch (Exception e) {
-            log.warn("청크 추출 실패: {} - {}", e.getClass().getSimpleName(), e.getMessage());
-            if (log.isDebugEnabled()) {
-                log.debug("청크 추출 예외 상세", e);
-            }
+            log.warn("청크 추출 실패: {}", e.getMessage());
             return null;
         }
     }
 
+    /** Vision 비용 절감: 최대 너비 초과 시 리사이즈 (비율 유지) */
     private byte[] resizeImageIfNeeded(byte[] imageBytes, int maxWidth) {
         if (imageBytes == null || imageBytes.length == 0) return imageBytes;
         try (ByteArrayInputStream in = new ByteArrayInputStream(imageBytes);
@@ -473,13 +474,16 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             g.drawImage(scaled, 0, 0, null);
             g.dispose();
             ImageIO.write(outImg, "png", out);
-            return out.toByteArray();
+            byte[] resized = out.toByteArray();
+            log.debug("스크린샷 리사이즈: {}x{} -> {}x{}, {} -> {} bytes", w, img.getHeight(), maxWidth, h, imageBytes.length, resized.length);
+            return resized;
         } catch (Exception e) {
             log.warn("이미지 리사이즈 스킵: {}", e.getMessage());
             return imageBytes;
         }
     }
 
+    /** URL에서 HTML 문자열 다운로드 */
     private String fetchHtml(String pageUrl) {
         try {
             URI uri = URI.create(pageUrl);
@@ -504,6 +508,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         }
     }
 
+    /** HTML에서 본문 텍스트만 추출 (main/article 우선, 없으면 body) */
     private String extractBodyText(String html) {
         if (html == null || html.isBlank()) return "";
         try {
@@ -517,6 +522,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         }
     }
 
+    /** 텍스트만 LLM에 보내서 구조화 (Vision 아님). 섹션 구분 가능하면 섹션별 추출 후 병합, 아니면 전체 한 번에. */
     private PortfolioExtractDto extractFromTextWithLlm(String bodyText) {
         if (chatClientBuilder.isEmpty()) {
             throw new IllegalStateException(
@@ -552,6 +558,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         }
     }
 
+    /** 섹션별로 LLM 호출 후 하나의 DTO로 병합 */
     private PortfolioExtractDto extractFromSectionsAndMerge(PageSections sections, String fullText) {
         var chatClient = chatClientBuilder.get().build();
         String headerText = sections.header() != null && !sections.header().isBlank()
@@ -585,6 +592,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         }
     }
 
+    /** 헤더·경력·나머지 부분 추출 결과를 하나의 DTO로 병합 (null/빈 값은 다른 쪽으로 채움) */
     private PortfolioExtractDto mergePartialDtos(PortfolioExtractDto header, PortfolioExtractDto career, PortfolioExtractDto rest) {
         String name = firstNonBlank(header != null ? header.name() : null, rest != null ? rest.name() : null);
         String role = firstNonBlank(header != null ? header.role() : null, rest != null ? rest.role() : null);
@@ -614,6 +622,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         return new ArrayList<>(set);
     }
 
+    /** LLM에 보낼 본문 길이 제한. 경력 전체(P사·외주작·표지 등)가 들어가도록 충분히 확대. */
     private static final int MAX_BODY_TEXT_FOR_LLM = 40_000;
 
     private String truncateForPrompt(String text) {
@@ -685,6 +694,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             return null;
         }
         String json = response.trim();
+        // LLM이 ```json ... ``` 또는 ``` ... ``` 로 감싼 경우 제거
         if (json.startsWith("```")) {
             int firstNewline = json.indexOf('\n');
             int endBlock = json.indexOf("```", 3);
@@ -700,45 +710,12 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             json = json.substring(start, end + 1);
         }
         try {
-            return OBJECT_MAPPER.readValue(json, PortfolioExtractDto.class);
+            PortfolioExtractDto dto = OBJECT_MAPPER.readValue(json, PortfolioExtractDto.class);
+            return dto;
         } catch (Exception e) {
-            String normalized = normalizeJsonKeysToEnglish(json);
-            if (!normalized.equals(json)) {
-                try {
-                    return OBJECT_MAPPER.readValue(normalized, PortfolioExtractDto.class);
-                } catch (Exception e2) {
-                    log.debug("한글 키 치환 후 파싱 재시도 실패: {}", e2.getMessage());
-                }
-            }
-            String snippet = json.length() > 600 ? json.substring(0, 600) + "..." : json;
-            log.warn("포트폴리오 추출 JSON 파싱 실패. 응답 길이={}, 파싱 예외={}, 시도한 JSON 앞부분: {}", response.length(), e.getMessage(), snippet);
+            log.warn("포트폴리오 추출 JSON 파싱 실패. 응답 길이={}, 앞 300자={}", response.length(), response.length() > 300 ? response.substring(0, 300) : response);
+            log.warn("추출된 JSON 문자열 길이={}, 내용={}", json.length(), json.length() > 500 ? json.substring(0, 500) + "..." : json);
             return null;
         }
-    }
-
-    /** LLM이 한글 키로 응답한 JSON 문자열을 영문 키로 치환 (파싱 폴백) */
-    private static String normalizeJsonKeysToEnglish(String json) {
-        if (json == null || json.isBlank()) return json;
-        String s = json;
-        s = replaceJsonKey(s, "이름", "name");
-        s = replaceJsonKey(s, "직무", "role");
-        s = replaceJsonKey(s, "직위", "role");
-        s = replaceJsonKey(s, "이메일", "email");
-        s = replaceJsonKey(s, "메일", "email");
-        s = replaceJsonKey(s, "전화", "phone");
-        s = replaceJsonKey(s, "전화번호", "phone");
-        s = replaceJsonKey(s, "연락처", "phone");
-        s = replaceJsonKey(s, "프로젝트", "projects");
-        s = replaceJsonKey(s, "경력항목", "careerItems");
-        s = replaceJsonKey(s, "경력", "careerItems");
-        s = replaceJsonKey(s, "작업스타일", "workStyle");
-        s = replaceJsonKey(s, "작업 스타일", "workStyle");
-        s = replaceJsonKey(s, "스킬", "skills");
-        s = replaceJsonKey(s, "기술", "skills");
-        return s;
-    }
-
-    private static String replaceJsonKey(String json, String keyKr, String keyEn) {
-        return json.replace("\"" + keyKr + "\"", "\"" + keyEn + "\"");
     }
 }

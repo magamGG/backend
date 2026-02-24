@@ -140,9 +140,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // permitAll 엔드포인트 목록
         return !uri.startsWith("/api/auth/login") 
             && !uri.startsWith("/api/auth/refresh")
-            && !uri.startsWith("/api/auth/reissue")  // 재발급 엔드포인트 추가
+            && !uri.startsWith("/api/auth/reissue")
             && !uri.startsWith("/api/members")
             && !uri.startsWith("/uploads/")
-            && !uri.startsWith("/login/oauth2");  // OAuth2 엔드포인트 추가
+            && !uri.startsWith("/login/oauth2");
     }
 }
