@@ -31,4 +31,6 @@ public class ProjectListResponse {
     private String managerName;
     /** 담당자 회원 번호 */
     private Long managerMemberNo;
+    /** 다음 연재일(yyyy-MM-dd). 휴재 제외 로직(computeNextSerialDateConsideringHiatus) 적용 */
+    private String nextDeadline;
 }
