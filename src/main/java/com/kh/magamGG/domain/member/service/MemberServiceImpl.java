@@ -90,7 +90,7 @@ public class MemberServiceImpl implements MemberService {
         if (!emailVerificationService.isEmailVerified(request.getMemberEmail())) {
             throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
         }
-        */
+*/
         
         // 이메일 중복 체크
         if (memberRepository.existsByMemberEmail(request.getMemberEmail())) {

@@ -56,7 +56,7 @@ public class AuthService {
 
         log.info("🔐 [로그인] 회원 검증 완료: memberNo={}, email={}", member.getMemberNo(), member.getMemberEmail());
 
-        // Access Token 발급
+        // Access Token 발급d
         log.info("🎫 [로그인] Access Token 발급 시작: memberNo={}", member.getMemberNo());
         String accessToken = jwtTokenProvider.generateAccessToken(
                 member.getMemberNo(), 
