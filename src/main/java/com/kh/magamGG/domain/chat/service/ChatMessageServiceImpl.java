@@ -64,8 +64,11 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         ChatMessage saved = chatMessageRepository.save(message);
 
+        // 발신자는 적은 순간 읽음 처리 → lastReadChatNo 갱신하면 n(읽지 않음)에 포함 안 됨
+        chatRoomService.updateLastReadMessage(room.getChatRoomNo(), member.getMemberNo(), saved.getChatNo());
+
         long unreadCount = chatRoomService.getUnreadMemberCount(
-                room.getChatRoomNo(), saved.getChatNo(), member.getMemberNo());
+                room.getChatRoomNo(), saved.getChatNo(), member.getMemberNo(), null);
         return ChatMessageResponseDto.from(saved, unreadCount);
     }
 
@@ -92,9 +95,13 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                 .findAllByChatRoomAndChatStatusAndChatMessageCreatedAtGreaterThanEqualOrderByChatMessageCreatedAtDesc(
                         room, "Y", roomMember.getChatRoomMemberJoinedAt(), pageable);
 
-        // 엔티티 Slice를 DTO Slice로 변환 (참여 중인 멤버 기준 읽지 않은 사람 수 포함)
-        return messages.map(msg -> ChatMessageResponseDto.from(msg,
-                chatRoomService.getUnreadMemberCount(chatRoomNo, msg.getChatNo(), msg.getMember().getMemberNo())));
+        // 엔티티 Slice를 DTO Slice로 변환 (참여 중인 멤버 기준 읽지 않은 사람 수 포함, 발신자 제외)
+        return messages.map(msg -> {
+            Long senderNo = msg.getMember() != null ? msg.getMember().getMemberNo() : null;
+            // requesterMemberNo = 채팅방 연 사람(요청자) → 카운트에서 제외해서 처음 들어왔을 때부터 n-1로 반환
+            long count = chatRoomService.getUnreadMemberCount(chatRoomNo, msg.getChatNo(), senderNo, memberNo);
+            return ChatMessageResponseDto.from(msg, count);
+        });
     }
 
 
@@ -265,8 +272,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         try {
             ChatMessage savedMessage = chatMessageRepository.save(message);
+            // 발신자는 적은 순간 읽음 처리 → lastReadChatNo 갱신하면 n(읽지 않음)에 포함 안 됨
+            chatRoomService.updateLastReadMessage(room.getChatRoomNo(), member.getMemberNo(), savedMessage.getChatNo());
             long unreadCount = chatRoomService.getUnreadMemberCount(
-                    room.getChatRoomNo(), savedMessage.getChatNo(), member.getMemberNo());
+                    room.getChatRoomNo(), savedMessage.getChatNo(), member.getMemberNo(), null);
             return ChatMessageResponseDto.from(savedMessage, unreadCount);
         } catch (Exception e) {
             // 메시지 저장 실패 시 업로드된 파일 삭제
@@ -315,30 +324,6 @@ public class ChatMessageServiceImpl implements ChatMessageService {
             Path chatUploadDir = uploadBaseDir.resolve("chat");
             Path filePath = chatUploadDir.resolve(fileName);
 
-            System.out.println("=== 파일 다운로드 디버깅 ===");
-            System.out.println("1. 설정된 uploadPath: " + uploadPath);
-            System.out.println("2. 현재 작업 디렉토리: " + System.getProperty("user.dir"));
-            System.out.println("3. 절대 경로로 변환된 위치: " + uploadBaseDir);
-            System.out.println("4. chat 폴더 경로: " + chatUploadDir);
-            System.out.println("5. 최종적으로 찾으려는 파일 경로: " + filePath);
-            System.out.println("6. 파일 실제 존재 여부: " + Files.exists(filePath));
-            System.out.println("7. 요청된 파일명: " + fileName);
-            
-            // 실제 uploads/chat 디렉토리 내용 확인
-            try {
-                if (Files.exists(chatUploadDir)) {
-                    System.out.println("7. chat 디렉토리 존재함. 내부 파일 목록:");
-                    Files.list(chatUploadDir).forEach(path -> 
-                        System.out.println("   - " + path.getFileName()));
-                } else {
-                    System.out.println("7. chat 디렉토리가 존재하지 않음!");
-                }
-            } catch (Exception e) {
-                System.out.println("7. 디렉토리 목록 조회 실패: " + e.getMessage());
-            }
-            
-            System.out.println("========================================");
-            
             // 파일 존재 여부 확인
             if (!Files.exists(filePath)) {
                 return org.springframework.http.ResponseEntity.notFound().build();

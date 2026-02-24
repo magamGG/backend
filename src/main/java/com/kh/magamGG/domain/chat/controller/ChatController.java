@@ -51,26 +51,11 @@ public class ChatController {
             @RequestParam(defaultValue = "all") String type,
             @RequestHeader(value = "X-Member-No", required = false) Long memberNo) {
         
-        System.out.println("=== 채팅방 목록 조회 API 호출 ===");
-        System.out.println("agencyNo: " + agencyNo);
-        System.out.println("type: " + type);
-        System.out.println("memberNo: " + memberNo);
-        
-        // 테스트용: memberNo가 null이면 기본값 1 사용
         if (memberNo == null) {
             memberNo = 1L;
-            System.out.println("memberNo가 null이어서 기본값 1로 설정");
         }
-        
-        try {
-            List<ChatRoomResponseDto> rooms = chatRoomService.getChatRoomsByAgency(agencyNo, type, memberNo);
-            System.out.println("조회된 채팅방 개수: " + (rooms != null ? rooms.size() : 0));
-            return ResponseEntity.ok(rooms);
-        } catch (Exception e) {
-            System.out.println("채팅방 조회 중 에러 발생: " + e.getMessage());
-            e.printStackTrace();
-            throw e;
-        }
+        List<ChatRoomResponseDto> rooms = chatRoomService.getChatRoomsByAgency(agencyNo, type, memberNo);
+        return ResponseEntity.ok(rooms);
     }
 
     /**
@@ -124,7 +109,6 @@ public class ChatController {
             readUpdate.put("memberNo", memberNo);
             readUpdate.put("lastChatNo", lastChatNo);
             messagingTemplate.convertAndSend("/topic/room/" + chatRoomNo, readUpdate);
-            System.out.println("[READ_UPDATE] 브로드캐스트 room=" + chatRoomNo + " memberNo=" + memberNo + " lastChatNo=" + lastChatNo);
         }
         return ResponseEntity.ok().build();
     }
@@ -138,7 +122,7 @@ public class ChatController {
             @PathVariable Long chatRoomNo,
             @PathVariable Long chatNo,
             @RequestParam(required = false) Long senderMemberNo) {
-        long unreadMemberCount = chatRoomService.getUnreadMemberCount(chatRoomNo, chatNo, senderMemberNo);
+        long unreadMemberCount = chatRoomService.getUnreadMemberCount(chatRoomNo, chatNo, senderMemberNo, null);
         Map<String, Object> body = new HashMap<>();
         body.put("unreadMemberCount", unreadMemberCount);
         return ResponseEntity.ok(body);
@@ -235,15 +219,9 @@ public class ChatController {
             @PathVariable String fileName,
             @RequestHeader(value = "X-Member-No", required = false) Long memberNo) {
 
-        System.out.println("=== 채팅 파일 다운로드 API 호출 ===");
-        System.out.println("chatRoomNo: " + chatRoomNo);
-        System.out.println("fileName: " + fileName);
-        System.out.println("memberNo: " + memberNo);
-
         try {
             return chatMessageService.downloadChatFile(fileName);
         } catch (Exception e) {
-            System.out.println("다운로드 에러: " + e.getMessage());
             return ResponseEntity.notFound().build();
         }
     }
