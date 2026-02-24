@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.List;
 
 @Getter
@@ -13,6 +12,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MemberDetailResponse {
+    private MemberResponse member; // 기본 회원 정보 (이메일, 전화번호 등)
     private List<String> currentProjects; // 참여 중인 프로젝트 목록
     private List<String> participatedProjects; // 참여한 프로젝트 목록
     private List<String> myWorks; // 내 작품 목록 (작가용)

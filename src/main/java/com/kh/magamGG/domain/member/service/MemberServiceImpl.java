@@ -484,7 +484,10 @@ public class MemberServiceImpl implements MemberService {
                 .build();
         }
 
+        MemberResponse memberResponse = convertToResponseWithManagerNo(member, null);
+
         return MemberDetailResponse.builder()
+            .member(memberResponse)
             .currentProjects(currentProjects)
             .participatedProjects(participatedProjects)
             .myWorks(myWorks)

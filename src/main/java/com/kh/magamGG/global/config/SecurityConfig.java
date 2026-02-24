@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -94,7 +95,7 @@ public class SecurityConfig {
                     "/api/auth/reset-password",
                     "/api/holidays/**",
                     "/login/oauth2/**",               // Spring Security OAuth2 엔드포인트
-                    "/oauth2/**"                      // OAuth2 관련 추가 엔드포인트
+                    "/oauth2/**"                  // OAuth2 관련 추가 엔드포인트
                 ).permitAll()
                 .requestMatchers("/uploads/**").permitAll()
                 .requestMatchers("/ws-stomp/**").permitAll()
