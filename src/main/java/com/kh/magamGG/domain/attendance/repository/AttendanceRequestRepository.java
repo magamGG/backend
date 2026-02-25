@@ -133,6 +133,26 @@ public interface AttendanceRequestRepository extends JpaRepository<AttendanceReq
             @Param("agencyNo") Long agencyNo,
             @Param("startDate") java.time.LocalDateTime startDate,
             @Param("endDate") java.time.LocalDateTime endDate);
+
+    /**
+     * 특정 회원의 근태 신청 중, 주어진 기간과 하루라도 겹치는 신청 조회
+     * - 상태: PENDING 또는 APPROVED 만 대상 (CANCELLED/REJECTED 는 중복 체크에서 제외)
+     * - 날짜 겹침 조건:
+     *   기존 신청의 시작일 <= 새 신청 종료일 AND 기존 신청의 종료일 >= 새 신청 시작일
+     */
+    @Query("SELECT ar FROM AttendanceRequest ar " +
+           "JOIN FETCH ar.member m " +
+           "LEFT JOIN FETCH ar.projectLeaveRequest plr " +
+           "LEFT JOIN FETCH plr.project " +
+           "WHERE m.memberNo = :memberNo " +
+           "AND ar.attendanceRequestStatus IN ('PENDING', 'APPROVED') " +
+           "AND ar.attendanceRequestStartDate <= :endDate " +
+           "AND ar.attendanceRequestEndDate >= :startDate " +
+           "ORDER BY ar.attendanceRequestStartDate ASC")
+    List<AttendanceRequest> findOverlappingByMemberNoAndDateRange(
+            @Param("memberNo") Long memberNo,
+            @Param("startDate") java.time.LocalDateTime startDate,
+            @Param("endDate") java.time.LocalDateTime endDate);
 }
 
 
