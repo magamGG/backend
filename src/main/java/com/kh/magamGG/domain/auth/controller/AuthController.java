@@ -446,6 +446,11 @@ public class AuthController {
                 .encode()  // 빌드 후 인코딩 적용 (한글 처리)
                 .toUriString();
 
+            // Refresh Token을 쿠키에 저장 (일반 로그인과 동일하게)
+            if (loginResponse.getRefreshToken() != null) {
+                addRefreshTokenCookie(response, loginResponse.getRefreshToken());
+            }
+
             response.sendRedirect(redirectUrl);
             return ResponseEntity.ok().build();
 

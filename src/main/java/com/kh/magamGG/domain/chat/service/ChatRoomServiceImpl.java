@@ -7,6 +7,10 @@ import com.kh.magamGG.domain.chat.entity.ChatRoomMember;
 import com.kh.magamGG.domain.chat.repository.ChatMessageRepository;
 import com.kh.magamGG.domain.chat.repository.ChatRoomMemberRepository;
 import com.kh.magamGG.domain.chat.repository.ChatRoomRepository;
+import com.kh.magamGG.domain.attendance.entity.Attendance;
+import com.kh.magamGG.domain.attendance.entity.AttendanceRequest;
+import com.kh.magamGG.domain.attendance.repository.AttendanceRepository;
+import com.kh.magamGG.domain.attendance.repository.AttendanceRequestRepository;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
 import com.kh.magamGG.domain.project.entity.Project;
@@ -17,10 +21,14 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -37,6 +45,8 @@ public class ChatRoomServiceImpl implements ChatRoomService {
     private final MemberRepository memberRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectRepository projectRepository;
+    private final AttendanceRequestRepository attendanceRequestRepository;
+    private final AttendanceRepository attendanceRepository;
 
     @Override
     @Transactional
@@ -211,8 +221,20 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         }
     }
 
+    /** 근태 신청 타입 → 금일 표시용 (휴가/재택근무/워케이션만) */
+    private static String requestTypeToDisplay(String requestType) {
+        if (requestType == null) return null;
+        String t = requestType.trim();
+        if ("연차".equals(t) || "반차".equals(t) || "반반차".equals(t) || "병가".equals(t) || "휴재".equals(t) || "휴가".equals(t)) {
+            return "휴가";
+        }
+        if ("재택근무".equals(t) || "재택".equals(t)) return "재택근무";
+        if ("워케이션".equals(t)) return "워케이션";
+        return null;
+    }
+
     /**
-     * 특정 채팅방의 참여자 목록 조회
+     * 특정 채팅방의 참여자 목록 조회 (오늘 근태 상태 todayDisplayStatus 포함)
      */
     @Override
     @Transactional(readOnly = true)
@@ -222,15 +244,91 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         
         List<ChatRoomMember> roomMembers = chatRoomMemberRepository.findAllByChatRoom(chatRoom);
         List<Map<String, Object>> result = new ArrayList<>();
+
+        Long agencyNo = chatRoom.getAgencyNo();
+        if (agencyNo == null && !roomMembers.isEmpty()) {
+            Member first = roomMembers.get(0).getMember();
+            if (first.getAgency() != null) {
+                agencyNo = first.getAgency().getAgencyNo();
+            }
+        }
+
+        Map<Long, String> memberStatusFromRequest = new LinkedHashMap<>();
+        Map<Long, String> lastAttendanceTypeByMember = new LinkedHashMap<>();
+        if (agencyNo != null) {
+            LocalDate today = LocalDate.now();
+            LocalDateTime todayStart = today.atStartOfDay();
+            LocalDateTime todayEnd = today.atTime(LocalTime.MAX);
+            List<AttendanceRequest> approvedToday;
+            try {
+                approvedToday = attendanceRequestRepository.findApprovedByAgencyNoAndDateBetween(agencyNo, todayStart, todayEnd);
+            } catch (Exception e) {
+                approvedToday = Collections.emptyList();
+            }
+            for (AttendanceRequest ar : approvedToday) {
+                String displayType = requestTypeToDisplay(ar.getAttendanceRequestType());
+                if (displayType == null) continue;
+                Long memberNo = ar.getMember().getMemberNo();
+                if ("휴가".equals(displayType)) memberStatusFromRequest.put(memberNo, displayType);
+            }
+            for (AttendanceRequest ar : approvedToday) {
+                String displayType = requestTypeToDisplay(ar.getAttendanceRequestType());
+                if ("재택근무".equals(displayType)) {
+                    Long memberNo = ar.getMember().getMemberNo();
+                    if (!memberStatusFromRequest.containsKey(memberNo)) memberStatusFromRequest.put(memberNo, displayType);
+                }
+            }
+            for (AttendanceRequest ar : approvedToday) {
+                String displayType = requestTypeToDisplay(ar.getAttendanceRequestType());
+                if ("워케이션".equals(displayType)) {
+                    Long memberNo = ar.getMember().getMemberNo();
+                    if (!memberStatusFromRequest.containsKey(memberNo)) memberStatusFromRequest.put(memberNo, displayType);
+                }
+            }
+            List<Attendance> todayRecords;
+            try {
+                todayRecords = attendanceRepository.findByAgency_AgencyNoAndDate(agencyNo, today);
+            } catch (Exception e) {
+                todayRecords = Collections.emptyList();
+            }
+            // 멤버별 오늘 마지막 근태 기록(출근/퇴근) → 작업중/작업 종료/작업 시작 전 (ORDER BY memberNo, attendanceTime DESC)
+            for (Attendance a : todayRecords) {
+                Long no = a.getMember().getMemberNo();
+                if (!lastAttendanceTypeByMember.containsKey(no)) {
+                    lastAttendanceTypeByMember.put(no, a.getAttendanceType());
+                }
+            }
+        }
         
+        final Map<Long, String> todayStatusMap = memberStatusFromRequest;
+        final Map<Long, String> lastTypeMap = lastAttendanceTypeByMember;
+
         for (ChatRoomMember roomMember : roomMembers) {
             Member member = roomMember.getMember();
             String profileImage = member.getMemberProfileImage();
+            Long memberNo = member.getMemberNo();
+
+            // 프로젝트 상세와 동일: 휴가/재택/워케이션 → 해당 표시, 출근→작업중, 퇴근→작업 종료, 그 외/미기록→작업 시작 전
+            String todayDisplayStatus = "작업 시작 전";
+            if (agencyNo != null) {
+                if (todayStatusMap.containsKey(memberNo)) {
+                    todayDisplayStatus = todayStatusMap.get(memberNo);
+                } else if (lastTypeMap.containsKey(memberNo)) {
+                    String lastType = lastTypeMap.get(memberNo);
+                    if ("출근".equals(lastType)) todayDisplayStatus = "작업중";
+                    else if ("퇴근".equals(lastType)) todayDisplayStatus = "작업 종료";
+                    else todayDisplayStatus = "작업 시작 전";
+                }
+            }
             
             Map<String, Object> memberInfo = new HashMap<>();
-            memberInfo.put("memberNo", member.getMemberNo());
+            memberInfo.put("memberNo", memberNo);
             memberInfo.put("memberName", member.getMemberName());
             memberInfo.put("memberRole", member.getMemberRole());
+            memberInfo.put("memberEmail", member.getMemberEmail());
+            memberInfo.put("memberPhone", member.getMemberPhone());
+            memberInfo.put("memberStatus", member.getMemberStatus());
+            memberInfo.put("todayDisplayStatus", todayDisplayStatus);
             memberInfo.put("profileImage", profileImage);
             memberInfo.put("joinedAt", roomMember.getChatRoomMemberJoinedAt());
             

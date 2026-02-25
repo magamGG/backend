@@ -57,23 +57,33 @@ public class MagamjigiAiService {
     public String getArtistHealthFeedback(Long memberNo) {
         validateArtistRole(memberNo);
 
-        int phq9 = getLatestScoreByOrderRange(memberNo, "월간 정신", 1, 9);
-        int gad = getLatestScoreByOrderRange(memberNo, "월간 정신", 10, 19);
-        int dash = getLatestTotalScore(memberNo, "월간 신체");
+        Integer phq9 = getLatestScoreByOrderRange(memberNo, "월간 정신", 1, 9);
+        Integer gad = getLatestScoreByOrderRange(memberNo, "월간 정신", 10, 19);
+        Integer dash = getLatestTotalScore(memberNo, "월간 신체");
+
+        // 설문 데이터가 모두 없을 때 처리
+        if (phq9 == null && gad == null && dash == null) {
+            return "아직 건강 설문을 완료하지 않으셨네요. 건강 관리를 위해 설문을 완료해주시면 더 정확한 건강 조언을 드릴 수 있어요.";
+        }
+
+        String phq9Text = phq9 != null ? phq9 + "점" : "미완료";
+        String gadText = gad != null ? gad + "점" : "미완료";
+        String dashText = dash != null ? dash + "점" : "미완료";
 
         String templateText =
             "너는 마감지기를 사용하는 웹툰/웹소설 작가의 건강을 챙겨주는 따뜻한 매니저야. " +
             "작가의 최근 건강 설문 결과를 3가지 검사별로 알려줄게.\n" +
-            "1) 우울 지수(PHQ-9): {phq9}점 (27점 만점, 10점 이상이면 주의)\n" +
-            "2) 불안 지수(GAD): {gad}점 (40점 만점, 16점 이상이면 주의)\n" +
-            "3) 손목/어깨 통증 지수(QuickDASH): {dash}점 (55점 만점, 25점 이상이면 주의)\n\n" +
+            "1) 우울 지수(PHQ-9): {phq9} (27점 만점, 10점 이상이면 주의)\n" +
+            "2) 불안 지수(GAD): {gad} (40점 만점, 16점 이상이면 주의)\n" +
+            "3) 손목/어깨 통증 지수(QuickDASH): {dash} (55점 만점, 25점 이상이면 주의)\n\n" +
             "각 검사 결과를 개별적으로 분석해서, " +
             "의학적 진단은 절대 배제하고, 현재 점수 상태에 대한 공감과 함께 " +
             "일상이나 작업 중에 할 수 있는 가벼운 스트레칭, 마인드컨트롤 팁을 " +
             "친근하고 부드러운 말투로 조언해 줘. " +
+            "미완료된 검사가 있으면 건강 관리를 위해 설문 완료를 권유해 줘. " +
             "각 검사별 1~2문장, 총 5문장 이내로 작성해.";
 
-        return callAi(templateText, Map.of("phq9", phq9, "gad", gad, "dash", dash));
+        return callAi(templateText, Map.of("phq9", phq9Text, "gad", gadText, "dash", dashText));
     }
 
     public String getManagerArtistHealthSummary(Long memberNo) {
@@ -91,12 +101,17 @@ public class MagamjigiAiService {
         for (ArtistAssignment assignment : assignments) {
             Member artist = assignment.getArtist();
             Long mNo = artist.getMemberNo();
-            int phq9 = getLatestScoreByOrderRange(mNo, "월간 정신", 1, 9);
-            int gad = getLatestScoreByOrderRange(mNo, "월간 정신", 10, 19);
-            int dash = getLatestTotalScore(mNo, "월간 신체");
-            artistData.append(String.format("- %s(%s): PHQ-9 %d점(%s), GAD %d점(%s), QuickDASH %d점(%s)\n",
+            Integer phq9 = getLatestScoreByOrderRange(mNo, "월간 정신", 1, 9);
+            Integer gad = getLatestScoreByOrderRange(mNo, "월간 정신", 10, 19);
+            Integer dash = getLatestTotalScore(mNo, "월간 신체");
+            
+            String phq9Text = phq9 != null ? String.format("%d점(%s)", phq9, evaluateRiskPhq9(phq9)) : "미완료";
+            String gadText = gad != null ? String.format("%d점(%s)", gad, evaluateRiskGad(gad)) : "미완료";
+            String dashText = dash != null ? String.format("%d점(%s)", dash, evaluateRiskDash(dash)) : "미완료";
+            
+            artistData.append(String.format("- %s(%s): PHQ-9 %s, GAD %s, QuickDASH %s\n",
                 artist.getMemberName(), artist.getMemberRole(),
-                phq9, evaluateRiskPhq9(phq9), gad, evaluateRiskGad(gad), dash, evaluateRiskDash(dash)));
+                phq9Text, gadText, dashText));
         }
 
         String templateText =
@@ -133,24 +148,31 @@ public class MagamjigiAiService {
 
         for (Map.Entry<Long, List<HealthSurveyResponseItem>> entry : byMember.entrySet()) {
             Long mNo = entry.getKey();
-            int phq9 = getLatestScoreByOrderRange(mNo, "월간 정신", 1, 9);
-            int gad = getLatestScoreByOrderRange(mNo, "월간 정신", 10, 19);
-            int dash = getLatestTotalScore(mNo, "월간 신체");
+            Integer phq9 = getLatestScoreByOrderRange(mNo, "월간 정신", 1, 9);
+            Integer gad = getLatestScoreByOrderRange(mNo, "월간 정신", 10, 19);
+            Integer dash = getLatestTotalScore(mNo, "월간 신체");
 
-            String rP = evaluateRiskPhq9(phq9);
-            if ("주의".equals(rP)) phq9Caution++;
-            else if ("경고".equals(rP)) phq9Warning++;
-            else if ("위험".equals(rP)) phq9Danger++;
+            // 설문 데이터가 있을 때만 위험도 평가
+            if (phq9 != null) {
+                String rP = evaluateRiskPhq9(phq9);
+                if ("주의".equals(rP)) phq9Caution++;
+                else if ("경고".equals(rP)) phq9Warning++;
+                else if ("위험".equals(rP)) phq9Danger++;
+            }
 
-            String rG = evaluateRiskGad(gad);
-            if ("주의".equals(rG)) gadCaution++;
-            else if ("경고".equals(rG)) gadWarning++;
-            else if ("위험".equals(rG)) gadDanger++;
+            if (gad != null) {
+                String rG = evaluateRiskGad(gad);
+                if ("주의".equals(rG)) gadCaution++;
+                else if ("경고".equals(rG)) gadWarning++;
+                else if ("위험".equals(rG)) gadDanger++;
+            }
 
-            String rD = evaluateRiskDash(dash);
-            if ("주의".equals(rD)) dashCaution++;
-            else if ("경고".equals(rD)) dashWarning++;
-            else if ("위험".equals(rD)) dashDanger++;
+            if (dash != null) {
+                String rD = evaluateRiskDash(dash);
+                if ("주의".equals(rD)) dashCaution++;
+                else if ("경고".equals(rD)) dashWarning++;
+                else if ("위험".equals(rD)) dashDanger++;
+            }
         }
 
         String templateText =
@@ -224,12 +246,20 @@ public class MagamjigiAiService {
             .collect(Collectors.groupingBy(i -> i.getMember().getMemberNo()));
         int phq9Risk = 0, gadRisk = 0, dashRisk = 0;
         for (Map.Entry<Long, List<HealthSurveyResponseItem>> entry : byMember.entrySet()) {
-            int phq9 = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 1, 9);
-            int gad = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 10, 19);
-            int dash = getLatestTotalScore(entry.getKey(), "월간 신체");
-            if ("경고".equals(evaluateRiskPhq9(phq9)) || "위험".equals(evaluateRiskPhq9(phq9))) phq9Risk++;
-            if ("경고".equals(evaluateRiskGad(gad)) || "위험".equals(evaluateRiskGad(gad))) gadRisk++;
-            if ("경고".equals(evaluateRiskDash(dash)) || "위험".equals(evaluateRiskDash(dash))) dashRisk++;
+            Integer phq9 = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 1, 9);
+            Integer gad = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 10, 19);
+            Integer dash = getLatestTotalScore(entry.getKey(), "월간 신체");
+            
+            // 설문 데이터가 있을 때만 위험도 평가
+            if (phq9 != null && ("경고".equals(evaluateRiskPhq9(phq9)) || "위험".equals(evaluateRiskPhq9(phq9)))) {
+                phq9Risk++;
+            }
+            if (gad != null && ("경고".equals(evaluateRiskGad(gad)) || "위험".equals(evaluateRiskGad(gad)))) {
+                gadRisk++;
+            }
+            if (dash != null && ("경고".equals(evaluateRiskDash(dash)) || "위험".equals(evaluateRiskDash(dash)))) {
+                dashRisk++;
+            }
         }
         String healthSummary = String.format("건강 위험/경고: 우울 %d명, 불안 %d명, 신체 %d명", phq9Risk, gadRisk, dashRisk);
 
@@ -345,12 +375,20 @@ public class MagamjigiAiService {
             .collect(Collectors.groupingBy(i -> i.getMember().getMemberNo()));
         int phq9Risk = 0, gadRisk = 0, dashRisk = 0;
         for (Map.Entry<Long, List<HealthSurveyResponseItem>> entry : byMember.entrySet()) {
-            int phq9 = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 1, 9);
-            int gad = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 10, 19);
-            int dash = getLatestTotalScore(entry.getKey(), "월간 신체");
-            if ("경고".equals(evaluateRiskPhq9(phq9)) || "위험".equals(evaluateRiskPhq9(phq9))) phq9Risk++;
-            if ("경고".equals(evaluateRiskGad(gad)) || "위험".equals(evaluateRiskGad(gad))) gadRisk++;
-            if ("경고".equals(evaluateRiskDash(dash)) || "위험".equals(evaluateRiskDash(dash))) dashRisk++;
+            Integer phq9 = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 1, 9);
+            Integer gad = getLatestScoreByOrderRange(entry.getKey(), "월간 정신", 10, 19);
+            Integer dash = getLatestTotalScore(entry.getKey(), "월간 신체");
+            
+            // 설문 데이터가 있을 때만 위험도 평가
+            if (phq9 != null && ("경고".equals(evaluateRiskPhq9(phq9)) || "위험".equals(evaluateRiskPhq9(phq9)))) {
+                phq9Risk++;
+            }
+            if (gad != null && ("경고".equals(evaluateRiskGad(gad)) || "위험".equals(evaluateRiskGad(gad)))) {
+                gadRisk++;
+            }
+            if (dash != null && ("경고".equals(evaluateRiskDash(dash)) || "위험".equals(evaluateRiskDash(dash)))) {
+                dashRisk++;
+            }
         }
         String healthSection = "[건강 위험/경고 인원]\n우울(PHQ-9): " + phq9Risk + "명, 불안(GAD): " + gadRisk + "명, 신체(QuickDASH): " + dashRisk + "명";
 
@@ -637,23 +675,33 @@ public class MagamjigiAiService {
     public String getManagerMyHealthFeedback(Long memberNo) {
         validateExactRole(memberNo, "담당자");
 
-        int phq9 = getLatestScoreByOrderRange(memberNo, "월간 정신", 1, 9);
-        int gad = getLatestScoreByOrderRange(memberNo, "월간 정신", 10, 19);
-        int dash = getLatestTotalScore(memberNo, "월간 신체");
+        Integer phq9 = getLatestScoreByOrderRange(memberNo, "월간 정신", 1, 9);
+        Integer gad = getLatestScoreByOrderRange(memberNo, "월간 정신", 10, 19);
+        Integer dash = getLatestTotalScore(memberNo, "월간 신체");
+
+        // 설문 데이터가 모두 없을 때 처리
+        if (phq9 == null && gad == null && dash == null) {
+            return "아직 건강 설문을 완료하지 않으셨네요. 건강 관리를 위해 설문을 완료해주시면 더 정확한 건강 조언을 드릴 수 있어요.";
+        }
+
+        String phq9Text = phq9 != null ? phq9 + "점" : "미완료";
+        String gadText = gad != null ? gad + "점" : "미완료";
+        String dashText = dash != null ? dash + "점" : "미완료";
 
         String templateText =
             "너는 마감지기를 사용하는 웹툰/웹소설 에이전시 담당자의 건강을 챙겨주는 따뜻한 매니저야. " +
             "담당자의 최근 건강 설문 결과를 3가지 검사별로 알려줄게.\n" +
-            "1) 우울 지수(PHQ-9): {phq9}점 (27점 만점, 10점 이상이면 주의)\n" +
-            "2) 불안 지수(GAD): {gad}점 (40점 만점, 16점 이상이면 주의)\n" +
-            "3) 손목/어깨 통증 지수(QuickDASH): {dash}점 (55점 만점, 25점 이상이면 주의)\n\n" +
+            "1) 우울 지수(PHQ-9): {phq9} (27점 만점, 10점 이상이면 주의)\n" +
+            "2) 불안 지수(GAD): {gad} (40점 만점, 16점 이상이면 주의)\n" +
+            "3) 손목/어깨 통증 지수(QuickDASH): {dash} (55점 만점, 25점 이상이면 주의)\n\n" +
             "각 검사 결과를 개별적으로 분석해서, " +
             "의학적 진단은 절대 배제하고, 현재 점수 상태에 대한 공감과 함께 " +
             "일상이나 업무 중에 할 수 있는 가벼운 스트레칭, 마인드컨트롤 팁을 " +
             "친근하고 부드러운 말투로 조언해 줘. " +
+            "미완료된 검사가 있으면 건강 관리를 위해 설문 완료를 권유해 줘. " +
             "각 검사별 1~2문장, 총 5문장 이내로 작성해.";
 
-        return callAi(templateText, Map.of("phq9", phq9, "gad", gad, "dash", dash));
+        return callAi(templateText, Map.of("phq9", phq9Text, "gad", gadText, "dash", dashText));
     }
 
     public String getManagerWorkationRecommendation(Long memberNo) {
@@ -995,20 +1043,20 @@ public class MagamjigiAiService {
         };
     }
 
-    private int getLatestTotalScore(Long memberNo, String healthSurveyQuestionType) {
+    private Integer getLatestTotalScore(Long memberNo, String healthSurveyQuestionType) {
         List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository
             .findByMemberNoAndHealthSurveyType(memberNo, healthSurveyQuestionType);
         return sumLatestScores(items);
     }
 
-    private int getLatestScoreByOrderRange(Long memberNo, String type, int minOrder, int maxOrder) {
+    private Integer getLatestScoreByOrderRange(Long memberNo, String type, int minOrder, int maxOrder) {
         List<HealthSurveyResponseItem> items = healthSurveyResponseItemRepository
             .findByMemberNoAndTypeAndOrderRange(memberNo, type, minOrder, maxOrder);
         return sumLatestScores(items);
     }
 
-    private int sumLatestScores(List<HealthSurveyResponseItem> items) {
-        if (items == null || items.isEmpty()) return 0;
+    private Integer sumLatestScores(List<HealthSurveyResponseItem> items) {
+        if (items == null || items.isEmpty()) return null;
 
         Map<LocalDateTime, List<HealthSurveyResponseItem>> byCreatedAt = items.stream()
             .filter(i -> i.getHealthSurveyQuestionItemCreatedAt() != null)
@@ -1016,7 +1064,7 @@ public class MagamjigiAiService {
         LocalDateTime latest = byCreatedAt.keySet().stream()
             .max(LocalDateTime::compareTo)
             .orElse(null);
-        if (latest == null) return 0;
+        if (latest == null) return null;
 
         return byCreatedAt.get(latest).stream()
             .mapToInt(i -> i.getHealthSurveyQuestionItemAnswerScore() != null

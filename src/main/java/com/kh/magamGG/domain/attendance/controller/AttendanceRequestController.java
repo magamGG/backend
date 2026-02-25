@@ -152,7 +152,14 @@ public class AttendanceRequestController {
     @GetMapping("/balance/{memberNo}")
     public ResponseEntity<LeaveBalanceResponse> getLeaveBalance(@PathVariable String memberNo) {
         try {
-            Long memberNoLong = Long.parseLong(memberNo);
+            // 공백 제거, 소수("1.0")·전각문자 등 허용 후 Long 변환
+            String trimmed = memberNo != null ? memberNo.trim() : "";
+            long parsed = (long) Double.parseDouble(trimmed);
+            if (parsed < 1) {
+                log.warn("[연차 잔액 조회] 회원번호는 1 이상이어야 함: memberNo={}", memberNo);
+                return ResponseEntity.badRequest().build();
+            }
+            Long memberNoLong = parsed;
             log.info("회원 {} 연차 잔액 조회", memberNoLong);
             LeaveBalanceResponse response = attendanceService.getLeaveBalance(memberNoLong);
             if (response == null) {
@@ -160,7 +167,8 @@ public class AttendanceRequestController {
             }
             return ResponseEntity.ok(response);
         } catch (NumberFormatException e) {
-            log.error("❌ [연차 잔액 조회] 잘못된 회원번호 형식: memberNo={}, error={}", memberNo, e.getMessage());
+            log.error("❌ [연차 잔액 조회] 잘못된 회원번호 형식: memberNo=[{}], length={}, error={}",
+                    memberNo, memberNo != null ? memberNo.length() : 0, e.getMessage());
             return ResponseEntity.badRequest().build();
         }
     }
