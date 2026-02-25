@@ -106,11 +106,16 @@ public-data:
     data-dir: holidays  # uploads/holidays 디렉토리에 저장
 
 # Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
+# 포트폴리오 → Notion 페이지 생성: Integration Token + 부모 페이지 ID (해당 페이지를 Integration에 공유)
 notion:
   client-id: ${NOTION_CLIENT_ID:your-notion-client-id}
   client-secret: ${NOTION_CLIENT_SECRET:your-notion-client-secret}
   redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
   api-version: "2022-06-28"
+  portfolio:
+    enabled: ${NOTION_PORTFOLIO_ENABLED:false}
+    integration-token: ${NOTION_PORTFOLIO_INTEGRATION_TOKEN:}
+    parent-page-id: ${NOTION_PORTFOLIO_PARENT_PAGE_ID:}
 
 # Google OAuth: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
 google:

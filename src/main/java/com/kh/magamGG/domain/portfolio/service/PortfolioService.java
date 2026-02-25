@@ -35,4 +35,14 @@ public interface PortfolioService {
      * 포트폴리오 수정 (본인만)
      */
     PortfolioResponse update(Long portfolioNo, Long memberNo, PortfolioUpdateRequest request);
+
+    /**
+     * 포트폴리오 삭제 (본인만, portfolio_status를 N으로 변경)
+     */
+    void delete(Long portfolioNo, Long memberNo);
+
+    /**
+     * 포트폴리오를 Notion 페이지로 연동(생성/갱신). 본인 포트폴리오만 가능.
+     */
+    PortfolioResponse syncNotion(Long portfolioNo, Long memberNo);
 }

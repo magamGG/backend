@@ -20,10 +20,12 @@ import java.util.stream.Collectors;
 public class PortfolioServiceImpl implements PortfolioService {
 
     private static final String STATUS_ACTIVE = "Y";
+    private static final String STATUS_INACTIVE = "N";
 
     private final PortfolioRepository portfolioRepository;
     private final MemberRepository memberRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final NotionPortfolioSyncService notionPortfolioSyncService;
 
     @Override
     @Transactional
@@ -122,6 +124,31 @@ public class PortfolioServiceImpl implements PortfolioService {
         return toResponse(portfolio);
     }
 
+    @Override
+    @Transactional
+    public void delete(Long portfolioNo, Long memberNo) {
+        Portfolio portfolio = portfolioRepository.findById(portfolioNo)
+                .orElseThrow(() -> new IllegalArgumentException("포트폴리오를 찾을 수 없습니다."));
+        if (portfolio.getMember() == null || !portfolio.getMember().getMemberNo().equals(memberNo)) {
+            throw new IllegalArgumentException("본인의 포트폴리오만 삭제할 수 있습니다.");
+        }
+        portfolio.setPortfolioStatus(STATUS_INACTIVE);
+        portfolioRepository.save(portfolio);
+    }
+
+    @Override
+    @Transactional
+    public PortfolioResponse syncNotion(Long portfolioNo, Long memberNo) {
+        Portfolio portfolio = portfolioRepository.findById(portfolioNo)
+                .orElseThrow(() -> new IllegalArgumentException("포트폴리오를 찾을 수 없습니다."));
+        if (portfolio.getMember() == null || !portfolio.getMember().getMemberNo().equals(memberNo)) {
+            throw new IllegalArgumentException("본인의 포트폴리오만 Notion 연동할 수 있습니다.");
+        }
+        notionPortfolioSyncService.syncPortfolioToNotion(portfolio);
+        portfolio = portfolioRepository.save(portfolio);
+        return toResponse(portfolio);
+    }
+
     private static String joinList(List<String> list) {
         if (list == null || list.isEmpty()) return null;
         return String.join("\n", list.stream().filter(s -> s != null && !s.isBlank()).toList());
@@ -144,6 +171,10 @@ public class PortfolioServiceImpl implements PortfolioService {
                 .portfolioStatus(p.getPortfolioStatus())
                 .portfolioCreatedAt(p.getPortfolioCreatedAt())
                 .portfolioUpdatedAt(p.getPortfolioUpdatedAt())
+                .notionPageId(p.getNotionPageId())
+                .notionPageUrl(p.getNotionPageUrl())
+                .notionWorkspaceName(p.getNotionWorkspaceName())
+                .profileImage(p.getMember() != null ? p.getMember().getMemberProfileImage() : null)
                 .build();
     }
 }

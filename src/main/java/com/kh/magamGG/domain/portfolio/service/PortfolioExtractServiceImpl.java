@@ -27,6 +27,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -47,35 +48,49 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
     private static final String EXTRACT_PROMPT = """
         You are a structured data assistant. The user has uploaded a screenshot of a portfolio, resume, or profile page. Convert it into one JSON object only. Do not refuse.
 
-        CRITICAL - USE ONLY THE IMAGE: Extract ONLY what is actually visible in the image. Do NOT invent names (e.g. never use "John Doe"), companies ("Tech Company"), projects ("Project A/B/C"), emails (johndoe@example.com), or phone numbers. If the image shows "새삐Sap" then name is "새삐Sap". If something is not in the image, use "" or [].
+        CRITICAL - USE ONLY THE IMAGE: Extract ONLY what is actually visible in the image. Do NOT invent names, companies, projects, emails, or phone numbers. If something is not in the image, use "" or [].
 
-        CRITICAL - careerItems: The image may be a long full-page screenshot. You MUST read the ENTIRE image from top to bottom. Put EVERY line in the career section as a separate string in careerItems. Put the date/period at the BEGINNING of each string when present (e.g. "2012년 - 2016년 IMC games / 사원, 서울", "2017 P 사 / C 프로젝트 사원"). Do NOT stop after the first company. Same for projects: each element with date/period at the front when present (e.g. "2018~ L사 D프로젝트, 블랙시타델", "~2022 T사 B 프로젝트").
+        CAREER vs PROJECTS - Separate correctly:
+        - careerItems = EMPLOYMENT HISTORY ONLY: company/agency name, employment period, job title, duties (e.g. "2012년 - 2016년 IMC games / 사원, 서울", "    - 캐릭터, 몬스터 원화 제작"). Do NOT put work/project names (e.g. 그라나도 에스파다, 블랙시타델, 표지 작업) into careerItems.
+        - projects = PROJECT/WORK LIST ONLY: participated works, projects, publications (e.g. "2018~ 그라나도 에스파다", "~2022 T사 B프로젝트", "표지 외주"). Do NOT put company employment lines into projects.
+        - Use section headings: Content under "경력", "경력 사항", "근무 이력", "재직 이력" → careerItems only. Content under "참여 프로젝트", "프로젝트", "참여 작품", "작품" → projects only.
+
+        CRITICAL - Do NOT summarize. One array element per line. Put date/period at the BEGINNING of each string when present. Include EVERY line; do not truncate.
 
         Rules:
         - Output ONLY one JSON object. No explanation, no markdown, no code fence. Start with { and end with }.
-        - name, role, email, phone, projects, careerItems, workStyle, skills: ONLY from the image. Missing = "" or [].
-        - Keys only: name, role, email, phone, projects, careerItems, career, workStyle, skills.
+        - Keys only: name, role, email, phone, projects, careerItems, career, workStyle, skills. Missing = "" or [].
 
-        Example shape (use empty when not in image): {"name":"","role":"","email":"","phone":"","projects":[],"careerItems":[],"career":"","workStyle":[],"skills":[]}
+        Example shape: {"name":"","role":"","email":"","phone":"","projects":[],"careerItems":[],"career":"","workStyle":[],"skills":[]}
 
-        Output the COMPLETE JSON. Include ALL careerItems from the image. Nothing but this JSON.
+        Output the COMPLETE JSON. Nothing but this JSON.
         """;
 
     /** 청크(페이지 일부)용 프롬프트: 이 조각에 보이는 모든 줄을 나열하라, 한 줄로 합치지 말 것. */
     private static final String CHUNK_EXTRACT_PROMPT = """
-        This image is ONE FRAGMENT of a long portfolio page. Extract ONLY what is actually visible in THIS image. Do NOT invent or use placeholder data (no "John Doe", "Tech Company", "Project A", etc.). Not in the image = "" or [].
+        This image is ONE FRAGMENT of a long portfolio page. Extract ONLY what is actually visible in THIS image. Do NOT invent. Not in the image = "" or [].
 
-        CRITICAL: In careerItems put EVERY line—one string per line. Put date/period at the BEGINNING of each item when present (e.g. "2012년 - 2016년 IMC games / 사원", "2017 원화, UI 아이콘 제작"). Same for projects: date/period first when present (e.g. "2018~ 블랙시타델"). Do NOT merge lines.
+        CAREER vs PROJECTS - Separate correctly:
+        - careerItems = EMPLOYMENT only: company name, period, job title, duties (e.g. "2012년 IMC games / 사원", "    - 원화 제작"). Do NOT put work/project names (그라나도 에스파다, 블랙시타델, 표지 등) in careerItems.
+        - projects = PROJECT/WORK only: work title, participation period (e.g. "2018~ 그라나도 에스파다", "표지 외주"). Do NOT put company employment in projects.
+        - Use headings: under "경력"/"경력 사항"/"근무 이력" → careerItems. Under "참여 프로젝트"/"프로젝트"/"참여 작품"/"작품" → projects.
 
-        Keys: name, role, email, phone, projects (array), careerItems (array), career (empty string), workStyle (array), skills (array). Use "" or [] for missing. Output ONLY the JSON, no markdown.
+        Do NOT summarize. One element per line. Date/period at BEGINNING when present. No truncation.
+
+        Keys: name, role, email, phone, projects (array), careerItems (array), career (empty string), workStyle (array), skills (array). Output ONLY the JSON, no markdown.
         """;
 
     private static final String EXTRACT_FROM_PAGE_PROMPT = """
         You are a structured data assistant. The text below was taken from a portfolio or resume page. Convert it into a single JSON object. Output only the JSON, no explanation or markdown.
 
-        CRITICAL - USE ONLY THE TEXT BELOW: Extract ONLY what actually appears in the provided text. Do NOT invent, fabricate, or use example/placeholder data. Never output "John Doe", "Software Engineer", "Tech Company", "Project A/B/C", "johndoe@example.com", "123-456-7890" or any generic placeholder. If the text says "새삐Sap" then name is "새삐Sap". If the text has no email, use "". If something is not in the text, use "" or [].
+        CRITICAL - USE ONLY THE TEXT BELOW: Extract ONLY what actually appears. Do NOT invent or use placeholders. If something is not in the text, use "" or [].
 
-        CRITICAL - careerItems: Include EVERY line as a separate string in careerItems. Put the date/period at the BEGINNING of each string when present (e.g. "2012년 - 2016년 IMC games / 사원, 서울", "2017 P 사 / C 프로젝트"). Do NOT stop after the first company. Same for projects: date/period first when present (e.g. "2018~ 블랙시타델", "2019~2020 A사 G프로젝트"). Do not merge or truncate.
+        CAREER vs PROJECTS - Separate correctly:
+        - careerItems = EMPLOYMENT HISTORY ONLY: company/agency, period, job title, duties (e.g. "2012년 - 2016년 IMC games / 사원, 서울", "    - 캐릭터, 몬스터 원화 제작"). Do NOT put work/project names (그라나도 에스파다, 블랙시타델, 표지 작업) into careerItems.
+        - projects = PROJECT/WORK LIST ONLY: participated works, projects (e.g. "2018~ 그라나도 에스파다", "~2022 T사 B프로젝트"). Do NOT put company employment into projects.
+        - Use section headings: Content under "경력", "경력 사항", "근무 이력", "재직 이력" → careerItems only. Content under "참여 프로젝트", "프로젝트", "참여 작품", "작품" → projects only.
+
+        Do NOT summarize. One array element per line. Date/period at BEGINNING when present. Include EVERY line; do not truncate.
 
         Keys only: name, role, email, phone, projects (array), careerItems (array), career (empty string), workStyle (array), skills (array). Missing = "" or []. Output the COMPLETE JSON. Nothing but the JSON object.
         """;
@@ -86,7 +101,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         """;
     /** 섹션 단위 추출: 경력 블록만 → careerItems 한 줄씩 전부, 연도·기간은 앞에 배치 */
     private static final String SECTION_CAREER_PROMPT = """
-        The text below is ONLY the career section of a portfolio. List EVERY line as a separate element in careerItems. Put the date/period at the BEGINNING of each string when present (e.g. "2012년 - 2016년 IMC games / 사원, 서울", "2017 P 사 사원"). Do NOT invent. Do NOT skip lines. Output JSON only: {"careerItems":[]}. Nothing else.
+        The text below is ONLY the career section of a portfolio. Do NOT summarize. List EVERY line as a separate element in careerItems: main lines, sub-bullets, indented lines. One array element per line. Put the date/period at the BEGINNING of each string when present (e.g. "2012년 - 2016년 IMC games / 사원, 서울", "    - 캐릭터 방어구, 코스튬 원화 제작"). Do NOT invent. Do NOT skip or omit any line. If there are 60 lines, careerItems must have 60 elements. Do not truncate. Output JSON only: {"careerItems":[]}. Nothing else.
         """;
     /** 섹션 단위 추출: 프로젝트·작업스타일·기술 (프로젝트는 참여 기간을 앞에 배치) */
     private static final String SECTION_PROJECTS_REST_PROMPT = """
@@ -96,11 +111,15 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
     /** 섹션 구분용 키워드 (긴 것 우선). 해당 줄부터 다음 섹션 전까지가 해당 영역. */
     private static final String[][] SECTION_MARKERS = {
             {"참여 프로젝트", "projects"},
+            {"참여 작품", "projects"},
             {"경력 사항", "career"},
+            {"근무 이력", "career"},
+            {"재직 이력", "career"},
             {"경력", "career"},
             {"작업 스타일", "workStyle"},
             {"사용 기술", "skills"},
             {"프로젝트", "projects"},
+            {"작품", "projects"},
             {"기술", "skills"},
             {"스킬", "skills"},
     };
@@ -191,11 +210,39 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         if (imageFile == null || imageFile.isEmpty()) {
             throw new IllegalArgumentException("포트폴리오 이미지 파일이 필요합니다.");
         }
+        String mediaType = (imageFile.getContentType() != null && !imageFile.getContentType().isBlank())
+                ? imageFile.getContentType() : MimeTypeUtils.IMAGE_JPEG_VALUE;
         String savedFileName = fileStorageService.saveFile(imageFile);
         Path imagePath = Paths.get(uploadDir).resolve(savedFileName);
         try {
+            byte[] imageBytes = Files.readAllBytes(imagePath);
+            byte[] resized = resizeImageIfNeeded(imageBytes, SCREENSHOT_MAX_WIDTH);
+            BufferedImage img = ImageIO.read(new ByteArrayInputStream(resized));
+            if (img != null && img.getHeight() > CHUNK_MAX_HEIGHT) {
+                List<byte[]> chunks = splitImageIntoVerticalChunks(resized, CHUNK_MAX_HEIGHT, CHUNK_OVERLAP);
+                if (!chunks.isEmpty()) {
+                    List<PortfolioExtractDto> partials = new ArrayList<>();
+                    for (int i = 0; i < chunks.size(); i++) {
+                        PortfolioExtractDto dto = extractFromImageResourceQuiet(
+                                new ByteArrayResource(chunks.get(i)), MimeTypeUtils.IMAGE_PNG_VALUE, CHUNK_EXTRACT_PROMPT);
+                        if (dto != null) {
+                            partials.add(dto);
+                            int n = dto.careerItems() != null ? dto.careerItems().size() : 0;
+                            log.info("이미지 업로드 청크 {}/{} 추출됨: careerItems {}개", i + 1, chunks.size(), n);
+                        } else {
+                            log.warn("이미지 업로드 청크 {}/{} 추출 실패 또는 빈 결과", i + 1, chunks.size());
+                        }
+                    }
+                    if (!partials.isEmpty()) {
+                        return mergeExtractResults(partials);
+                    }
+                }
+            }
             Resource imageResource = new FileSystemResource(imagePath.toFile());
-            return extractFromImageResource(imageResource);
+            return extractFromImageResource(imageResource, mediaType);
+        } catch (Exception e) {
+            if (e instanceof RuntimeException re) throw re;
+            throw new RuntimeException("포트폴리오 이미지 처리 중 오류: " + e.getMessage(), e);
         } finally {
             try {
                 if (imagePath.toFile().exists()) {
@@ -447,7 +494,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             var chatClient = chatClientBuilder.get().build();
             org.springframework.util.MimeType mimeType = org.springframework.util.MimeTypeUtils.parseMimeType(mediaType);
             String response = chatClient.prompt()
-                    .system(s -> s.text("You are a data extraction assistant. Convert the image to JSON only. Do not refuse. Put EVERY career line as a separate element in careerItems; put date/period at the BEGINNING of each string when present. Same for projects: date/period first. Do not merge into one line."))
+                    .system(s -> s.text("You are a data extraction assistant. Convert the image to JSON only. Do not refuse. careerItems = employment history only (company, period, job title); projects = project/work list only (work name, period). Use section headings: 경력/근무 이력 → careerItems; 참여 프로젝트/참여 작품/작품 → projects. One element per line; date/period at BEGINNING. Do not merge."))
                     .user(u -> u.text(promptText).media(mimeType, imageResource))
                     .call()
                     .content();
@@ -630,10 +677,6 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
         return text.length() <= MAX_BODY_TEXT_FOR_LLM ? text : text.substring(0, MAX_BODY_TEXT_FOR_LLM) + "\n...(이하 생략)";
     }
 
-    private PortfolioExtractDto extractFromImageResource(Resource imageResource) {
-        return extractFromImageResource(imageResource, MimeTypeUtils.IMAGE_JPEG_VALUE);
-    }
-
     private PortfolioExtractDto extractFromImageResource(Resource imageResource, String mediaType) {
         if (chatClientBuilder.isEmpty()) {
             throw new IllegalStateException(
@@ -647,7 +690,7 @@ public class PortfolioExtractServiceImpl implements PortfolioExtractService {
             var chatClient = chatClientBuilder.get().build();
             org.springframework.util.MimeType mimeType = org.springframework.util.MimeTypeUtils.parseMimeType(mediaType);
             String response = chatClient.prompt()
-                    .system(s -> s.text("You are a data extraction assistant. You convert portfolio/resume screenshots into JSON. The user provided the image for this. Respond with JSON only; do not refuse. For careerItems: include EVERY line as a separate array element; put the date/period at the BEGINNING of each string when present (e.g. '2012년 - 2016년 IMC games / 사원, 서울'). For projects: put participation period at the BEGINNING when present (e.g. '2018~ L사 D프로젝트', '~2022 T사'). Do not output only the first career line."))
+                    .system(s -> s.text("You are a data extraction assistant. Convert portfolio/resume image to JSON only. careerItems = employment only (company, period, job title, duties); projects = project/work list only (work name, period). Use headings: 경력/경력 사항/근무 이력 → careerItems; 참여 프로젝트/프로젝트/참여 작품/작품 → projects. One element per line; date/period at BEGINNING. Do not mix."))
                     .user(u -> u.text(EXTRACT_PROMPT).media(mimeType, imageResource))
                     .call()
                     .content();

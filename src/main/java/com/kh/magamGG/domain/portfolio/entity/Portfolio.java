@@ -61,6 +61,18 @@ public class Portfolio {
     @Column(name = "PORTFOLIO_UPDATED_AT")
     private LocalDateTime portfolioUpdatedAt;
 
+    @Column(name = "NOTION_PAGE_ID", length = 36)
+    private String notionPageId;
+
+    @Column(name = "NOTION_PAGE_URL", length = 500)
+    private String notionPageUrl;
+
+    @Column(name = "NOTION_ACCESS_TOKEN", length = 500)
+    private String notionAccessToken;
+
+    @Column(name = "NOTION_WORKSPACE_NAME", length = 100)
+    private String notionWorkspaceName;
+
     @PrePersist
     protected void onCreate() {
         if (portfolioCreatedAt == null) {

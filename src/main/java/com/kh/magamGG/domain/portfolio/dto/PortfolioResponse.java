@@ -27,4 +27,9 @@ public class PortfolioResponse {
     private String portfolioStatus;
     private LocalDateTime portfolioCreatedAt;
     private LocalDateTime portfolioUpdatedAt;
+    private String notionPageId;
+    private String notionPageUrl;
+    private String notionWorkspaceName;
+    /** 작가(회원) 프로필 사진 경로. Member.MEMBER_PROFILE_IMAGE에서 채움. */
+    private String profileImage;
 }
