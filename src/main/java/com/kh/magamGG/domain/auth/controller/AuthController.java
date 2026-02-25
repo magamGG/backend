@@ -28,7 +28,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 /**
  * 인증 컨트롤러
- * 
+ *
  * 주요 변경사항:
  * - /api/auth/reissue 엔드포인트 추가 (쿠키에서 Refresh Token 추출)
  * - Refresh Token Rotation 적용
@@ -56,14 +56,14 @@ public class AuthController {
             @RequestBody LoginRequest request,
             HttpServletResponse httpResponse) {
         LoginResponse response = authService.login(request);
-        
+
         // Refresh Token을 쿠키에 저장 (reissue 시 쿠키에서 읽기 위해)
         // Valkey에는 이미 AuthService.login()에서 저장됨
         if (response.getRefreshToken() != null) {
             addRefreshTokenCookie(httpResponse, response.getRefreshToken());
             log.info("✅ [로그인] Refresh Token 쿠키 저장 완료");
         }
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -80,28 +80,28 @@ public class AuthController {
 
     /**
      * 토큰 재발급 엔드포인트 (쿠키 기반)
-     * 
+     *
      * 작동 원리:
      * 1. HttpOnly 쿠키에서 Refresh Token 추출
      * 2. Valkey에 저장된 토큰과 비교
      * 3. 일치하면 기존 토큰 삭제 후 새 토큰 발급 (Rotation)
      * 4. 새 Refresh Token을 쿠키에 저장 + Valkey에 저장
      * 5. 새 Access Token을 응답으로 반환
-     * 
+     *
      * 보안 고려사항:
      * - 쿠키에서 토큰을 추출하므로 XSS 공격에 안전 (HttpOnly)
      * - 토큰 불일치 시 모든 세션 무효화
      */
     /**
      * 토큰 재발급 엔드포인트 (쿠키 기반)
-     * 
+     *
      * 작동 원리:
      * 1. HttpOnly 쿠키에서 Refresh Token 추출
      * 2. Valkey에 저장된 토큰과 비교
      * 3. 일치하면 기존 토큰 삭제 후 새 토큰 발급 (Rotation)
      * 4. 새 Refresh Token을 쿠키에 저장 + Valkey에 저장
      * 5. 새 Access Token을 응답으로 반환
-     * 
+     *
      * 보안 고려사항:
      * - 쿠키에서 토큰을 추출하므로 XSS 공격에 안전 (HttpOnly)
      * - 토큰 불일치 시 모든 세션 무효화
@@ -113,8 +113,8 @@ public class AuthController {
             HttpServletResponse response) {
 
         log.info("🔄 [토큰 재발급] /api/auth/reissue 요청 시작");
-        log.debug("🔄 [토큰 재발급] 요청 헤더 확인: Origin={}, Cookie={}", 
-                request.getHeader("Origin"), 
+        log.debug("🔄 [토큰 재발급] 요청 헤더 확인: Origin={}, Cookie={}",
+                request.getHeader("Origin"),
                 request.getHeader("Cookie") != null ? "있음" : "없음");
 
         // 1. 쿠키에서 Refresh Token 추출
@@ -128,7 +128,7 @@ public class AuthController {
                             .refreshToken(null)
                             .build());
         }
-        
+
         log.info("✅ [토큰 재발급] 쿠키에서 Refresh Token 추출 성공: 길이={}", refreshToken.length());
 
         // 2. Refresh Token 검증 (JWT 서명 및 만료 시간)
@@ -149,7 +149,7 @@ public class AuthController {
             log.error("❌ [토큰 재발급] 토큰에서 회원번호 추출 실패: {}", e.getMessage());
             return ResponseEntity.status(401).build();
         }
-        
+
         // 4. 회원 정보 조회 (이메일 가져오기)
         String email = authService.getMemberEmail(memberNo);
         if (email == null) {
@@ -173,7 +173,7 @@ public class AuthController {
                             .refreshToken(null)
                             .build());
         }
-        log.info("✅ [토큰 재발급] Valkey에 Refresh Token 존재 확인: email={}, key={}, hashLength={}", 
+        log.info("✅ [토큰 재발급] Valkey에 Refresh Token 존재 확인: email={}, key={}, hashLength={}",
                 email, key, storedTokenHash != null ? storedTokenHash.length() : 0);
 
         // 6. 새 Access Token 발급
@@ -217,11 +217,11 @@ public class AuthController {
 
         log.debug("🍪 [쿠키 추출] 총 {}개의 쿠키 발견", cookies.length);
         for (Cookie cookie : cookies) {
-            log.debug("🍪 [쿠키 추출] 쿠키 이름: {}, 값 길이: {}", 
+            log.debug("🍪 [쿠키 추출] 쿠키 이름: {}, 값 길이: {}",
                     cookie.getName(), cookie.getValue() != null ? cookie.getValue().length() : 0);
             if ("refreshToken".equals(cookie.getName())) {
                 String tokenValue = cookie.getValue();
-                log.info("✅ [쿠키 추출] Refresh Token 발견: 길이={}", 
+                log.info("✅ [쿠키 추출] Refresh Token 발견: 길이={}",
                         tokenValue != null ? tokenValue.length() : 0);
                 return tokenValue;
             }
@@ -238,7 +238,7 @@ public class AuthController {
         boolean isLocal = "local".equals(activeProfile);
         int maxAge = (int) (refreshExpiration / 1000);
         String secureFlag = isLocal ? "" : "Secure; ";
-        
+
         String cookieValue = String.format(
             "refreshToken=%s; HttpOnly; Path=/; Max-Age=%d; %sSameSite=Strict",
             refreshToken,
@@ -250,7 +250,7 @@ public class AuthController {
 
     /**
      * 로그아웃 처리
-     * 
+     *
      * 처리 과정:
      * 1. 쿠키에서 Refresh Token 추출
      * 2. Valkey에서 Refresh Token 즉시 삭제
@@ -261,25 +261,25 @@ public class AuthController {
             @RequestBody(required = false) RefreshTokenRequest request,
             HttpServletRequest httpRequest,
             HttpServletResponse httpResponse) {
-        
+
         log.info("🚪 [로그아웃] 요청 시작");
-        
+
         // 쿠키에서 Refresh Token 추출 시도
         String refreshToken = extractRefreshTokenFromCookie(httpRequest);
-        
+
         // Request Body에서도 시도 (하위 호환성)
         if (refreshToken == null && request != null) {
             refreshToken = request.getRefreshToken();
         }
-        
+
         if (refreshToken != null) {
             // Valkey에서 Refresh Token 삭제
             authService.logout(refreshToken);
         }
-        
+
         // 쿠키 만료 처리 (Max-Age=0으로 설정하여 즉시 삭제)
         expireRefreshTokenCookie(httpResponse);
-        
+
         log.info("✅ [로그아웃] 완료");
         return ResponseEntity.ok().build();
     }
@@ -309,14 +309,14 @@ public class AuthController {
     @PostMapping("/verify-reset-code")
     public ResponseEntity<VerifyResponse> verifyResetCode(@RequestBody VerifyResetCodeRequest request) {
         boolean isValid = passwordResetService.verifyResetCode(
-            request.getEmail(), 
+            request.getEmail(),
             request.getCode()
         );
-        
+
         VerifyResponse response = new VerifyResponse();
         response.setVerified(isValid);
         response.setMessage(isValid ? "인증이 완료되었습니다." : "인증 코드가 올바르지 않거나 만료되었습니다.");
-        
+
         return ResponseEntity.ok(response);
     }
 
@@ -326,8 +326,8 @@ public class AuthController {
     @PostMapping("/reset-password")
     public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
         passwordResetService.resetPassword(
-            request.getEmail(), 
-            request.getCode(), 
+            request.getEmail(),
+            request.getCode(),
             request.getNewPassword()
         );
         return ResponseEntity.ok().build();
@@ -410,10 +410,10 @@ public class AuthController {
                 response.sendRedirect(loginUrl);
                 return ResponseEntity.ok().build();
             }
-            
+
             LoginResponse loginResponse;
             String frontendCallbackUrl;
-            
+
             switch (provider.toLowerCase()) {
                 case "google":
                     loginResponse = googleOAuthService.handleCallback(code);
@@ -432,7 +432,7 @@ public class AuthController {
                 default:
                     throw new IllegalArgumentException("지원하지 않는 OAuth 제공자입니다: " + provider);
             }
-            
+
             // 프론트엔드로 리디렉션
             String redirectUrl = UriComponentsBuilder
                 .fromUriString(frontendCallbackUrl)
@@ -445,10 +445,10 @@ public class AuthController {
                 .build()  // false (기본값)로 빌드
                 .encode()  // 빌드 후 인코딩 적용 (한글 처리)
                 .toUriString();
-            
+
             response.sendRedirect(redirectUrl);
             return ResponseEntity.ok().build();
-            
+
         } catch (OAuthRegistrationRequiredException e) {
             // 신규 회원인 경우 회원가입 페이지로 리디렉션
             log.info("{} OAuth 신규 회원 감지: email={}, name={}", provider, e.getEmail(), e.getName());
