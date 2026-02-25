@@ -60,14 +60,42 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
 
     @Override
     public List<TodayTaskResponse> getTodayTasksForMember(Long memberNo) {
-        List<KanbanCard> cards = kanbanCardRepository
-            .findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(memberNo, "N");
         LocalDate today = LocalDate.now();
-        // 기간 지난 업무(마감일이 오늘 이전인 카드) 제외 - 대시보드 오늘 할 일에만 미래/오늘 마감만 노출
-        return cards.stream()
-            .filter(card -> card.getKanbanCardEndedAt() == null || !card.getKanbanCardEndedAt().isBefore(today))
+        // 미완료(N) + 완료(Y) 둘 다 조회 → 오늘 기간에 해당하는 건 목록에 유지 (다른 페이지 갔다 와도 완료된 일이 사라지지 않도록)
+        List<KanbanCard> notCompleted = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusAndBoardVisibleOrderByKanbanCardEndedAtAsc(memberNo, "N");
+        List<KanbanCard> completed = kanbanCardRepository
+            .findByProjectMember_Member_MemberNoAndKanbanCardStatusAndBoardVisibleOrderByKanbanCardEndedAtAsc(memberNo, "Y");
+        return java.util.stream.Stream.concat(
+            notCompleted.stream().filter(card -> isTodayWithinCardPeriod(card, today)),
+            completed.stream().filter(card -> isTodayWithinCardPeriod(card, today))
+        )
+            .sorted((a, b) -> {
+                LocalDate ea = a.getKanbanCardEndedAt();
+                LocalDate eb = b.getKanbanCardEndedAt();
+                if (ea == null && eb == null) return 0;
+                if (ea == null) return 1;
+                if (eb == null) return -1;
+                return ea.compareTo(eb);
+            })
             .map(this::toTodayTaskResponse)
             .collect(Collectors.toList());
+    }
+
+    /** 카드의 시작일~마감일 구간에 오늘이 포함되는지 여부 */
+    private boolean isTodayWithinCardPeriod(KanbanCard card, LocalDate today) {
+        LocalDate start = card.getKanbanCardStartedAt();
+        LocalDate end = card.getKanbanCardEndedAt();
+        if (start != null && end != null) {
+            return !today.isBefore(start) && !today.isAfter(end);
+        }
+        if (end != null) {
+            return today.equals(end);
+        }
+        if (start != null) {
+            return !today.isBefore(start);
+        }
+        return false;
     }
 
     @Override
@@ -182,6 +210,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         String projectColor = project != null ? project.getProjectColor() : null;
         Long projectNo = project != null ? project.getProjectNo() : null;
         Long boardId = card.getKanbanBoard() != null ? card.getKanbanBoard().getKanbanBoardNo() : null;
+        String startDate = card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt().format(DATE_FMT) : null;
         String dueDate = card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt().format(DATE_FMT) : null;
         return TodayTaskResponse.builder()
             .id(card.getKanbanCardNo())
@@ -191,7 +220,9 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             .boardId(boardId)
             .title(card.getKanbanCardName())
             .description(card.getKanbanCardDescription())
+            .startDate(startDate)
             .dueDate(dueDate)
+            .completed("Y".equals(card.getKanbanCardStatus()))
             .build();
     }
 
