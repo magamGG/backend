@@ -9,10 +9,16 @@ import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
 import com.kh.magamGG.domain.attendance.service.AttendanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 근태 신청 컨트롤러
@@ -25,6 +31,9 @@ import java.util.List;
 public class AttendanceRequestController {
     
     private final AttendanceService attendanceService;
+
+    @Value("${file.upload-dir:uploads}")
+    private String uploadDir;
     
     /**
      * 근태 신청 생성
@@ -189,6 +198,40 @@ public class AttendanceRequestController {
         log.info("회원 {} 연차 조정 요청: 사유={}, 조정일수={}", memberNo, request.getReason(), request.getAdjustment());
         LeaveBalanceResponse response = attendanceService.adjustLeaveBalance(memberNo, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 근태 신청 첨부 파일 업로드 (병가 진단서 등)
+     * POST /api/leave/file/upload
+     *
+     * - 파일은 uploads/attendance 하위에 저장
+     * - 응답으로 파일명을 반환 (예: uuid.gif)
+     */
+    @PostMapping("/file/upload")
+    public ResponseEntity<String> uploadAttendanceFile(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body("파일이 비어 있습니다.");
+        }
+        try {
+            Path baseDir = Paths.get(uploadDir).toAbsolutePath();
+            Path attendanceDir = baseDir.resolve("attendance");
+            Files.createDirectories(attendanceDir);
+
+            String originalFilename = file.getOriginalFilename();
+            String extension = (originalFilename != null && originalFilename.contains("."))
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : "";
+            String fileName = UUID.randomUUID().toString() + extension;
+
+            Path filePath = attendanceDir.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath);
+
+            log.info("근태 첨부 파일 업로드 완료: {}", filePath);
+            return ResponseEntity.ok(fileName);
+        } catch (Exception e) {
+            log.error("근태 첨부 파일 업로드 실패: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body("파일 업로드에 실패했습니다.");
+        }
     }
 
     /**

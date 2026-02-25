@@ -99,8 +99,26 @@ public class AttendanceServiceImpl implements AttendanceService {
         // 시작일은 00:00:00, 종료일은 23:59:59로 설정
         LocalDateTime startDate = parseDateTime(request.getAttendanceRequestStartDate(), false);
         LocalDateTime endDate = parseDateTime(request.getAttendanceRequestEndDate(), true);
+
+        // 1) 동일 회원의 기존 근태 신청과 기간이 겹치면 차단 (PENDING/APPROVED 만 대상)
+        List<AttendanceRequest> overlapping = attendanceRequestRepository
+                .findOverlappingByMemberNoAndDateRange(memberNo, startDate, endDate);
+        if (!overlapping.isEmpty()) {
+            AttendanceRequest existing = overlapping.get(0);
+            String existingStart = existing.getAttendanceRequestStartDate()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String existingEnd = existing.getAttendanceRequestEndDate()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            String status = existing.getAttendanceRequestStatus();
+            String displayStatus = "PENDING".equals(status) ? "대기" :
+                    "APPROVED".equals(status) ? "승인" : status;
+            throw new IllegalStateException(
+                    String.format("이미 해당 기간에 근태 신청이 있습니다. (기간: %s ~ %s, 상태: %s)",
+                            existingStart, existingEnd, displayStatus)
+            );
+        }
         
-        // AttendanceRequest 엔티티 생성
+        // 2) AttendanceRequest 엔티티 생성
         AttendanceRequest attendanceRequest = AttendanceRequest.builder()
                 .member(member)
                 .attendanceRequestType(request.getAttendanceRequestType())
