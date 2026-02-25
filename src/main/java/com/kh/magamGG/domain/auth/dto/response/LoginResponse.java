@@ -10,7 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class LoginResponse {
-    private String token;
+    private String token;  // 기존 프론트엔드 호환성 유지 (Access Token)
+    private String accessToken;  // 새 필드 (명시적)
+    private String refreshToken;  // 새 필드
     private Long memberNo;
     private String memberName;
     private String memberRole;
