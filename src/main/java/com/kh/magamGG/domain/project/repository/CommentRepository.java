@@ -25,6 +25,16 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
            "ORDER BY c.commentCreatedAt DESC")
     List<Comment> findRecentByProjectNos(@Param("projectNos") List<Long> projectNos, Pageable pageable);
 
+    /** 소속 프로젝트 칸반 카드에 달린 최신 ACTIVE 코멘트만 조회 (작가 대시보드 피드백 - 담당자/본인 구분 없이 모두 표시) */
+    @Query("SELECT c FROM Comment c " +
+           "JOIN c.kanbanCard kc " +
+           "JOIN kc.kanbanBoard kb " +
+           "JOIN kb.project p " +
+           "WHERE p.projectNo IN :projectNos " +
+           "AND c.commentStatus = 'ACTIVE' " +
+           "ORDER BY c.commentCreatedAt DESC")
+    List<Comment> findRecentActiveByProjectNos(@Param("projectNos") List<Long> projectNos, Pageable pageable);
+
     /**
      * 담당자인 카드에 다른 사람이 작성한 최신 코멘트만 조회 (아티스트 대시보드 피드백용).
      * - 카드 담당자(projectMember.member) = 요청 회원

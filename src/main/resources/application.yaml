@@ -98,19 +98,16 @@ server:
 file:
   upload-dir: uploads
 
+  # Notion 등 외부에서 이미지 로드 시 사용할 공개 URL (배포 시 HTTPS 도메인으로 설정)
+  app:
+    public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8888}
+
 # 공공데이터 API 설정
 public-data:
   holiday:
     api-key: ${PUBLIC_DATA_API_KEY:}
     base-url: http://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService
     data-dir: holidays  # uploads/holidays 디렉토리에 저장
-
-# Notion OAuth: NOTION_CLIENT_ID, NOTION_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
-notion:
-  client-id: ${NOTION_CLIENT_ID:}
-  client-secret: ${NOTION_CLIENT_SECRET:}
-  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
-  api-version: "2022-06-28"
 
 # Google OAuth: GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
 google:
@@ -141,3 +138,13 @@ kakao:
     authorization-url: https://kauth.kakao.com/oauth/authorize
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
+# 포트폴리오 → Notion 페이지 생성: Integration Token + 부모 페이지 ID (해당 페이지를 Integration에 공유)
+notion:
+  client-id: ${NOTION_CLIENT_ID:}
+  client-secret: ${NOTION_CLIENT_SECRET:}
+  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
+  api-version: "2022-06-28"
+  portfolio:
+    enabled: ${NOTION_PORTFOLIO_ENABLED:false}
+    integration-token: ${NOTION_PORTFOLIO_INTEGRATION_TOKEN:}
+    parent-page-id: ${NOTION_PORTFOLIO_PARENT_PAGE_ID:}

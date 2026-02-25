@@ -44,33 +44,37 @@ public class NotionSyncService {
     @Transactional
     @SuppressWarnings("unchecked")
     public void syncCardCreateSync(KanbanCard card, Project project) {
-        if (project.getNotionAccessToken() == null || project.getNotionDatabaseId() == null) {
+        if (project == null || project.getNotionAccessToken() == null || project.getNotionDatabaseId() == null) {
             return;
         }
+        // @Async로 다른 스레드에서 실행되므로 detached 엔티티의 lazy 로딩 방지 — DB에서 보드/담당자 포함 재조회
+        KanbanCard loaded = (card.getKanbanCardNo() != null)
+            ? kanbanCardRepository.findByIdWithBoardAndMember(card.getKanbanCardNo()).orElse(card)
+            : card;
 
         try {
             HttpHeaders headers = buildHeaders(project.getNotionAccessToken());
 
             Map<String, Object> properties = new LinkedHashMap<>();
             properties.put("Name", Map.of("title", List.of(
-                    Map.of("text", Map.of("content", card.getKanbanCardName() != null ? card.getKanbanCardName() : ""))
+                    Map.of("text", Map.of("content", loaded.getKanbanCardName() != null ? loaded.getKanbanCardName() : ""))
             )));
 
-            if (card.getKanbanBoard() != null && card.getKanbanBoard().getKanbanBoardName() != null) {
-                properties.put("Status", Map.of("select", Map.of("name", card.getKanbanBoard().getKanbanBoardName())));
+            if (loaded.getKanbanBoard() != null && loaded.getKanbanBoard().getKanbanBoardName() != null) {
+                properties.put("Status", Map.of("select", Map.of("name", loaded.getKanbanBoard().getKanbanBoardName())));
             }
 
-            if (card.getKanbanCardDescription() != null && !card.getKanbanCardDescription().isEmpty()) {
+            if (loaded.getKanbanCardDescription() != null && !loaded.getKanbanCardDescription().isEmpty()) {
                 properties.put("Description", Map.of("rich_text", List.of(
-                        Map.of("text", Map.of("content", card.getKanbanCardDescription()))
+                        Map.of("text", Map.of("content", loaded.getKanbanCardDescription()))
                 )));
             }
 
-            if (card.getKanbanCardEndedAt() != null) {
-                properties.put("Due", Map.of("date", Map.of("start", card.getKanbanCardEndedAt().toString())));
+            if (loaded.getKanbanCardEndedAt() != null) {
+                properties.put("Due", Map.of("date", Map.of("start", loaded.getKanbanCardEndedAt().toString())));
             }
 
-            String assigneeName = getAssigneeName(card);
+            String assigneeName = getAssigneeName(loaded);
             if (assigneeName != null && !assigneeName.isEmpty()) {
                 properties.put("Assignee", Map.of("rich_text", List.of(
                         Map.of("text", Map.of("content", assigneeName))
@@ -111,35 +115,39 @@ public class NotionSyncService {
     }
 
     @Async
+    @Transactional
     @SuppressWarnings("unchecked")
     public void syncCardUpdate(KanbanCard card, Project project) {
-        if (project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
+        if (project == null || project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
             return;
         }
+        // @Async로 다른 스레드에서 실행되므로 detached 엔티티의 lazy 로딩 방지 — DB에서 보드/담당자 포함 재조회 후 Status(보드명) 반영
+        KanbanCard loaded = kanbanCardRepository.findByIdWithBoardAndMember(card.getKanbanCardNo())
+            .orElse(card);
 
         try {
             HttpHeaders headers = buildHeaders(project.getNotionAccessToken());
 
             Map<String, Object> properties = new LinkedHashMap<>();
             properties.put("Name", Map.of("title", List.of(
-                    Map.of("text", Map.of("content", card.getKanbanCardName() != null ? card.getKanbanCardName() : ""))
+                    Map.of("text", Map.of("content", loaded.getKanbanCardName() != null ? loaded.getKanbanCardName() : ""))
             )));
 
-            if (card.getKanbanBoard() != null && card.getKanbanBoard().getKanbanBoardName() != null) {
-                properties.put("Status", Map.of("select", Map.of("name", card.getKanbanBoard().getKanbanBoardName())));
+            if (loaded.getKanbanBoard() != null && loaded.getKanbanBoard().getKanbanBoardName() != null) {
+                properties.put("Status", Map.of("select", Map.of("name", loaded.getKanbanBoard().getKanbanBoardName())));
             }
 
-            if (card.getKanbanCardDescription() != null) {
+            if (loaded.getKanbanCardDescription() != null) {
                 properties.put("Description", Map.of("rich_text", List.of(
-                        Map.of("text", Map.of("content", card.getKanbanCardDescription()))
+                        Map.of("text", Map.of("content", loaded.getKanbanCardDescription()))
                 )));
             }
 
-            if (card.getKanbanCardEndedAt() != null) {
-                properties.put("Due", Map.of("date", Map.of("start", card.getKanbanCardEndedAt().toString())));
+            if (loaded.getKanbanCardEndedAt() != null) {
+                properties.put("Due", Map.of("date", Map.of("start", loaded.getKanbanCardEndedAt().toString())));
             }
 
-            String assigneeName = getAssigneeName(card);
+            String assigneeName = getAssigneeName(loaded);
             if (assigneeName != null && !assigneeName.isEmpty()) {
                 properties.put("Assignee", Map.of("rich_text", List.of(
                         Map.of("text", Map.of("content", assigneeName))
@@ -161,7 +169,7 @@ public class NotionSyncService {
 
     @Async
     public void syncCardArchive(KanbanCard card, Project project) {
-        if (project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
+        if (project == null || project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
             return;
         }
 
