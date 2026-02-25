@@ -33,6 +33,18 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("memberNo") Long memberNo, @Param("status") String status);
 
     /**
+     * 오늘 할 일 전용: 담당자 배정 + 미완료(N) + 표시 중인 보드(kanbanBoardStatus='Y')만 조회.
+     * 칸반 보드 UI에 보이는 카드와 동일한 집합만 노출.
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = :status " +
+           "AND kb.kanbanBoardStatus = 'Y' " +
+           "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardStatusAndBoardVisibleOrderByKanbanCardEndedAtAsc(
+            @Param("memberNo") Long memberNo, @Param("status") String status);
+
+    /**
      * 회원에게 배정된 칸반 카드 수 (PROJECT_MEMBER 경유, 상태 N=미완료만)
      */
     @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
