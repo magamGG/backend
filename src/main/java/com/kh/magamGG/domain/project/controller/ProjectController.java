@@ -6,6 +6,7 @@ import com.kh.magamGG.domain.project.dto.request.KanbanCardCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.CommentCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.CommentUpdateRequest;
 import com.kh.magamGG.domain.project.dto.request.KanbanCardUpdateRequest;
+import com.kh.magamGG.domain.project.dto.request.AssignManagerRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectCreateRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectMemberAddRequest;
 import com.kh.magamGG.domain.project.dto.request.ProjectUpdateRequest;
@@ -15,6 +16,7 @@ import com.kh.magamGG.domain.project.dto.response.DashboardFeedbackResponse;
 import com.kh.magamGG.domain.project.dto.response.DeadlineCountResponse;
 import com.kh.magamGG.domain.project.dto.response.KanbanCardResponse;
 import com.kh.magamGG.domain.project.dto.response.ManagedProjectResponse;
+import com.kh.magamGG.domain.project.dto.response.AssignableManagerResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectListResponse;
 import com.kh.magamGG.domain.project.dto.response.NextSerialProjectItemResponse;
 import com.kh.magamGG.domain.project.dto.response.ProjectMemberResponse;
@@ -23,6 +25,7 @@ import com.kh.magamGG.domain.project.dto.response.TodayTaskResponse;
 import com.kh.magamGG.domain.member.dto.MemberKanbanStatsResponseDto;
 import com.kh.magamGG.domain.project.service.CommentService;
 import com.kh.magamGG.domain.project.service.KanbanBoardService;
+import com.kh.magamGG.domain.project.service.NotionAuthService;
 import com.kh.magamGG.domain.project.service.ProjectService;
 import com.kh.magamGG.global.storage.FileStorageService;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +36,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 프로젝트 API 컨트롤러
@@ -47,6 +51,7 @@ public class ProjectController {
     private final KanbanBoardService kanbanBoardService;
     private final CommentService commentService;
     private final FileStorageService fileStorageService;
+    private final NotionAuthService notionAuthService;
 
     /**
      * 담당자 대시보드 - 담당 프로젝트 현황 (마감 기한 대비 진행률 → 정상/주의)
@@ -103,6 +108,19 @@ public class ProjectController {
             @RequestParam int year,
             @RequestParam int month) {
         List<CalendarCardResponse> list = kanbanBoardService.getCalendarCardsForMember(memberNo, year, month);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 담당자/에이전시 캘린더: 로그인 회원이 속한 모든 프로젝트의 칸반 카드 목록 (PROJECT_COLOR, STARTED_AT, ENDED_AT)
+     * GET /api/projects/my-projects-calendar-cards?year=2026&month=1
+     */
+    @GetMapping("/my-projects-calendar-cards")
+    public ResponseEntity<List<CalendarCardResponse>> getMyProjectsCalendarCards(
+            @RequestHeader("X-Member-No") Long memberNo,
+            @RequestParam int year,
+            @RequestParam int month) {
+        List<CalendarCardResponse> list = kanbanBoardService.getCalendarCardsForMyProjects(memberNo, year, month);
         return ResponseEntity.ok(list);
     }
 
@@ -315,6 +333,38 @@ public class ProjectController {
     }
 
     /**
+     * 프로젝트에 배치 가능한 담당자 목록 (프로젝트 작가들이 ARTIST_ASSIGNMENT로 연결된 담당자만)
+     * GET /api/projects/{projectNo}/assignable-managers
+     */
+    @GetMapping("/{projectNo}/assignable-managers")
+    public ResponseEntity<List<AssignableManagerResponse>> getAssignableManagers(
+            @PathVariable Long projectNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        List<AssignableManagerResponse> list = projectService.getAssignableManagers(projectNo);
+        return ResponseEntity.ok(list);
+    }
+
+    /**
+     * 프로젝트 담당자 배치 (PROJECT_MEMBER role 담당자 및 KANBAN_CARD 담당자 업데이트)
+     * PUT /api/projects/{projectNo}/assign-manager
+     */
+    @PutMapping("/{projectNo}/assign-manager")
+    public ResponseEntity<Void> assignManagerToProject(
+            @PathVariable Long projectNo,
+            @RequestBody AssignManagerRequest request,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        if (request.getManagerNo() == null) {
+            throw new IllegalArgumentException("managerNo는 필수입니다.");
+        }
+        projectService.assignManagerToProject(projectNo, request.getManagerNo());
+        return ResponseEntity.ok().build();
+    }
+
+    /**
      * 프로젝트에서 팀원 삭제 (PROJECT_MEMBER 테이블에서 삭제)
      * DELETE /api/projects/{projectNo}/members/remove/{projectMemberNo}
      */
@@ -461,5 +511,98 @@ public class ProjectController {
         projectService.ensureProjectAccess(memberNo, projectNo);
         List<KanbanBoardResponse> boards = kanbanBoardService.getBoardsByProjectNo(projectNo);
         return ResponseEntity.ok(boards);
+    }
+
+    /**
+     * Notion OAuth 설정 정보 조회 (Client ID, Redirect URI)
+     * GET /api/projects/notion/config
+     */
+    @GetMapping("/notion/config")
+    public ResponseEntity<Map<String, String>> getNotionConfig() {
+        return ResponseEntity.ok(Map.of(
+                "clientId", notionAuthService.getClientId(),
+                "redirectUri", notionAuthService.getRedirectUri(),
+                "version", "v3-always-create"
+        ));
+    }
+
+    /**
+     * Notion OAuth 콜백 — code를 받아 토큰 교환 후 프로젝트에 연동 정보 저장
+     * POST /api/projects/{projectNo}/notion/callback
+     */
+    @PostMapping("/{projectNo}/notion/callback")
+    public ResponseEntity<Map<String, Object>> notionCallback(
+            @PathVariable Long projectNo,
+            @RequestBody Map<String, String> body,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        String code = body.get("code");
+        if (code == null || code.isEmpty()) {
+            throw new IllegalArgumentException("code는 필수입니다.");
+        }
+        Map<String, Object> result = notionAuthService.exchangeCodeAndSave(projectNo, code);
+        return ResponseEntity.ok(result);
+    }
+
+    /**
+     * Notion Database ID 저장 (사용자가 DB를 선택했을 때)
+     * PUT /api/projects/{projectNo}/notion/database
+     */
+    @PutMapping("/{projectNo}/notion/database")
+    public ResponseEntity<Void> setNotionDatabase(
+            @PathVariable Long projectNo,
+            @RequestBody Map<String, String> body,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        String databaseId = body.get("databaseId");
+        if (databaseId == null || databaseId.isEmpty()) {
+            throw new IllegalArgumentException("databaseId는 필수입니다.");
+        }
+        notionAuthService.saveDatabaseId(projectNo, databaseId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * Notion 연동 상태 조회
+     * GET /api/projects/{projectNo}/notion/status
+     */
+    @GetMapping("/{projectNo}/notion/status")
+    public ResponseEntity<Map<String, Object>> getNotionStatus(
+            @PathVariable Long projectNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        Map<String, Object> status = notionAuthService.getNotionStatus(projectNo);
+        return ResponseEntity.ok(status);
+    }
+
+    /**
+     * Notion 연동 해제
+     * DELETE /api/projects/{projectNo}/notion
+     */
+    @DeleteMapping("/{projectNo}/notion")
+    public ResponseEntity<Void> disconnectNotion(
+            @PathVariable Long projectNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        notionAuthService.disconnectNotion(projectNo);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Notion 수동 동기화 (기존 칸반 카드 → Notion 페이지 생성)
+     * POST /api/projects/{projectNo}/notion/sync
+     */
+    @PostMapping("/{projectNo}/notion/sync")
+    public ResponseEntity<Map<String, Object>> syncNotionCards(
+            @PathVariable Long projectNo,
+            @RequestHeader("X-Member-No") Long memberNo
+    ) {
+        projectService.ensureProjectAccess(memberNo, projectNo);
+        int count = notionAuthService.manualSyncCards(projectNo);
+        return ResponseEntity.ok(Map.of("synced", count));
     }
 }

@@ -24,13 +24,25 @@ public class CorsConfig {
                 "http://127.0.0.1:5173"
         ));
 
+        // 허용할 HTTP 메서드 (SSE는 GET이므로 포함)
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        
+        // 허용할 헤더 (모든 헤더 허용)
         configuration.setAllowedHeaders(List.of("*"));
+        
+        // 자격 증명 허용 (쿠키, Authorization 헤더 등)
         configuration.setAllowCredentials(true);
-        configuration.setExposedHeaders(Arrays.asList("Authorizat ion", "Content-Type"));
+        
+        // 클라이언트가 읽을 수 있는 응답 헤더
+        configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie", "Content-Type", "Last-Event-ID"));
+        
+        // Preflight 요청 캐시 시간 (초)
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
+        // WebSocket 엔드포인트도 CORS 허용
+        source.registerCorsConfiguration("/ws-stomp/**", configuration);
 
         return source;
     }

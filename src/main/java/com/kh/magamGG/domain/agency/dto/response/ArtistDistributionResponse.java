@@ -19,8 +19,8 @@ public class ArtistDistributionResponse {
     /** 작품(프로젝트)별 아티스트 수 [{ name: "로맨스 판타지", artists: 5 }, ...] */
     private List<ArtistDistributionItem> distribution;
 
-    /** 가장 많은 아티스트가 배정된 작품명 (하단 안내 문구용) */
-    private String maxArtistProjectName;
+    /** 가장 많은 아티스트가 배정된 작품명 목록 (동일 수일 때 모두 포함, 하단 안내 문구용) */
+    private List<String> maxArtistProjectNames;
 
     @Getter
     @NoArgsConstructor

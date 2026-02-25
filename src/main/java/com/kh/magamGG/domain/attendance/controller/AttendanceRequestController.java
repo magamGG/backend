@@ -146,17 +146,23 @@ public class AttendanceRequestController {
      * 회원 연차 잔액 조회 (당해 연도 기준)
      * GET /api/leave/balance/{memberNo}
      *
-     * @param memberNo 회원 번호
+     * @param memberNo 회원 번호 (String으로 받아 Long으로 변환 - 타입 변환 실패 시 명확한 에러 처리)
      * @return 연차 잔액 (없으면 404 없음, null 반환 시 204 또는 200 with null body 정책에 따라 200 + body null)
      */
     @GetMapping("/balance/{memberNo}")
-    public ResponseEntity<LeaveBalanceResponse> getLeaveBalance(@PathVariable Long memberNo) {
-        log.info("회원 {} 연차 잔액 조회", memberNo);
-        LeaveBalanceResponse response = attendanceService.getLeaveBalance(memberNo);
-        if (response == null) {
-            return ResponseEntity.noContent().build();
+    public ResponseEntity<LeaveBalanceResponse> getLeaveBalance(@PathVariable String memberNo) {
+        try {
+            Long memberNoLong = Long.parseLong(memberNo);
+            log.info("회원 {} 연차 잔액 조회", memberNoLong);
+            LeaveBalanceResponse response = attendanceService.getLeaveBalance(memberNoLong);
+            if (response == null) {
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.ok(response);
+        } catch (NumberFormatException e) {
+            log.error("❌ [연차 잔액 조회] 잘못된 회원번호 형식: memberNo={}, error={}", memberNo, e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(response);
     }
 
     /**

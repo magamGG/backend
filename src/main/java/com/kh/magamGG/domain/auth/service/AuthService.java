@@ -1,11 +1,12 @@
 package com.kh.magamGG.domain.auth.service;
 
 import com.kh.magamGG.domain.auth.dto.request.LoginRequest;
+import com.kh.magamGG.domain.auth.dto.request.RefreshTokenRequest;
 import com.kh.magamGG.domain.auth.dto.response.LoginResponse;
+import com.kh.magamGG.domain.auth.dto.response.RefreshTokenResponse;
 import com.kh.magamGG.domain.member.entity.Member;
 import com.kh.magamGG.domain.member.repository.MemberRepository;
-import com.kh.magamGG.global.exception.InvalidCredentialsException;
-import com.kh.magamGG.global.exception.MemberNotFoundException;
+import com.kh.magamGG.global.exception.*;
 import com.kh.magamGG.global.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +22,7 @@ import java.time.LocalDateTime;
  * 주요 기능:
  * - RefreshTokenService (Valkey)를 사용하여 Refresh Token 관리
  * - Valkey의 TTL 기능으로 자동 만료 처리
+ * - Refresh Token Rotation 방식 적용
  */
 @Service
 @RequiredArgsConstructor
@@ -54,7 +56,7 @@ public class AuthService {
 
         log.info("🔐 [로그인] 회원 검증 완료: memberNo={}, email={}", member.getMemberNo(), member.getMemberEmail());
 
-        // Access Token 발급
+        // Access Token 발급d
         log.info("🎫 [로그인] Access Token 발급 시작: memberNo={}", member.getMemberNo());
         String accessToken = jwtTokenProvider.generateAccessToken(
                 member.getMemberNo(), 
@@ -107,6 +109,76 @@ public class AuthService {
                 .memberRole(member.getMemberRole())
                 .agencyNo(agencyNo)
                 .build();
+    }
+
+    /**
+     * Refresh Token으로 Access Token 갱신 (Valkey 기반)
+     * Token Rotation 방식 적용
+     */
+    @Transactional
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
+        log.info("🔄 [토큰 갱신] refreshToken() 메서드 호출 시작 (Valkey)");
+        String refreshTokenValue = request.getRefreshToken();
+
+        // 1. Refresh 토큰 검증
+        if (!jwtTokenProvider.validateRefreshToken(refreshTokenValue)) {
+            throw new InvalidTokenException("유효하지 않은 Refresh Token입니다.");
+        }
+
+        // 2. Refresh Token에서 회원번호 추출
+        Long memberNo = jwtTokenProvider.getMemberIdFromRefreshToken(refreshTokenValue);
+        
+        // 3. 회원 정보 조회 (이메일 가져오기)
+        Member member = memberRepository.findById(memberNo)
+                .orElseThrow(() -> new MemberNotFoundException("회원을 찾을 수 없습니다."));
+        
+        String email = member.getMemberEmail();
+
+        // 4. 새 Access Token 발급
+        String newAccessToken = jwtTokenProvider.generateAccessToken(
+                member.getMemberNo(),
+                member.getMemberEmail()
+        );
+
+        // 5. 새 Refresh Token 발급
+        String newRefreshToken = jwtTokenProvider.generateRefreshToken(member.getMemberNo());
+
+        // 6. Refresh Token Rotation (Valkey 기반)
+        // validateAndRotate: 기존 토큰 검증 → 삭제 → 새 토큰 저장 (원자적 연산)
+        try {
+            refreshTokenService.validateAndRotate(email, refreshTokenValue, newRefreshToken);
+        } catch (InvalidTokenException e) {
+            // 토큰 불일치 또는 없음 → 탈취된 토큰으로 간주
+            log.error("🔒 [보안 경고] Refresh Token 검증 실패: email={}", email);
+            throw e;
+        }
+
+        log.info("✅ [토큰 갱신] 성공 (Valkey): email={}", email);
+
+        // 7. 응답 반환
+        return RefreshTokenResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .build();
+    }
+
+    /**
+     * 로그아웃 처리 (Valkey 기반)
+     */
+    @Transactional
+    public void logout(String refreshTokenValue) {
+        // Refresh Token에서 회원번호 추출
+        Long memberNo = jwtTokenProvider.getMemberIdFromRefreshToken(refreshTokenValue);
+        
+        // 회원 정보 조회 (이메일 가져오기)
+        Member member = memberRepository.findById(memberNo)
+                .orElse(null);
+        
+        if (member != null) {
+            // Valkey에서 Refresh Token 삭제
+            refreshTokenService.deleteRefreshToken(member.getMemberEmail());
+            log.info("✅ 로그아웃 처리 (Valkey): email={}", member.getMemberEmail());
+        }
     }
 
     /**

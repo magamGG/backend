@@ -20,6 +20,12 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
     List<Member> findByAgency_AgencyNo(Long agencyNo);
 
     /**
+     * 에이전시 번호로 소속 회원 목록 조회 (ACTIVE 회원만, BLOCKED 제외)
+     */
+    @Query("SELECT m FROM Member m LEFT JOIN FETCH m.agency WHERE m.agency.agencyNo = :agencyNo AND m.memberStatus = 'ACTIVE'")
+    List<Member> findByAgency_AgencyNoAndMemberStatusActive(@Param("agencyNo") Long agencyNo);
+
+    /**
      * 특정 에이전시 소속이면서 특정 역할들 중 하나인 회원 목록 조회
      * (담당자/매니저에게 알림 보낼 때 사용)
      */
@@ -51,6 +57,13 @@ public interface MemberRepository extends JpaRepository<Member, Long> {
      */
     @Query("SELECT DISTINCT m FROM Member m LEFT JOIN FETCH m.agency WHERE m.agency.agencyNo = :agencyNo AND (m.memberRole = '웹툰 작가' OR m.memberRole = '웹소설 작가')")
     List<Member> findArtistsByAgencyNo(@Param("agencyNo") Long agencyNo);
+
+    /**
+     * 에이전시 소속 작가·어시스턴트 수 (웹툰작가, 웹소설작가, 어시스트* 전체, ACTIVE만)
+     */
+    @Query("SELECT COUNT(m) FROM Member m WHERE m.agency.agencyNo = :agencyNo AND m.memberStatus = 'ACTIVE' " +
+           "AND (m.memberRole = '웹툰 작가' OR m.memberRole = '웹소설 작가' OR m.memberRole LIKE '어시스트%')")
+    long countArtistsAndAssistantsByAgencyNo(@Param("agencyNo") Long agencyNo);
 
     /**
      * 특정 담당자에게 배정된 작가 목록 조회

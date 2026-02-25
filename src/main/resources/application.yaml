@@ -57,8 +57,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username:
-    password:
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
     properties:
       mail:
         smtp:
@@ -73,7 +73,7 @@ spring:
   # OpenAI API Key: application-local.yaml 또는 OPENAI_API_KEY 환경변수로 설정
   ai:
     openai:
-      api-key:
+      api-key: ${OPENAI_API_KEY:}
       chat:
         options:
           model: gpt-4o-mini
@@ -81,8 +81,8 @@ spring:
 
 # JWT 시크릿: application-local.yaml 또는 JWT_ACCESS_SECRET, JWT_REFRESH_SECRET 환경변수로 설정
 jwt:
-  access-secret:
-  refresh-secret:
+  access-secret: ${JWT_ACCESS_SECRET:}
+  refresh-secret: ${JWT_REFRESH_SECRET:}
   access-expiration: 900000      # 15분 (밀리초)
   refresh-expiration: 604800000  # 7일 (밀리초)
 

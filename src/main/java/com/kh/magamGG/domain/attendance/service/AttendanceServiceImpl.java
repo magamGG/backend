@@ -19,6 +19,7 @@ import com.kh.magamGG.domain.attendance.repository.LeaveHistoryRepository;
 import com.kh.magamGG.domain.attendance.repository.ProjectLeaveRequestRepository;
 import com.kh.magamGG.domain.attendance.entity.ProjectLeaveRequest;
 import com.kh.magamGG.domain.project.entity.Project;
+import com.kh.magamGG.domain.project.repository.ProjectMemberRepository;
 import com.kh.magamGG.domain.project.repository.ProjectRepository;
 import com.kh.magamGG.global.exception.ProjectNotFoundException;
 import com.kh.magamGG.domain.health.dto.request.DailyHealthCheckRequest;
@@ -45,6 +46,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -63,8 +65,8 @@ import java.util.TreeMap;
 @Transactional(readOnly = true)
 public class AttendanceServiceImpl implements AttendanceService {
 
-    /** 휴가로 집계하는 타입: 해당 날짜에 승인되면 출근 이력이 있어도 휴가로 집계 */
-    private static final Set<String> LEAVE_TYPES = Set.of("연차", "반차", "반반차", "병가");
+    /** 휴가로 집계하는 타입: 해당 날짜에 승인되면 출근 이력 없어도 휴가로 집계 (연차/병가 등) */
+    private static final Set<String> LEAVE_TYPES = Set.of("연차", "반차", "반반차", "병가", "VACATION");
     /** 실제 출근(ATTENDANCE) 이력이 있는 날만 집계하는 타입. 승인 기간이 아닌 실제 체크인 일수만 표시 */
     private static final Set<String> ATTENDANCE_REQUIRED_TYPES = Set.of("재택근무", "워케이션");
 
@@ -79,6 +81,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     private final ArtistAssignmentRepository artistAssignmentRepository;
     private final ManagerRepository managerRepository;
     private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
     private final ProjectLeaveRequestRepository projectLeaveRequestRepository;
     // 비즈니스 로직 분리: 연차 차감 서비스
     private final LeaveBalanceDeductionService leaveBalanceDeductionService;
@@ -237,73 +240,82 @@ public class AttendanceServiceImpl implements AttendanceService {
     
     @Override
     public AttendanceStatisticsResponseDto getAttendanceStatistics(Long memberNo, int year, int month) {
-        // member_no 기준 attendance에서 출근한 날짜 목록 조회
-        List<LocalDate> checkInDates = attendanceRepository
-            .findDistinctCheckInDatesByMemberNoAndMonth(memberNo, year, month)
-            .stream()
-            .map(java.sql.Date::toLocalDate)
-            .collect(Collectors.toList());
-        Set<LocalDate> checkInSet = new HashSet<>(checkInDates);
-        
-        // 해당 회원의 승인된 근태 신청 목록
-        List<AttendanceRequest> approvedRequests = attendanceRequestRepository.findApprovedByMemberNo(memberNo);
-        
-        // 이번 달 1일부터 오늘까지의 모든 날짜 확인
+        // member_no 기준 attendance에서 근무일(출근/재택근무/워케이션) 날짜·타입 조회
+        List<Object[]> datesWithTypes = attendanceRepository
+            .findDistinctCheckInDatesWithTypeByMemberNoAndMonth(memberNo, year, month);
+        Set<LocalDate> checkInSet = new HashSet<>();
+        Map<LocalDate, String> dateToAttendanceType = new HashMap<>();
+        for (Object[] row : datesWithTypes) {
+            LocalDate d = ((java.sql.Date) row[0]).toLocalDate();
+            String t = row[1] != null ? ((String) row[1]).trim() : "출근";
+            checkInSet.add(d);
+            dateToAttendanceType.merge(d, t, (a, b) -> "출근".equals(a) ? b : a);
+        }
+
+        // 현재 날짜 기준: 해당 월 1일 ~ 오늘(또는 월말) 사이만 집계
         LocalDate firstDayOfMonth = LocalDate.of(year, month, 1);
         LocalDate today = LocalDate.now();
         LocalDate endDate = today.isBefore(firstDayOfMonth.plusMonths(1)) ? today : firstDayOfMonth.plusMonths(1).minusDays(1);
-        
+
+        // 해당 기간과 겹치는 승인된 근태 신청만 조회 (연차/병가 등 휴가 포함)
+        LocalDateTime periodStart = firstDayOfMonth.atStartOfDay();
+        LocalDateTime periodEnd = endDate.atTime(23, 59, 59);
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository
+            .findApprovedByMemberNoAndDateRange(memberNo, periodStart, periodEnd);
+
         Map<String, Long> typeToCount = new TreeMap<>();
-        
-        // 이번 달 1일부터 오늘까지 순회
+
         LocalDate currentDate = firstDayOfMonth;
         while (!currentDate.isAfter(endDate)) {
             boolean hasCheckIn = checkInSet.contains(currentDate);
             String type = null;
             boolean isLeaveType = false;
 
-            // 승인된 근태 신청 확인
             for (AttendanceRequest req : approvedRequests) {
                 LocalDate start = req.getAttendanceRequestStartDate().toLocalDate();
                 LocalDate end = req.getAttendanceRequestEndDate().toLocalDate();
                 if (!currentDate.isBefore(start) && !currentDate.isAfter(end)) {
-                    type = req.getAttendanceRequestType() != null ? req.getAttendanceRequestType() : "출근";
-                    isLeaveType = type != null && LEAVE_TYPES.contains(type);
+                    String raw = req.getAttendanceRequestType();
+                    type = (raw != null && !raw.isEmpty()) ? raw.trim() : "출근";
+                    // DB에 영문(VACATION) 저장된 경우 연차로 통일
+                    if ("VACATION".equalsIgnoreCase(type)) {
+                        type = "연차";
+                    }
+                    isLeaveType = LEAVE_TYPES.contains(type);
                     break;
                 }
             }
 
-            // 휴재는 근태 통계에 포함하지 않음
             if (type != null && "휴재".equals(type)) {
                 currentDate = currentDate.plusDays(1);
                 continue;
             }
-            // 휴가(연차·병가 등) 승인된 날은 출근 이력 유무와 관계없이 휴가로 집계
+            // 휴가(연차·병가 등): 출근 이력 없어도 승인된 해당 날짜는 휴가로 집계
             if (type != null && isLeaveType) {
                 typeToCount.merge(type, 1L, Long::sum);
             } else if (hasCheckIn) {
-                // 실제 출근한 날: 승인된 타입(재택/워케이션 등)이 있으면 그 타입, 없으면 '출근'
-                String finalType = (type != null) ? type : "출근";
+                String finalType = (type != null) ? type : dateToAttendanceType.getOrDefault(currentDate, "출근");
                 typeToCount.merge(finalType, 1L, Long::sum);
             } else if (type != null && !ATTENDANCE_REQUIRED_TYPES.contains(type)) {
-                // 재택근무·워케이션은 실제 출근 이력이 있는 날만 집계(위 hasCheckIn 분기에서만 집계)
                 typeToCount.merge(type, 1L, Long::sum);
             }
 
             currentDate = currentDate.plusDays(1);
         }
-        
+
         List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = typeToCount.entrySet().stream()
             .map(e -> AttendanceStatisticsResponseDto.TypeCount.builder()
                 .type(e.getKey())
                 .count(e.getValue())
                 .build())
             .collect(Collectors.toList());
-        
-        // totalCount는 출근한 날짜 수 (기존 로직 유지)
+
+        // totalCount는 typeCounts 합계와 일치시켜 파이/범례와 불일치 방지 (출근+연차+재택 등 전체 일수)
+        long totalFromTypes = typeToCount.values().stream().mapToLong(Long::longValue).sum();
+
         return AttendanceStatisticsResponseDto.builder()
             .typeCounts(typeCounts)
-            .totalCount(checkInDates.size())
+            .totalCount(totalFromTypes > 0 ? (int) totalFromTypes : checkInSet.size())
             .build();
     }
     
@@ -375,7 +387,7 @@ public class AttendanceServiceImpl implements AttendanceService {
             }
         }
 
-        // 휴재 신청인 경우 프로젝트 상태를 "휴재"로 변경
+        // 휴재 신청인 경우 프로젝트 상태를 "휴재"로 변경 + PROJECT_MEMBER 전원 알림
         if ("휴재".equals(requestType) && request.getProjectLeaveRequest() != null) {
             Project project = request.getProjectLeaveRequest().getProject();
             if (project != null) {
@@ -383,6 +395,17 @@ public class AttendanceServiceImpl implements AttendanceService {
                 projectRepository.save(project);
                 log.info("프로젝트 상태 업데이트 완료: 프로젝트번호={}, 프로젝트명={}, 상태=휴재",
                         project.getProjectNo(), project.getProjectName());
+
+                // 프로젝트 참여 인원 전원에게 휴재 알림
+                String message = project.getProjectName() + " 작품이 휴재로 전환되었습니다.";
+                projectMemberRepository.findByProject_ProjectNo(project.getProjectNo()).forEach(pm -> {
+                    try {
+                        notificationService.createNotification(
+                                pm.getMember().getMemberNo(), "작품 휴재", message, "PROJ_HIATUS");
+                    } catch (Exception e) {
+                        log.warn("휴재 알림 발송 실패: memberNo={}", pm.getMember().getMemberNo(), e);
+                    }
+                });
             }
         }
 
@@ -577,6 +600,15 @@ public class AttendanceServiceImpl implements AttendanceService {
         history.setLeaveHistoryReason(request.getNote() != null ? request.getNote() : "");
         history.setLeaveHistoryAmount(adjustment);
         leaveHistoryRepository.save(history);
+
+        // 연차 조정 알림 발송
+        String reason = request.getReason() != null ? request.getReason() : "";
+        String message = String.format("연차가 %d일 조정되었습니다. 사유: %s", adjustment, reason);
+        try {
+            notificationService.createNotification(memberNo, "연차 조정", message, "LEAVE_ADJ");
+        } catch (Exception e) {
+            log.warn("연차 조정 알림 발송 실패: memberNo={}", memberNo, e);
+        }
 
         log.info("연차 조정 완료: 회원번호={}, 사유={}, 조정일수={}, 조정 후 잔여={}", memberNo, request.getReason(), adjustment, newRemain);
         // 응답 시 balance.getMember() lazy load 방지: 이미 가진 값으로 DTO 생성
@@ -794,5 +826,93 @@ public class AttendanceServiceImpl implements AttendanceService {
                 .sorted((a, b) -> b.getAttendanceRequestCreatedAt().compareTo(a.getAttendanceRequestCreatedAt()))
                 .map(AttendanceRequestResponse::fromEntity)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    public AttendanceStatisticsResponseDto getAdminCalendar(Long agencyNo, int year, int month) {
+        validateAgencyExists(agencyNo);
+        
+        // 해당 월의 첫날과 마지막날
+        LocalDate firstDay = LocalDate.of(year, month, 1);
+        LocalDate lastDay = firstDay.withDayOfMonth(firstDay.lengthOfMonth());
+        
+        // 에이전시 소속 직원들의 승인된 근태 신청 조회
+        List<AttendanceRequest> approvedRequests = attendanceRequestRepository
+                .findApprovedByAgencyNoAndDateRange(agencyNo, firstDay.atStartOfDay(), lastDay.atTime(23, 59, 59));
+        
+        // 캘린더 이벤트 생성
+        List<AttendanceStatisticsResponseDto.CalendarEvent> calendarEvents = new ArrayList<>();
+        
+        for (AttendanceRequest request : approvedRequests) {
+            String eventType = request.getAttendanceRequestType();
+            String colorCode = getColorCodeByType(eventType);
+            String title = getMemberName(request) + " - " + eventType;
+            
+            // 신청 기간 내의 모든 날짜에 대해 이벤트 생성
+            LocalDate startDate = request.getAttendanceRequestStartDate().toLocalDate();
+            LocalDate endDate = request.getAttendanceRequestEndDate().toLocalDate();
+            
+            // 해당 월 범위 내에서만 이벤트 생성
+            LocalDate eventStart = startDate.isBefore(firstDay) ? firstDay : startDate;
+            LocalDate eventEnd = endDate.isAfter(lastDay) ? lastDay : endDate;
+            
+            LocalDate currentDate = eventStart;
+            while (!currentDate.isAfter(eventEnd)) {
+                calendarEvents.add(AttendanceStatisticsResponseDto.CalendarEvent.builder()
+                        .memberNo(request.getMember().getMemberNo())
+                        .memberName(getMemberName(request))
+                        .eventDate(currentDate)
+                        .eventType(eventType)
+                        .colorCode(colorCode)
+                        .title(title)
+                        .build());
+                
+                currentDate = currentDate.plusDays(1);
+            }
+        }
+        
+        // 기본 통계 정보도 함께 반환 (기존 로직 활용)
+        List<AttendanceStatisticsResponseDto.TypeCount> typeCounts = approvedRequests.stream()
+                .collect(Collectors.groupingBy(AttendanceRequest::getAttendanceRequestType, Collectors.counting()))
+                .entrySet().stream()
+                .map(entry -> AttendanceStatisticsResponseDto.TypeCount.builder()
+                        .type(entry.getKey())
+                        .count(entry.getValue())
+                        .build())
+                .collect(Collectors.toList());
+        
+        return AttendanceStatisticsResponseDto.builder()
+                .typeCounts(typeCounts)
+                .totalCount(approvedRequests.size())
+                .calendarEvents(calendarEvents)
+                .build();
+    }
+    
+    /**
+     * 근무 유형별 색상 코드 반환
+     */
+    private String getColorCodeByType(String eventType) {
+        switch (eventType) {
+            case "재택근무":
+                return "#FF8C00"; // 주황색
+            case "연차":
+            case "반차":
+            case "반반차":
+            case "병가":
+                return "#808080"; // 회색
+            case "워케이션":
+                return "#8A2BE2"; // 보라색
+            default:
+                return "#4CAF50"; // 기본 녹색
+        }
+    }
+    
+    /**
+     * 회원 이름 안전하게 가져오기
+     */
+    private String getMemberName(AttendanceRequest request) {
+        return request.getMember() != null && request.getMember().getMemberName() != null 
+                ? request.getMember().getMemberName() 
+                : "알 수 없음";
     }
 }

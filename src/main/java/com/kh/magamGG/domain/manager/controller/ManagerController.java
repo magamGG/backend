@@ -79,4 +79,11 @@ public class ManagerController {
                 .map(AssignedArtistResponse::from)
                 .toList();
     }
+
+    @GetMapping("/{managerNo}/working-artists")
+    public List<AssignedArtistResponse> getWorkingArtists(
+            @PathVariable Long managerNo
+    ) {
+        return assignmentService.getWorkingArtistResponses(managerNo);
+    }
 }
