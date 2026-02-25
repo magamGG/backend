@@ -560,7 +560,7 @@ public class AttendanceServiceImpl implements AttendanceService {
     }
 
     @Override
-    @Cacheable(value = "leaveBalance", key = "#memberNo")
+    @Cacheable(value = "leaveBalance", key = "#memberNo", unless = "#result == null")
     public LeaveBalanceResponse getLeaveBalance(Long memberNo) {
         // 최적화: 데이터가 없을 때만 회원 존재 확인하여 불필요한 쿼리 제거
         // 캐싱: 자주 조회되는 연차 잔액 정보 캐싱
