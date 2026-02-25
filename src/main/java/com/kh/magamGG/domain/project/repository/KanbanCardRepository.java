@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
 
@@ -134,5 +135,13 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
            "LEFT JOIN FETCH pm.member m " +
            "WHERE kb.project.projectNo = :projectNo")
     List<KanbanCard> findByProjectNoWithBoardAndMember(@Param("projectNo") Long projectNo);
+
+    /** 응답 DTO 변환용: 카드 + 보드 + 담당자(멤버) 한 번에 로드 (lazy 연쇄 호출로 인한 JDBC 상태 오류 완화) */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "LEFT JOIN FETCH kc.kanbanBoard " +
+           "LEFT JOIN FETCH kc.projectMember pm " +
+           "LEFT JOIN FETCH pm.member " +
+           "WHERE kc.kanbanCardNo = :id")
+    Optional<KanbanCard> findByIdWithBoardAndMember(@Param("id") Long id);
 }
 

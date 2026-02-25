@@ -98,8 +98,8 @@ public class CommentServiceImpl implements CommentService {
         if (projectNos.isEmpty()) {
             return new ArrayList<>();
         }
-        // 담당자인 카드에 다른 사람이 작성한 코멘트만 조회 (본인 코멘트 제외)
-        List<Comment> comments = commentRepository.findRecentFeedbackForAssignee(projectNos, memberNo, PageRequest.of(0, limit));
+        // 소속 프로젝트 카드에 달린 최신 ACTIVE 코멘트 전부 조회 (카드에 코멘트 달리면 피드백 칸에 표시)
+        List<Comment> comments = commentRepository.findRecentActiveByProjectNos(projectNos, PageRequest.of(0, limit));
         return comments.stream().map(this::toDashboardFeedbackResponse).collect(Collectors.toList());
     }
 

@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -45,7 +46,22 @@ public class SecurityConfig {
         this.oAuth2SuccessHandler = oAuth2SuccessHandler;
     }
 
+    /**
+     * 정적 리소스(uploads) - Notion 등 외부에서 이미지 로드 시 인증 없이 허용.
+     * JWT 필터를 타지 않으며, 별도 체인으로 먼저 매칭된다.
+     */
     @Bean
+    @Order(1)
+    public SecurityFilterChain staticResourceSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher("/uploads/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .requestCache(cache -> cache.disable())
+                .build();
+    }
+
+    @Bean
+    @Order(2)
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             // CORS 설정 (SSE를 포함한 모든 요청에 적용)

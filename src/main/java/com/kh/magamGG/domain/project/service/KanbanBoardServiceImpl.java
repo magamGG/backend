@@ -257,14 +257,19 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     public KanbanCardResponse updateCard(Long projectNo, Long cardId, KanbanCardUpdateRequest request) {
         KanbanCard card = kanbanCardRepository.findById(cardId)
             .orElseThrow(() -> new IllegalArgumentException("카드를 찾을 수 없습니다: " + cardId));
-        if (!card.getKanbanBoard().getProject().getProjectNo().equals(projectNo)) {
+        KanbanBoard currentBoard = card.getKanbanBoard();
+        Project currentProject = currentBoard != null ? currentBoard.getProject() : null;
+        if (currentProject != null && !currentProject.getProjectNo().equals(projectNo)) {
             throw new IllegalArgumentException("해당 프로젝트의 카드가 아닙니다.");
         }
         if (request.getStatus() != null && "D".equalsIgnoreCase(request.getStatus())) {
             card.setKanbanCardStatus("D");
             kanbanCardRepository.save(card);
-            notionSyncService.syncCardArchive(card, card.getKanbanBoard().getProject());
-            return toCardResponse(card);
+            Project archiveProject = card.getKanbanBoard() != null ? card.getKanbanBoard().getProject() : null;
+            notionSyncService.syncCardArchive(card, archiveProject);
+            KanbanCard forResponse = kanbanCardRepository.findByIdWithBoardAndMember(card.getKanbanCardNo())
+                .orElse(card);
+            return toCardResponse(forResponse);
         }
         if (request.getTitle() != null) card.setKanbanCardName(request.getTitle());
         if (request.getDescription() != null) card.setKanbanCardDescription(request.getDescription());
@@ -272,7 +277,11 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
         if (request.getBoardId() != null) {
             KanbanBoard board = kanbanBoardRepository.findById(request.getBoardId())
                 .orElseThrow(() -> new IllegalArgumentException("보드를 찾을 수 없습니다: " + request.getBoardId()));
-            if (board.getProject().getProjectNo().equals(projectNo)) card.setKanbanBoard(board);
+            Project targetProject = board.getProject();
+            if (targetProject != null && !targetProject.getProjectNo().equals(projectNo)) {
+                throw new IllegalArgumentException("해당 프로젝트의 보드가 아닙니다. boardId=" + request.getBoardId());
+            }
+            card.setKanbanBoard(board);
         }
         if (request.getProjectMemberNo() != null || request.getMemberNo() != null) {
             ProjectMember assignee = resolveProjectMember(projectNo, request.getProjectMemberNo(), request.getMemberNo());
@@ -285,8 +294,12 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
             card.setKanbanCardEndedAt(LocalDate.parse(request.getDueDate(), DATE_FMT));
         }
         KanbanCard saved = kanbanCardRepository.save(card);
-        notionSyncService.syncCardUpdate(saved, saved.getKanbanBoard().getProject());
-        return toCardResponse(saved);
+        Project syncProject = saved.getKanbanBoard() != null ? saved.getKanbanBoard().getProject() : null;
+        notionSyncService.syncCardUpdate(saved, syncProject);
+        // 응답용으로 보드/담당자까지 한 번에 로드해 lazy 연쇄 호출을 줄임 (JdbcValuesSourceProcessingState 오류 완화)
+        KanbanCard forResponse = kanbanCardRepository.findByIdWithBoardAndMember(saved.getKanbanCardNo())
+            .orElse(saved);
+        return toCardResponse(forResponse);
     }
 
     @Override
@@ -332,7 +345,7 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
     private KanbanCardResponse toCardResponse(KanbanCard card) {
         ProjectMember pm = card.getProjectMember();
         KanbanCardResponse.AssigneeInfo assignee = null;
-        if (pm != null) {
+        if (pm != null && pm.getMember() != null) {
             assignee = KanbanCardResponse.AssigneeInfo.builder()
                 .id(pm.getProjectMemberNo())
                 .name(pm.getMember().getMemberName())
@@ -341,13 +354,14 @@ public class KanbanBoardServiceImpl implements KanbanBoardService {
                 .avatar(pm.getMember().getMemberProfileImage())
                 .build();
         }
+        Long boardId = card.getKanbanBoard() != null ? card.getKanbanBoard().getKanbanBoardNo() : null;
         return KanbanCardResponse.builder()
             .id(card.getKanbanCardNo())
             .title(card.getKanbanCardName())
             .description(card.getKanbanCardDescription())
             .startDate(card.getKanbanCardStartedAt() != null ? card.getKanbanCardStartedAt().format(DATE_FMT) : null)
             .dueDate(card.getKanbanCardEndedAt() != null ? card.getKanbanCardEndedAt().format(DATE_FMT) : null)
-            .boardId(card.getKanbanBoard().getKanbanBoardNo())
+            .boardId(boardId)
             .completed("Y".equals(card.getKanbanCardStatus()))
             .assignedTo(assignee)
             .createdAt(card.getKanbanCardCreatedAt() != null ? card.getKanbanCardCreatedAt().toString() : null)

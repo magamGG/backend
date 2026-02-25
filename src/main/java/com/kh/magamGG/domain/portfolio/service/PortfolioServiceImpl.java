@@ -93,6 +93,9 @@ public class PortfolioServiceImpl implements PortfolioService {
                             .projectName(p.getProjectName())
                             .projectStartedAt(p.getProjectStartedAt())
                             .projectMemberCreatedAt(pm.getProjectMemberCreatedAt())
+                            .projectStatus(p.getProjectStatus() != null ? p.getProjectStatus() : "연재")
+                            .platform(emptyToNull(p.getPlatform()))
+                            .projectMemberRole(pm.getProjectMemberRole() != null ? pm.getProjectMemberRole() : "담당자")
                             .build();
                 })
                 .collect(Collectors.toList());

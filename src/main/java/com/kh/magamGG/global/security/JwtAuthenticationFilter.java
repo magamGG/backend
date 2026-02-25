@@ -138,11 +138,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private boolean requiresAuthentication(HttpServletRequest request) {
         String uri = request.getRequestURI();
         // permitAll 엔드포인트 목록
-        return !uri.startsWith("/api/auth/login") 
+        return !uri.startsWith("/api/auth/login")
             && !uri.startsWith("/api/auth/refresh")
             && !uri.startsWith("/api/auth/reissue")
             && !uri.startsWith("/api/members")
             && !uri.startsWith("/uploads/")
-            && !uri.startsWith("/login/oauth2");
+            && !uri.startsWith("/login/oauth2")
+            && !uri.startsWith("/oauth2/");
     }
 }

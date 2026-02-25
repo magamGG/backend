@@ -113,7 +113,7 @@ public class NotionSyncService {
     @Async
     @SuppressWarnings("unchecked")
     public void syncCardUpdate(KanbanCard card, Project project) {
-        if (project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
+        if (project == null || project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
             return;
         }
 
@@ -161,7 +161,7 @@ public class NotionSyncService {
 
     @Async
     public void syncCardArchive(KanbanCard card, Project project) {
-        if (project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
+        if (project == null || project.getNotionAccessToken() == null || card.getNotionPageId() == null) {
             return;
         }
 

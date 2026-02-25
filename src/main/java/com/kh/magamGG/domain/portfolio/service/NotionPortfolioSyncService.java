@@ -33,6 +33,10 @@ public class NotionPortfolioSyncService {
     @Value("${notion.portfolio.parent-page-id:}")
     private String parentPageId;
 
+    /** Notion 등에서 이미지 로드 시 사용할 공개 URL (프로필 사진용) */
+    @Value("${app.public-base-url:http://localhost:8888}")
+    private String publicBaseUrl;
+
     /** Notion API 블록 추가 요청당 최대 개수 */
     private static final int NOTION_BLOCK_APPEND_LIMIT = 100;
 
@@ -271,18 +275,38 @@ public class NotionPortfolioSyncService {
     private List<Map<String, Object>> buildPortfolioBlocks(Portfolio p) {
         List<Map<String, Object>> blocks = new ArrayList<>();
 
-        blocks.add(heading2("기본 정보"));
-        blocks.add(paragraph("이름: " + nullToEmpty(p.getPortfolioUserName())));
-        blocks.add(paragraph("이메일: " + nullToEmpty(p.getPortfolioUserEmail())));
-        blocks.add(paragraph("전화: " + nullToEmpty(p.getPortfolioUserPhone())));
+        String profileImageUrl = toPublicProfileImageUrl(p);
+        if (profileImageUrl != null && !profileImageUrl.isBlank()) {
+            blocks.add(imageBlock(profileImageUrl));
+        }
 
+        String name = nullToEmpty(p.getPortfolioUserName());
+        if (!name.isBlank()) {
+            blocks.add(heading1(name));
+        }
+
+        // 연락처 | 경력 2단 레이아웃 (column_list)
+        String phone = nullToEmpty(p.getPortfolioUserPhone());
+        String email = nullToEmpty(p.getPortfolioUserEmail());
+        List<Map<String, Object>> contactChildren = List.of(
+                heading2("연락처"),
+                paragraph("T: " + (phone.isBlank() ? "-" : phone)),
+                paragraph("A: -"),
+                paragraph("E: " + (email.isBlank() ? "-" : email))
+        );
+
+        List<Map<String, Object>> careerChildren = new ArrayList<>();
+        careerChildren.add(heading2("경력"));
         if (p.getPortfolioUserCareer() != null && !p.getPortfolioUserCareer().isBlank()) {
-            blocks.add(heading2("경력"));
             for (String line : p.getPortfolioUserCareer().split("\n")) {
                 String trimmed = line.trim();
-                if (!trimmed.isEmpty()) blocks.add(bulletedItem(trimmed));
+                if (!trimmed.isEmpty()) careerChildren.add(bulletedItem(trimmed));
             }
         }
+        if (careerChildren.size() == 1) careerChildren.add(paragraph("-"));
+
+        blocks.add(columnListBlock(contactChildren, careerChildren));
+
         if (p.getPortfolioUserProject() != null && !p.getPortfolioUserProject().isBlank()) {
             blocks.add(heading2("참여 프로젝트"));
             for (String line : p.getPortfolioUserProject().split("\n")) {
@@ -295,6 +319,56 @@ public class NotionPortfolioSyncService {
             blocks.add(paragraph(p.getPortfolioUserSkill()));
         }
         return blocks;
+    }
+
+    /** column_list: 왼쪽 연락처, 오른쪽 경력 (각 column 최소 1개 자식 필요) */
+    private static Map<String, Object> columnListBlock(List<Map<String, Object>> leftChildren, List<Map<String, Object>> rightChildren) {
+        Map<String, Object> leftColumn = Map.of(
+                "object", "block",
+                "type", "column",
+                "column", Map.of("children", leftChildren)
+        );
+        Map<String, Object> rightColumn = Map.of(
+                "object", "block",
+                "type", "column",
+                "column", Map.of("children", rightChildren)
+        );
+        return Map.of(
+                "object", "block",
+                "type", "column_list",
+                "column_list", Map.of("children", List.of(leftColumn, rightColumn))
+        );
+    }
+
+    /** 회원 프로필 이미지를 공개 URL로 변환 (Notion 이미지 블록용) */
+    private String toPublicProfileImageUrl(Portfolio p) {
+        if (p.getMember() == null) return null;
+        String path = p.getMember().getMemberProfileImage();
+        if (path == null || path.isBlank()) return null;
+        if (path.startsWith("http://") || path.startsWith("https://")) return path;
+        String base = publicBaseUrl != null ? publicBaseUrl.trim() : "http://localhost:8888";
+        if (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        String segment = path.startsWith("/") ? path.substring(1) : (path.startsWith("uploads/") ? path : "uploads/" + path);
+        return base + "/" + segment;
+    }
+
+    private static Map<String, Object> imageBlock(String imageUrl) {
+        return Map.of(
+                "object", "block",
+                "type", "image",
+                "image", Map.of(
+                        "type", "external",
+                        "external", Map.of("url", imageUrl)
+                )
+        );
+    }
+
+    private static Map<String, Object> heading1(String text) {
+        return Map.of(
+                "object", "block",
+                "type", "heading_1",
+                "heading_1", Map.of("rich_text", List.of(richText(truncate(text, MAX_RICH_TEXT_LENGTH))))
+        );
     }
 
     private static Map<String, Object> heading2(String text) {
