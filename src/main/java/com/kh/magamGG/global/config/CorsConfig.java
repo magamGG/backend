@@ -17,11 +17,12 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         // 개발 환경: 프론트엔드 개발 서버 (Vite 기본 포트)
-        // 프로덕션: 실제 프론트엔드 도메인으로 변경 필요
+        // 프로덕션: 실제 프론트엔드 도메인 추가
         configuration.setAllowedOrigins(Arrays.asList(
-                "http://localhost:5173",  // Vite 기본 포트
-                "http://localhost:3000",  // React 기본 포트 (대비)
-                "http://127.0.0.1:5173"
+                "http://localhost:5173",   // Vite 기본 포트
+                "http://localhost:3000",   // React 기본 포트 (대비)
+                "http://127.0.0.1:5173",
+                "https://magam.cloud"      // 프로덕션 프론트엔드 도메인
         ));
 
         // 허용할 HTTP 메서드 (SSE는 GET이므로 포함)
