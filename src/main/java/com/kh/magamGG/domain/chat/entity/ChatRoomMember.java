@@ -11,7 +11,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "CHAT_ROOM_MEMBER")
+@Table(name = "chat_room_member")
 @Getter
 @Setter
 @NoArgsConstructor

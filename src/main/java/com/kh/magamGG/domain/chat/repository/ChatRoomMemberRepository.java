@@ -36,7 +36,7 @@ public interface ChatRoomMemberRepository extends JpaRepository<ChatRoomMember, 
      * 특정 메시지를 아직 읽지 않은 참여 중인 멤버 수 (참여 중 = joined_at IS NOT NULL).
      * 발신자 제외: senderMemberNo. 채팅방 연 사람 제외: requesterMemberNo (내역 조회 시 요청자를 '읽은 사람'으로 간주).
      */
-    @Query(value = "SELECT COUNT(*) FROM CHAT_ROOM_MEMBER crm WHERE crm.CHAT_ROOM_NO = :chatRoomNo " +
+    @Query(value = "SELECT COUNT(*) FROM chat_room_member crm WHERE crm.CHAT_ROOM_NO = :chatRoomNo " +
            "AND crm.CHAT_ROOM_MEMBER_JOINED_AT IS NOT NULL " +
            "AND (crm.LAST_READ_CHAT_NO IS NULL OR crm.LAST_READ_CHAT_NO < :chatNo) " +
            "AND (:senderMemberNo IS NULL OR crm.MEMBER_NO <> :senderMemberNo) " +

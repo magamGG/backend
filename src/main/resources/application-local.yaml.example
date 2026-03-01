@@ -6,12 +6,11 @@
 
 spring:
   datasource:
-    username: your-db-user
-    password: your-db-password
+    url: jdbc:mysql://localhost:3308/magamgg?useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
 
   mail:
-    username: your-gmail@gmail.com
-    password: your-app-password
+    username: luinha317@gmail.com
+    password: Eddrathe01!
 
   ai:
     openai:
