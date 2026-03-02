@@ -14,6 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -231,6 +235,42 @@ public class AttendanceRequestController {
         } catch (Exception e) {
             log.error("근태 첨부 파일 업로드 실패: {}", e.getMessage());
             return ResponseEntity.internalServerError().body("파일 업로드에 실패했습니다.");
+        }
+    }
+
+    /**
+     * 근태 신청 첨부 파일 다운로드
+     * GET /api/leave/file/{fileName}
+     *
+     * @param fileName 다운로드할 파일명 (예: uuid.gif)
+     * @return 파일 리소스
+     */
+    @GetMapping("/file/{fileName}")
+    public ResponseEntity<Resource> downloadAttendanceFile(@PathVariable String fileName) {
+        try {
+            Path baseDir = Paths.get(uploadDir).toAbsolutePath();
+            Path filePath = baseDir.resolve("attendance").resolve(fileName);
+            
+            if (!Files.exists(filePath)) {
+                log.warn("파일을 찾을 수 없음: {}", filePath);
+                return ResponseEntity.notFound().build();
+            }
+            
+            Resource resource = new UrlResource(filePath.toUri());
+            
+            if (!resource.exists() || !resource.isReadable()) {
+                log.warn("파일을 읽을 수 없음: {}", filePath);
+                return ResponseEntity.notFound().build();
+            }
+            
+            log.info("근태 첨부 파일 다운로드: {}", fileName);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + fileName + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("근태 첨부 파일 다운로드 실패: fileName={}, error={}", fileName, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 

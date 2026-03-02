@@ -32,6 +32,12 @@ public class AttendanceNotificationService {
     public CompletableFuture<Void> sendAttendanceRequestNotification(Member member, String requestType, 
                                                                       java.time.LocalDateTime startDate, 
                                                                       java.time.LocalDateTime endDate) {
+        log.info("🔔 [알림] 근태 신청 알림 발송 시작: memberNo={}, memberName={}, requestType={}, agencyNo={}", 
+            member.getMemberNo(), 
+            member.getMemberName(),
+            requestType,
+            member.getAgency() != null ? member.getAgency().getAgencyNo() : "null");
+        
         try {
             // 근태 신청(LEAVE_REQ) 알림은 에이전시 관리자에게만 발송
             if (member.getAgency() != null) {
@@ -42,16 +48,26 @@ public class AttendanceNotificationService {
                         startDate.toLocalDate(),
                         endDate.toLocalDate());
 
+                log.info("🔔 [알림] notifyAgencyManagers 호출: agencyNo={}, notificationName={}, notificationText={}", 
+                    member.getAgency().getAgencyNo(), notificationName, notificationText);
+                
                 notificationService.notifyAgencyManagers(
                         member.getAgency().getAgencyNo(),
                         notificationName,
                         notificationText,
                         "LEAVE_REQ"
                 );
-                log.info("근태 신청 알림 발송: 에이전시 관리자에게만 (에이전시={})", member.getAgency().getAgencyNo());
+                log.info("✅ [알림] 근태 신청 알림 발송 완료: 에이전시={}, 회원={}", 
+                    member.getAgency().getAgencyNo(), member.getMemberNo());
+            } else {
+                log.warn("⚠️ [알림] 회원의 에이전시가 null: memberNo={}, memberName={}", 
+                    member.getMemberNo(), member.getMemberName());
             }
         } catch (Exception e) {
-            log.error("근태 신청 알림 발송 실패: 회원번호={}", member.getMemberNo(), e);
+            log.error("❌ [알림] 근태 신청 알림 발송 실패: memberNo={}, agencyNo={}, error={}", 
+                member.getMemberNo(), 
+                member.getAgency() != null ? member.getAgency().getAgencyNo() : "null",
+                e.getMessage(), e);
         }
         return CompletableFuture.completedFuture(null);
     }
