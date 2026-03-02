@@ -3,12 +3,12 @@
  * ============================================ */
 
 -- PHQ-9
-INSERT INTO HEALTH_SURVEY_QUESTION
-(HEALTH_SURVEY_ORDER,
- HEALTH_SURVEY_QUESTION_CONTENT,
- HEALTH_SURVEY_QUESTION_TYPE,
- HEALTH_SURVEY_QUESTION_MIN_SCORE,
- HEALTH_SURVEY_QUESTION_MAX_SCORE)
+INSERT INTO health_survey_question
+(health_survey_order,
+ health_survey_question_content,
+ health_survey_question_type,
+ health_survey_question_min_score,
+ health_survey_question_max_score)
 VALUES
 (1, '기분이 가라앉거나, 우울하거나, 희망이 없다고 느꼈다.', '월간 정신', 0, 3),
 (2, '평소 하던 일에 대한 흥미가 없어지거나 즐거움을 느끼지 못했다.', '월간 정신', 0, 3),
@@ -21,12 +21,12 @@ VALUES
 (9, '차라리 죽는 것이 더 낫겠다고 생각했다 / 혹은 자해할 생각을 했다.', '월간 정신', 0, 3);
 
 -- 불안 검사 (GAD 유사)
-INSERT INTO HEALTH_SURVEY_QUESTION
-(HEALTH_SURVEY_ORDER,
- HEALTH_SURVEY_QUESTION_CONTENT,
- HEALTH_SURVEY_QUESTION_TYPE,
- HEALTH_SURVEY_QUESTION_MIN_SCORE,
- HEALTH_SURVEY_QUESTION_MAX_SCORE)
+INSERT INTO health_survey_question
+(health_survey_order,
+ health_survey_question_content,
+ health_survey_question_type,
+ health_survey_question_min_score,
+ health_survey_question_max_score)
 VALUES
 (10, '초조하거나 불안하거나 조마조마하게 느낀다.', '월간 정신', 0, 4),
 (11, '걱정하는 것을 멈추거나 조절할 수가 없다.', '월간 정신', 0, 4),
@@ -42,12 +42,12 @@ VALUES
 /* ============================================
  * 2. 월간 신체 (QuickDASH)
  * ============================================ */
-INSERT INTO HEALTH_SURVEY_QUESTION
-(HEALTH_SURVEY_ORDER,
- HEALTH_SURVEY_QUESTION_CONTENT,
- HEALTH_SURVEY_QUESTION_TYPE,
- HEALTH_SURVEY_QUESTION_MIN_SCORE,
- HEALTH_SURVEY_QUESTION_MAX_SCORE)
+INSERT INTO health_survey_question
+(health_survey_order,
+ health_survey_question_content,
+ health_survey_question_type,
+ health_survey_question_min_score,
+ health_survey_question_max_score)
 VALUES
 (1,  '지난 주 동안, 손목, 팔꿈치, 어깨의 통증으로 인해 열쇠를 돌리거나 문을 여는 등의 활동을 하는데 어려움이 있었습니까?', '월간 신체', 1, 5),
 (2,  '지난 주 동안, 손목, 팔꿈치, 어깨의 통증으로 인해 옷을 입거나 벗는 등의 활동을 하는데 어려움이 있었습니까?', '월간 신체', 1, 5),

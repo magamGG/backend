@@ -12,7 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "CHAT_ROOM")
+@Table(name = "chat_room")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -22,29 +22,29 @@ public class ChatRoom {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "CHAT_ROOM_NO")
+    @Column(name = "chat_room_no")
     private Long chatRoomNo;
 
-    @Column(name = "CHAT_ROOM_NAME", nullable = false, length = 50)
+    @Column(name = "chat_room_name", nullable = false, length = 50)
     private String chatRoomName;
 
-    @Column(name = "CHAT_ROOM_TYPE", length = 30)
+    @Column(name = "chat_room_type", length = 30)
     private String chatRoomType; // 전체 / 프로젝트 / 개인
 
     @Column(
-        name = "CHAT_ROOM_CREATED_AT",
+        name = "chat_room_created_at",
         nullable = false,
         columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP"
     )
     private LocalDateTime chatRoomCreatedAt;
 
     @Column(
-        name = "CHAT_ROOM_UPDATED_AT",
+        name = "chat_room_updated_at",
         columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
     )
     private LocalDateTime chatRoomUpdatedAt;
 
-    @Column(name = "CHAT_ROOM_STATUS", nullable = false, length = 1)
+    @Column(name = "chat_room_status", nullable = false, length = 1)
     private String chatRoomStatus; // Y / N
 
     @OneToMany(mappedBy = "chatRoom", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -55,10 +55,10 @@ public class ChatRoom {
     @Builder.Default
     private List<ChatRoomMember> roomMembers = new ArrayList<>();
 
-    @Column(name = "PROJECT_NO", nullable = true)
+    @Column(name = "project_no", nullable = true)
     private Long projectNo;
 
-    @Column(name = "AGENCY_NO")
+    @Column(name = "agency_no")
     private Long agencyNo;
 }
 

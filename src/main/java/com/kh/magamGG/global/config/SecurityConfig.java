@@ -47,6 +47,20 @@ public class SecurityConfig {
     }
 
     /**
+     * WebSocket(SockJS) - 인증 없이 허용. SockJS가 /ws-stomp, /ws-stomp/info 등으로 접근하므로 별도 체인으로 최우선 처리.
+     */
+    @Bean
+    @Order(0)
+    public SecurityFilterChain webSocketSecurityFilterChain(HttpSecurity http) throws Exception {
+        return http
+                .securityMatcher("/ws-stomp", "/ws-stomp/**")
+                .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())
+                .csrf(csrf -> csrf.disable())
+                .requestCache(cache -> cache.disable())
+                .build();
+    }
+
+    /**
      * 정적 리소스(uploads) - Notion 등 외부에서 이미지 로드 시 인증 없이 허용.
      * JWT 필터를 타지 않으며, 별도 체인으로 먼저 매칭된다.
      */
@@ -94,26 +108,17 @@ public class SecurityConfig {
             // JWT 필터를 UsernamePasswordAuthenticationFilter 전에 추가
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 
-            // 엔드포인트별 인증 요구사항 설정
+            // 엔드포인트별 인증 요구사항 설정 (인증 없이 호출하는 API)
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/logout", "/api/auth/reissue").permitAll()
+                .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(
-                    "/api/auth/login",
-                    "/api/auth/logout",
-                    "/api/auth/refresh",
-                    "/api/auth/reissue",
-                    "/api/auth/*/authorization-url",  // OAuth 인증 URL 조회
-                    "/api/auth/*/callback",           // OAuth 콜백 (커스텀)
                     "/api/members",
-                    "/api/auth/email/**",
-                    "/api/auth/forgot-password",
-                    "/api/auth/verify-reset-code",
-                    "/api/auth/reset-password",
                     "/api/holidays/**",
-                    "/login/oauth2/**",               // Spring Security OAuth2 엔드포인트
-                    "/oauth2/**"                  // OAuth2 관련 추가 엔드포인트
+                    "/login/oauth2/**",
+                    "/oauth2/**"
                 ).permitAll()
                 .requestMatchers("/uploads/**").permitAll()
-                .requestMatchers("/ws-stomp/**").permitAll()
                 .anyRequest().authenticated()
             );
 

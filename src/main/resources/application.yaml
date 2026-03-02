@@ -90,7 +90,7 @@ jwt:
   refresh-expiration: 604800000  # 7일 (밀리초)
 
 server:
-  port: ${SERVER_PORT:8080}  # Nginx가 8080으로 프록시하므로 8080으로 변경
+  port: ${SERVER_PORT:8888}  # 기본 8888 (Nginx 프록시 시 SERVER_PORT로 오버라이드)
 
   servlet:
     encoding:
@@ -117,7 +117,7 @@ google:
   oauth:
     client-id: ${GOOGLE_CLIENT_ID:}
     client-secret: ${GOOGLE_CLIENT_SECRET:}
-    redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.mgsv.co.kr/api/auth/google/callback}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.magamgiki.life/api/auth/google/callback}
     scope: ${GOOGLE_SCOPE:openid profile email}
 
 # Naver OAuth: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
