@@ -24,8 +24,7 @@ public class CorsConfig {
             "https://magamgiki.life",
             "https://www.magamgiki.life",
             "http://magamgiki.life",
-            "http://www.magamgiki.life"
-            "http://127.0.0.1:5173",
+            "http://www.magamgiki.life",
             "https://magamgg.cloud",
             "https://www.magamgg.cloud"
     );
