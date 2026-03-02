@@ -24,7 +24,11 @@ public class CorsConfig {
             "https://magamgiki.life",
             "https://www.magamgiki.life",
             "http://magamgiki.life",
-            "http://www.magamgiki.life"
+            "http://www.magamgiki.life",
+            "http://mgsv.co.kr",
+            "http://www.mgsv.co.kr",
+            "https://mgsv.co.kr",
+            "https://www.mgsv.co.kr"
     );
 
     /** CorsFilter를 Security보다 먼저 실행해 preflight(OPTIONS)에도 CORS 헤더 적용 */
