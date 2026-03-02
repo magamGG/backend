@@ -20,7 +20,9 @@ public class CorsConfig {
     private static final List<String> ALLOWED_ORIGINS = Arrays.asList(
             "http://localhost:5173",
             "http://localhost:3000",
-            "http://127.0.0.1:5173"
+            "http://127.0.0.1:5173",
+            "https://magamgg.cloud",
+            "https://www.magamgg.cloud"
     );
 
     /** CorsFilter를 Security보다 먼저 실행해 preflight(OPTIONS)에도 CORS 헤더 적용 */

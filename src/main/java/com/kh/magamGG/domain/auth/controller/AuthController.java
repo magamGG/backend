@@ -49,6 +49,10 @@ public class AuthController {
 
     @Value("${jwt.refresh-expiration}")
     private Long refreshExpiration;
+
+    @Value("${app.frontend-base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
     private final GoogleOAuthService googleOAuthService;
 
     @PostMapping("/login")
@@ -402,7 +406,7 @@ public class AuthController {
             if (error != null || code == null || code.isEmpty()) {
                 log.warn("{} OAuth 로그인 취소 또는 에러: error={}", provider, error);
                 String loginUrl = UriComponentsBuilder
-                    .fromUriString("http://localhost:5173/auth/" + provider + "/callback")
+                    .fromUriString(frontendBaseUrl + "/auth/" + provider + "/callback")
                     .queryParam("error", error != null ? error : "user_cancelled")
                     .build()
                     .encode()
@@ -417,7 +421,7 @@ public class AuthController {
             switch (provider.toLowerCase()) {
                 case "google":
                     loginResponse = googleOAuthService.handleCallback(code);
-                    frontendCallbackUrl = "http://localhost:5173/auth/google/callback";
+                    frontendCallbackUrl = frontendBaseUrl + "/auth/google/callback";
                     break;
                 case "naver":
                     // TODO: NaverOAuthService 구현 시
@@ -459,7 +463,7 @@ public class AuthController {
             log.info("{} OAuth 신규 회원 감지: email={}, name={}", provider, e.getEmail(), e.getName());
             try {
                 String signupUrl = UriComponentsBuilder
-                    .fromUriString("http://localhost:5173/signup")
+                    .fromUriString(frontendBaseUrl + "/signup")
                     .queryParam("email", e.getEmail())
                     .queryParam("name", e.getName())
                     .queryParam("oauth", e.getProvider())
@@ -475,7 +479,7 @@ public class AuthController {
             log.error("{} OAuth 콜백 처리 실패", provider, e);
             try {
                 String errorUrl = UriComponentsBuilder
-                    .fromUriString("http://localhost:5173/auth/" + provider + "/callback")
+                    .fromUriString(frontendBaseUrl + "/auth/" + provider + "/callback")
                     .queryParam("error", "oauth_login_failed")
                     .build()  // false (기본값)로 빌드
                     .encode()  // 빌드 후 인코딩 적용

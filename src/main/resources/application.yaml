@@ -8,13 +8,12 @@ logging:
 spring:
   application:
     name: magamgg
-  profiles:
-    include: local   # application-local.yaml 로드 (파일 없으면 무시)
+
 
   datasource:
-    url: jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: magam01
+    url: jdbc:mysql://magam-db.crcc4u68y2fq.ap-northeast-2.rds.amazonaws.com:3306/magamgg?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: heetwo2234
+    password: dnskarb123
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 30
@@ -34,6 +33,7 @@ spring:
     show-sql: true
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
 
   # 캐싱 설정 (최적화)
@@ -98,9 +98,13 @@ server:
 file:
   upload-dir: uploads
 
-  # Notion 등 외부에서 이미지 로드 시 사용할 공개 URL (배포 시 HTTPS 도메인으로 설정)
+  # Notion 등 외부에서 이미지 로드 시 사용할 공개 URL (api 도메인 사용, 로컬 미사용)
   app:
-    public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:8888}
+    public-base-url: ${APP_PUBLIC_BASE_URL:https://api.magamgg.cloud}
+
+# 프론트엔드 베이스 URL (OAuth 리다이렉트·CORS 등, 배포 시 https://magamgg.cloud 로 설정)
+app:
+  frontend-base-url: ${FRONTEND_BASE_URL:http://localhost:5173}
 
 # 공공데이터 API 설정
 public-data:
@@ -114,7 +118,7 @@ google:
   oauth:
     client-id: ${GOOGLE_CLIENT_ID:}
     client-secret: ${GOOGLE_CLIENT_SECRET:}
-    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8888/api/auth/google/callback}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.magamgg.cloud/api/auth/google/callback}
     scope: ${GOOGLE_SCOPE:openid profile email}
 
 # Naver OAuth: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
@@ -122,7 +126,7 @@ naver:
   oauth:
     client-id: ${NAVER_CLIENT_ID:}
     client-secret: ${NAVER_CLIENT_SECRET:}
-    redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8888/api/auth/naver/callback}
+    redirect-uri: ${NAVER_REDIRECT_URI:https://api.magamgg.cloud/api/auth/naver/callback}
     # Naver API 엔드포인트
     authorization-url: https://nid.naver.com/oauth2.0/authorize
     token-url: https://nid.naver.com/oauth2.0/token
@@ -133,7 +137,7 @@ naver:
 kakao:
   oauth:
     rest-api-key: ${KAKAO_REST_API_KEY:}
-    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8888/api/auth/kakao/callback}
+    redirect-uri: ${KAKAO_REDIRECT_URI:https://api.magamgg.cloud/api/auth/kakao/callback}
     # Kakao API 엔드포인트
     authorization-url: https://kauth.kakao.com/oauth/authorize
     token-url: https://kauth.kakao.com/oauth/token
@@ -142,7 +146,7 @@ kakao:
 notion:
   client-id: ${NOTION_CLIENT_ID:}
   client-secret: ${NOTION_CLIENT_SECRET:}
-  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
+  redirect-uri: ${NOTION_REDIRECT_URI:${app.frontend-base-url}/notion/callback}
   api-version: "2022-06-28"
   portfolio:
     enabled: ${NOTION_PORTFOLIO_ENABLED:false}

@@ -48,6 +48,9 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Value("${jwt.refresh-expiration}")
     private Long refreshExpiration;
 
+    @Value("${app.frontend-base-url:http://localhost:5173}")
+    private String frontendBaseUrl;
+
     /**
      * 구글 로그인 성공 시 호출되는 메서드
      * 
@@ -127,7 +130,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         log.info("✅ [OAuth2] 토큰 발급 및 저장 완료: memberNo={}, email={}", member.getMemberNo(), email);
 
         // 7. 프론트엔드로 리다이렉트 (Access Token을 쿼리 파라미터로 전달)
-        String redirectUrl = UriComponentsBuilder.fromUriString("http://localhost:5173/oauth2/callback")
+        String redirectUrl = UriComponentsBuilder.fromUriString(frontendBaseUrl + "/oauth2/callback")
                 .queryParam("accessToken", accessToken)
                 .queryParam("memberNo", member.getMemberNo())
                 .queryParam("memberName", URLEncoder.encode(member.getMemberName(), StandardCharsets.UTF_8))
