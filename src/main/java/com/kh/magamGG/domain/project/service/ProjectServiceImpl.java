@@ -352,6 +352,9 @@ public class ProjectServiceImpl implements ProjectService {
         if (projectName.isEmpty()) {
             throw new IllegalArgumentException("프로젝트명을 입력해주세요.");
         }
+        if (request.getArtistMemberNo() == null) {
+            throw new IllegalArgumentException("작가 회원을 선택해주세요.");
+        }
 
         Member artist = memberRepository.findById(request.getArtistMemberNo())
                 .orElseThrow(() -> new IllegalArgumentException("작가 회원을 찾을 수 없습니다: " + request.getArtistMemberNo()));
@@ -400,11 +403,10 @@ public class ProjectServiceImpl implements ProjectService {
         List<Long> memberNos = members.stream()
                 .map(pm -> pm.getMember().getMemberNo())
                 .collect(Collectors.toList());
-        
         chatRoomService.createProjectChatRoom(
-                saved.getProjectNo(), 
-                saved.getProjectName(), 
-                agencyNo, 
+                saved.getProjectNo(),
+                saved.getProjectName(),
+                agencyNo,
                 memberNos
         );
         

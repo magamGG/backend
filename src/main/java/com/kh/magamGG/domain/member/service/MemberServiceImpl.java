@@ -86,11 +86,11 @@ public class MemberServiceImpl implements MemberService {
     @Transactional
     public MemberResponse register(MemberRequest request) {
         // 이메일 인증 완료 여부 확인 - 테스트를 위해 주석처리
-        /*
+
         if (!emailVerificationService.isEmailVerified(request.getMemberEmail())) {
             throw new IllegalArgumentException("이메일 인증이 완료되지 않았습니다.");
         }
-*/
+
         
         // 이메일 중복 체크
         if (memberRepository.existsByMemberEmail(request.getMemberEmail())) {
