@@ -34,9 +34,12 @@ public class NotificationController {
     /**
      * SSE 알림 구독 (EventSource는 Authorization 헤더를 보낼 수 없으므로 쿼리 token 사용)
      * GET /api/notifications/subscribe?token=...
+     * 서비스에 emitter를 등록해야 createNotification 시 pushToClient가 해당 회원에게 실시간 푸시 가능.
      */
     @GetMapping(value = "/subscribe", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter subscribe(@RequestParam("token") String token) {
+    public SseEmitter subscribe(
+            @RequestParam("token") String token,
+            @RequestHeader(value = "Last-Event-ID", required = false) String lastEventId) {
         if (token == null || token.isBlank()) {
             throw new IllegalArgumentException("token이 필요합니다.");
         }
@@ -45,7 +48,8 @@ public class NotificationController {
         }
         Long memberNo = jwtTokenProvider.getMemberNoFromToken(token);
 
-        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+        // EmitterRepository에 등록된 emitter 사용 (미등록 시 pushToClient에서 대상 없음)
+        SseEmitter emitter = notificationService.subscribe(memberNo, lastEventId);
         emitter.onCompletion(() -> log.debug("SSE 구독 종료: memberNo={}", memberNo));
         emitter.onTimeout(() -> log.debug("SSE 타임아웃: memberNo={}", memberNo));
 
@@ -58,11 +62,6 @@ public class NotificationController {
                     }
                 }, 15, 15, TimeUnit.SECONDS);
 
-        try {
-            emitter.send(SseEmitter.event().comment("EventStream"));
-        } catch (IOException e) {
-            emitter.completeWithError(e);
-        }
         return emitter;
     }
 
