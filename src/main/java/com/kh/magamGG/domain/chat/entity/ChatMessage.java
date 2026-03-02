@@ -11,7 +11,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "CHAT_MESSAGE")
+@Table(name = "chat_message")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,40 +21,40 @@ public class ChatMessage {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "CHAT_NO")
+    @Column(name = "chat_no")
     private Long chatNo;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "MEMBER_NO", nullable = false)
+    @JoinColumn(name = "member_no", nullable = false)
     private Member member;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "CHAT_ROOM_NO", nullable = false)
+    @JoinColumn(name = "chat_room_no", nullable = false)
     private ChatRoom chatRoom;
 
-    @Column(name = "CHAT_STATUS", nullable = false, length = 1)
+    @Column(name = "chat_status", nullable = false, length = 1)
     private String chatStatus; // Y / N (보임/삭제)
 
-    @Column(name = "CHAT_MESSAGE", nullable = false, length = 500)
+    @Column(name = "chat_message", nullable = false, length = 500)
     private String chatMessage;
 
     @Column(
-        name = "CHAT_MESSAGE_CREATED_AT",
+        name = "chat_message_created_at",
         nullable = false,
         columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP"
     )
     private LocalDateTime chatMessageCreatedAt;
 
     @Column(
-        name = "CHAT_MESSAGE_UPDATED_AT",
+        name = "chat_message_updated_at",
         columnDefinition = "DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"
     )
     private LocalDateTime chatMessageUpdatedAt;
 
-    @Column(name = "CHAT_MESSAGE_TYPE", nullable = false, length = 10)
+    @Column(name = "chat_message_type", nullable = false, length = 10)
     private String chatMessageType; // message / image / file
 
-    @Column(name = "ATTACHMENT_URL", length = 1000)
+    @Column(name = "attachment_url", length = 1000)
     private String attachmentUrl;
 }
 

@@ -21,6 +21,11 @@ public class CorsConfig {
             "http://localhost:5173",
             "http://localhost:3000",
             "http://127.0.0.1:5173",
+            "https://magamgiki.life",
+            "https://www.magamgiki.life",
+            "http://magamgiki.life",
+            "http://www.magamgiki.life"
+            "http://127.0.0.1:5173",
             "https://magamgg.cloud",
             "https://www.magamgg.cloud"
     );
@@ -59,16 +64,18 @@ public class CorsConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        // 구체적인 도메인만 허용 (AllowCredentials(true)와 "*" 함께 사용 불가)
         configuration.setAllowedOrigins(ALLOWED_ORIGINS);
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(true); // 쿠키/Authorization 토큰 주고받기 필수
         configuration.setExposedHeaders(Arrays.asList("Authorization", "Set-Cookie", "Content-Type", "Last-Event-ID"));
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", configuration);
         source.registerCorsConfiguration("/ws-stomp/**", configuration);
+        source.registerCorsConfiguration("/**", configuration); // 전체 경로에도 적용
         return source;
     }
 }

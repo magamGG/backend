@@ -216,7 +216,7 @@ public class ChatRoomServiceImpl implements ChatRoomService {
         // 2. 프로젝트 참여자들을 채팅방에 추가
         for (Long memberNo : memberNos) {
             Member member = memberRepository.findById(memberNo)
-                    .orElseThrow(() -> new RuntimeException("회원을 찾을 수 없습니다: " + memberNo));
+                    .orElseThrow(() -> new IllegalArgumentException("회원을 찾을 수 없습니다: " + memberNo));
             saveChatRoomMemberIfAbsent(projectRoom, member);
         }
     }

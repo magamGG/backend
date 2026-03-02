@@ -46,9 +46,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     Optional<ChatMessage> findFirstByChatRoomOrderByChatMessageCreatedAtDesc(ChatRoom chatRoom);
 
     // 3-1. 멤버 입장 시간 이후의 최신 메시지 조회 (LIMIT 1로 고유성 보장)
-    @Query(value = "SELECT cm.* FROM CHAT_MESSAGE cm WHERE cm.CHAT_ROOM_NO = :#{#chatRoom.chatRoomNo} " +
-           "AND cm.CHAT_STATUS = 'Y' AND cm.CHAT_MESSAGE_CREATED_AT >= :joinedAt " +
-           "ORDER BY cm.CHAT_MESSAGE_CREATED_AT DESC, cm.CHAT_NO DESC LIMIT 1", nativeQuery = true)
+    @Query(value = "SELECT cm.* FROM chat_message cm WHERE cm.chat_room_no = :#{#chatRoom.chatRoomNo} " +
+           "AND cm.chat_status = 'Y' AND cm.chat_message_created_at >= :joinedAt " +
+           "ORDER BY cm.chat_message_created_at DESC, cm.chat_no DESC LIMIT 1", nativeQuery = true)
     Optional<ChatMessage> findFirstByChatRoomAndChatMessageCreatedAtGreaterThanEqualOrderByChatMessageCreatedAtDesc(
             @Param("chatRoom") ChatRoom chatRoom, 
             @Param("joinedAt") java.time.LocalDateTime joinedAt);

@@ -137,10 +137,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
      */
     private boolean requiresAuthentication(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        // permitAll 엔드포인트 목록
+        // permitAll 엔드포인트 목록 (logout/reissue는 토큰 없어도 통과시켜 403 무한루프 방지)
         return !uri.startsWith("/api/auth/login")
             && !uri.startsWith("/api/auth/refresh")
             && !uri.startsWith("/api/auth/reissue")
+            && !uri.startsWith("/api/auth/logout")
             && !uri.startsWith("/api/members")
             && !uri.startsWith("/uploads/")
             && !uri.startsWith("/login/oauth2")

@@ -48,7 +48,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
     @Value("${jwt.refresh-expiration}")
     private Long refreshExpiration;
 
-    @Value("${app.frontend-base-url:http://localhost:5173}")
+    @Value("${frontend.base-url:http://localhost:5173}")
     private String frontendBaseUrl;
 
     /**
