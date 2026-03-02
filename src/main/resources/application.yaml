@@ -9,12 +9,14 @@ spring:
   application:
     name: magamgg
   profiles:
-    include: local   # application-local.yaml 로드 (파일 없으면 무시)
+    # include: local   # 프로덕션에서는 주석 처리 (또는 환경 변수로 제어)
+    active: ${SPRING_PROFILES_ACTIVE:local}  # 환경 변수로 제어
 
   datasource:
-    url: jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: root
-    password: magam01
+    # RDS 연결 정보 (환경 변수로 설정)
+    url: ${DB_URL:jdbc:mysql://localhost:3306/magamgg?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useSSL=false}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:magam01}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       maximum-pool-size: 30
@@ -30,10 +32,11 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${DDL_AUTO:update}  # 프로덕션에서는 'none' 또는 'validate'
+    show-sql: ${SHOW_SQL:true}      # 프로덕션에서는 false
     properties:
       hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
         format_sql: true
 
   # 캐싱 설정 (최적화)
@@ -87,7 +90,7 @@ jwt:
   refresh-expiration: 604800000  # 7일 (밀리초)
 
 server:
-  port: 8888
+  port: ${SERVER_PORT:8080}  # Nginx가 8080으로 프록시하므로 8080으로 변경
 
   servlet:
     encoding:
@@ -114,7 +117,7 @@ google:
   oauth:
     client-id: ${GOOGLE_CLIENT_ID:}
     client-secret: ${GOOGLE_CLIENT_SECRET:}
-    redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:8888/api/auth/google/callback}
+    redirect-uri: ${GOOGLE_REDIRECT_URI:https://api.mgsv.co.kr/api/auth/google/callback}
     scope: ${GOOGLE_SCOPE:openid profile email}
 
 # Naver OAuth: NAVER_CLIENT_ID, NAVER_CLIENT_SECRET 환경변수로 설정 (시크릿 노출 방지)
@@ -122,7 +125,7 @@ naver:
   oauth:
     client-id: ${NAVER_CLIENT_ID:}
     client-secret: ${NAVER_CLIENT_SECRET:}
-    redirect-uri: ${NAVER_REDIRECT_URI:http://localhost:8888/api/auth/naver/callback}
+    redirect-uri: ${NAVER_REDIRECT_URI:https://api.mgsv.co.kr/api/auth/naver/callback}
     # Naver API 엔드포인트
     authorization-url: https://nid.naver.com/oauth2.0/authorize
     token-url: https://nid.naver.com/oauth2.0/token
@@ -133,16 +136,17 @@ naver:
 kakao:
   oauth:
     rest-api-key: ${KAKAO_REST_API_KEY:}
-    redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:8888/api/auth/kakao/callback}
+    redirect-uri: ${KAKAO_REDIRECT_URI:https://api.mgsv.co.kr/api/auth/kakao/callback}
     # Kakao API 엔드포인트
     authorization-url: https://kauth.kakao.com/oauth/authorize
     token-url: https://kauth.kakao.com/oauth/token
     user-info-url: https://kapi.kakao.com/v2/user/me
+
 # 포트폴리오 → Notion 페이지 생성: Integration Token + 부모 페이지 ID (해당 페이지를 Integration에 공유)
 notion:
   client-id: ${NOTION_CLIENT_ID:}
   client-secret: ${NOTION_CLIENT_SECRET:}
-  redirect-uri: ${NOTION_REDIRECT_URI:http://localhost:5173/notion/callback}
+  redirect-uri: ${NOTION_REDIRECT_URI:https://mgsv.co.kr/notion/callback}
   api-version: "2022-06-28"
   portfolio:
     enabled: ${NOTION_PORTFOLIO_ENABLED:false}
