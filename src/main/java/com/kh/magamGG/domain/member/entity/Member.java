@@ -8,6 +8,7 @@ import com.kh.magamGG.domain.attendance.entity.LeaveHistory;
 import com.kh.magamGG.domain.health.entity.DailyHealthCheck;
 import com.kh.magamGG.domain.memo.entity.Memo;
 import com.kh.magamGG.domain.notification.entity.Notification;
+import com.kh.magamGG.domain.portfolio.entity.Portfolio;
 import com.kh.magamGG.domain.project.entity.ProjectMember;
 import com.kh.magamGG.domain.member.entity.NewRequest;
 import jakarta.persistence.*;
@@ -119,11 +120,13 @@ public class Member {
     @Builder.Default
     private List<NewRequest> newRequests = new ArrayList<>();
 
-    @OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<LeaveHistory> leaveHistories = new ArrayList<>();
 
-
+	@OneToMany(mappedBy = "member", cascade = CascadeType.ALL, orphanRemoval = true)
+	@Builder.Default
+	private List<Portfolio> portfolios = new ArrayList<>();
 
     @OneToMany(mappedBy = "artist")
     @Builder.Default

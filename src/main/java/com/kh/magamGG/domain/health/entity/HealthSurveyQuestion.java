@@ -3,6 +3,7 @@ package com.kh.magamGG.domain.health.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.List;
 @Entity
 @Table(name = "HEALTH_SURVEY_QUESTION")
 @Getter
+@Setter
 @NoArgsConstructor
 public class HealthSurveyQuestion {
 	

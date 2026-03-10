@@ -168,6 +168,15 @@ public interface AttendanceService {
      * @return 담당 작가들의 근태 신청 목록
      */
     List<AttendanceRequestResponse> getAttendanceRequestsByManager(Long memberNo);
+
+    /**
+     * 관리자 캘린더 조회 - 에이전시 소속 직원들의 근무 유형별 일정
+     * @param agencyNo 에이전시 번호
+     * @param year 조회 년도
+     * @param month 조회 월
+     * @return 캘린더 이벤트 목록 (재택근무: 주황색, 휴가: 회색, 워케이션: 보라색)
+     */
+    AttendanceStatisticsResponseDto getAdminCalendar(Long agencyNo, int year, int month);
 }
 
 

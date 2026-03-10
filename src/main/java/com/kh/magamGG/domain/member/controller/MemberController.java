@@ -8,6 +8,7 @@ import com.kh.magamGG.domain.member.dto.response.MemberDetailResponse;
 import com.kh.magamGG.domain.member.dto.response.MemberResponse;
 import com.kh.magamGG.domain.member.dto.response.WorkingArtistResponse;
 import com.kh.magamGG.domain.member.service.MemberService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +28,7 @@ public class MemberController {
      * 회원가입
      */
     @PostMapping
-    public ResponseEntity<MemberResponse> register(@RequestBody MemberRequest request) {
+    public ResponseEntity<MemberResponse> register(@Valid @RequestBody MemberRequest request) {
         MemberResponse response = memberService.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -93,7 +94,7 @@ public class MemberController {
     @PutMapping("/{memberNo}")
     public ResponseEntity<Void> updateProfile(
         @PathVariable Long memberNo,
-        @RequestBody MemberUpdateRequestDto requestDto
+        @Valid @RequestBody MemberUpdateRequestDto requestDto
     ) {
         memberService.updateProfile(memberNo, requestDto);
         return ResponseEntity.ok().build();

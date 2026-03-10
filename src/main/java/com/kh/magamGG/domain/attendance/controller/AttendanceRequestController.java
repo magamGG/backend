@@ -9,10 +9,20 @@ import com.kh.magamGG.domain.attendance.dto.response.LeaveHistoryResponse;
 import com.kh.magamGG.domain.attendance.service.AttendanceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * 근태 신청 컨트롤러
@@ -25,6 +35,9 @@ import java.util.List;
 public class AttendanceRequestController {
     
     private final AttendanceService attendanceService;
+
+    @Value("${file.upload-dir:uploads}")
+    private String uploadDir;
     
     /**
      * 근태 신청 생성
@@ -146,17 +159,31 @@ public class AttendanceRequestController {
      * 회원 연차 잔액 조회 (당해 연도 기준)
      * GET /api/leave/balance/{memberNo}
      *
-     * @param memberNo 회원 번호
+     * @param memberNo 회원 번호 (String으로 받아 Long으로 변환 - 타입 변환 실패 시 명확한 에러 처리)
      * @return 연차 잔액 (없으면 404 없음, null 반환 시 204 또는 200 with null body 정책에 따라 200 + body null)
      */
     @GetMapping("/balance/{memberNo}")
-    public ResponseEntity<LeaveBalanceResponse> getLeaveBalance(@PathVariable Long memberNo) {
-        log.info("회원 {} 연차 잔액 조회", memberNo);
-        LeaveBalanceResponse response = attendanceService.getLeaveBalance(memberNo);
-        if (response == null) {
-            return ResponseEntity.noContent().build();
+    public ResponseEntity<LeaveBalanceResponse> getLeaveBalance(@PathVariable String memberNo) {
+        try {
+            // 공백 제거, 소수("1.0")·전각문자 등 허용 후 Long 변환
+            String trimmed = memberNo != null ? memberNo.trim() : "";
+            long parsed = (long) Double.parseDouble(trimmed);
+            if (parsed < 1) {
+                log.warn("[연차 잔액 조회] 회원번호는 1 이상이어야 함: memberNo={}", memberNo);
+                return ResponseEntity.badRequest().build();
+            }
+            Long memberNoLong = parsed;
+            log.info("회원 {} 연차 잔액 조회", memberNoLong);
+            LeaveBalanceResponse response = attendanceService.getLeaveBalance(memberNoLong);
+            if (response == null) {
+                return ResponseEntity.noContent().build();
+            }
+            return ResponseEntity.ok(response);
+        } catch (NumberFormatException e) {
+            log.error("❌ [연차 잔액 조회] 잘못된 회원번호 형식: memberNo=[{}], length={}, error={}",
+                    memberNo, memberNo != null ? memberNo.length() : 0, e.getMessage());
+            return ResponseEntity.badRequest().build();
         }
-        return ResponseEntity.ok(response);
     }
 
     /**
@@ -175,6 +202,76 @@ public class AttendanceRequestController {
         log.info("회원 {} 연차 조정 요청: 사유={}, 조정일수={}", memberNo, request.getReason(), request.getAdjustment());
         LeaveBalanceResponse response = attendanceService.adjustLeaveBalance(memberNo, request);
         return ResponseEntity.ok(response);
+    }
+
+    /**
+     * 근태 신청 첨부 파일 업로드 (병가 진단서 등)
+     * POST /api/leave/file/upload
+     *
+     * - 파일은 uploads/attendance 하위에 저장
+     * - 응답으로 파일명을 반환 (예: uuid.gif)
+     */
+    @PostMapping("/file/upload")
+    public ResponseEntity<String> uploadAttendanceFile(@RequestParam("file") MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body("파일이 비어 있습니다.");
+        }
+        try {
+            Path baseDir = Paths.get(uploadDir).toAbsolutePath();
+            Path attendanceDir = baseDir.resolve("attendance");
+            Files.createDirectories(attendanceDir);
+
+            String originalFilename = file.getOriginalFilename();
+            String extension = (originalFilename != null && originalFilename.contains("."))
+                    ? originalFilename.substring(originalFilename.lastIndexOf("."))
+                    : "";
+            String fileName = UUID.randomUUID().toString() + extension;
+
+            Path filePath = attendanceDir.resolve(fileName);
+            Files.copy(file.getInputStream(), filePath);
+
+            log.info("근태 첨부 파일 업로드 완료: {}", filePath);
+            return ResponseEntity.ok(fileName);
+        } catch (Exception e) {
+            log.error("근태 첨부 파일 업로드 실패: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body("파일 업로드에 실패했습니다.");
+        }
+    }
+
+    /**
+     * 근태 신청 첨부 파일 다운로드
+     * GET /api/leave/file/{fileName}
+     *
+     * @param fileName 다운로드할 파일명 (예: uuid.gif)
+     * @return 파일 리소스
+     */
+    @GetMapping("/file/{fileName}")
+    public ResponseEntity<Resource> downloadAttendanceFile(@PathVariable String fileName) {
+        try {
+            Path baseDir = Paths.get(uploadDir).toAbsolutePath();
+            Path filePath = baseDir.resolve("attendance").resolve(fileName);
+            
+            if (!Files.exists(filePath)) {
+                log.warn("파일을 찾을 수 없음: {}", filePath);
+                return ResponseEntity.notFound().build();
+            }
+            
+            Resource resource = new UrlResource(filePath.toUri());
+            
+            if (!resource.exists() || !resource.isReadable()) {
+                log.warn("파일을 읽을 수 없음: {}", filePath);
+                return ResponseEntity.notFound().build();
+            }
+            
+            log.info("근태 첨부 파일 다운로드: {}", fileName);
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + fileName + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            log.error("근태 첨부 파일 다운로드 실패: fileName={}, error={}", fileName, e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
     }
 
     /**

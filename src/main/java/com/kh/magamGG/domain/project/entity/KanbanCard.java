@@ -67,6 +67,12 @@ public class KanbanCard {
 		kanbanCardUpdatedAt = LocalDateTime.now();
 	}
 
+	@Column(name = "NOTION_PAGE_ID", length = 100)
+	private String notionPageId;
+
+	@Column(name = "NOTION_PAGE_URL", length = 500)
+	private String notionPageUrl;
+
 	public void setKanbanBoard(KanbanBoard kanbanBoard) { this.kanbanBoard = kanbanBoard; }
 	public void setKanbanCardName(String kanbanCardName) { this.kanbanCardName = kanbanCardName; }
 	public void setKanbanCardDescription(String kanbanCardDescription) { this.kanbanCardDescription = kanbanCardDescription; }
@@ -74,4 +80,6 @@ public class KanbanCard {
 	public void setProjectMember(ProjectMember projectMember) { this.projectMember = projectMember; }
 	public void setKanbanCardStartedAt(LocalDate kanbanCardStartedAt) { this.kanbanCardStartedAt = kanbanCardStartedAt; }
 	public void setKanbanCardEndedAt(LocalDate kanbanCardEndedAt) { this.kanbanCardEndedAt = kanbanCardEndedAt; }
+	public void setNotionPageId(String notionPageId) { this.notionPageId = notionPageId; }
+	public void setNotionPageUrl(String notionPageUrl) { this.notionPageUrl = notionPageUrl; }
 }

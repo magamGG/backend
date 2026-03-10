@@ -22,12 +22,29 @@ configurations {
 
 repositories {
 	mavenCentral()
+	maven { url 'https://repo.spring.io/milestone' }
+}
+
+ext {
+	set('springAiVersion', '1.1.2')
+}
+
+dependencyManagement {
+	imports {
+		mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+	}
 }
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
+	// Redis 의존성 추가 (Valkey 호환)
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	// OAuth2 클라이언트 의존성 추가
+	implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.3'
 	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.3'
 	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.3'
@@ -37,8 +54,24 @@ dependencies {
     runtimeOnly 'com.mysql:mysql-connector-j'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	// Spring AI (포트폴리오 이미지/URL 추출 - Vision). BOM 1.1.2는 spring-ai-starter-model-openai 사용
+	implementation 'org.springframework.ai:spring-ai-starter-model-openai'
+	// 포트폴리오 URL → HTML 본문 텍스트 추출
+	implementation 'org.jsoup:jsoup:1.18.1'
+	// 포트폴리오 URL → 전체 스크린샷 (SPA/Notion 대응)
+	implementation 'com.microsoft.playwright:playwright:1.49.0'
 }
 
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('playwrightInstall', JavaExec) {
+	group = 'playwright'
+	description = 'Install Playwright Chromium for portfolio from-page-screenshot'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.microsoft.playwright.CLI'
+	args = ['install', 'chromium']
+}
+

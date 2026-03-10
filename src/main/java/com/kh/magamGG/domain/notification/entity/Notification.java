@@ -38,7 +38,7 @@ public class Notification {
 	@Column(name = "NOTIFICATION_STATUS", nullable = false, length = 1)
 	private String notificationStatus;
 	
-	@Column(name = "NOTIFICATION_TYPE", length = 10)
+	@Column(name = "NOTIFICATION_TYPE", length = 30)
 	private String notificationType;
 	
 	/**

@@ -8,6 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -35,10 +36,23 @@ public class ProjectMember {
 	
 	@Column(name = "PROJECT_MEMBER_ROLE", nullable = false, columnDefinition = "VARCHAR(50) DEFAULT '담당자'")
 	private String projectMemberRole;
+
+	@Column(name = "PROJECT_MEMBER_CREATED_AT", nullable = false, updatable = false)
+	private LocalDateTime projectMemberCreatedAt;
+
+	@Column(name = "PROJECT_MEMBER_ENDED_AT")
+	private LocalDateTime projectMemberEndedAt;
 	
 	@OneToMany(mappedBy = "projectMember", cascade = CascadeType.ALL, orphanRemoval = true)
 	@Builder.Default
 	private List<KanbanCard> kanbanCards = new ArrayList<>();
+
+	@PrePersist
+	protected void onCreate() {
+		if (projectMemberCreatedAt == null) {
+			projectMemberCreatedAt = LocalDateTime.now();
+		}
+	}
 
 	public void setMember(Member member) { this.member = member; }
 	public void setProject(Project project) { this.project = project; }

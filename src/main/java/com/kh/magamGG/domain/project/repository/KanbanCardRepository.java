@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
 
@@ -19,6 +20,8 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
 
     List<KanbanCard> findByKanbanBoard_Project_ProjectNo(Long projectNo);
 
+    List<KanbanCard> findByProjectMember_ProjectMemberNo(Long projectMemberNo);
+
     /**
      * 담당자 배정 + 미완료(N) 카드 전부 조회, 마감일 가까운 순 정렬 (아티스트 대시보드 오늘 할 일용).
      * Y(완료), D(삭제) 제외. 마감일 NULL은 맨 뒤로.
@@ -27,6 +30,18 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
            "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = :status " +
            "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
     List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardStatusOrderByKanbanCardEndedAtAsc(
+            @Param("memberNo") Long memberNo, @Param("status") String status);
+
+    /**
+     * 오늘 할 일 전용: 담당자 배정 + 미완료(N) + 표시 중인 보드(kanbanBoardStatus='Y')만 조회.
+     * 칸반 보드 UI에 보이는 카드와 동일한 집합만 노출.
+     */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardStatus = :status " +
+           "AND kb.kanbanBoardStatus = 'Y' " +
+           "ORDER BY kc.kanbanCardEndedAt ASC NULLS LAST")
+    List<KanbanCard> findByProjectMember_Member_MemberNoAndKanbanCardStatusAndBoardVisibleOrderByKanbanCardEndedAtAsc(
             @Param("memberNo") Long memberNo, @Param("status") String status);
 
     /**
@@ -50,6 +65,15 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
     @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
            "WHERE kc.projectMember.member.memberNo = :memberNo AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D')")
     long countByProjectMember_Member_MemberNoAndKanbanCardStatusNotD(@Param("memberNo") Long memberNo);
+
+    /**
+     * 회원의 마감일이 이미 지난 카드 중 상태별 건수 (마감 준수율 계산용: endedAt <= before, status = Y/N)
+     */
+    @Query("SELECT COUNT(kc) FROM KanbanCard kc " +
+           "WHERE kc.projectMember.member.memberNo = :memberNo AND kc.kanbanCardEndedAt IS NOT NULL " +
+           "AND kc.kanbanCardEndedAt <= :before AND kc.kanbanCardStatus = :status")
+    long countByProjectMember_Member_MemberNoAndKanbanCardEndedAtBeforeAndKanbanCardStatus(
+            @Param("memberNo") Long memberNo, @Param("before") LocalDate before, @Param("status") String status);
 
     /**
      * 여러 회원의 특정 기간 내 마감 칸반 카드 조회 (담당자/에이전시 대시보드 마감 임박 현황용)
@@ -102,5 +126,34 @@ public interface KanbanCardRepository extends JpaRepository<KanbanCard, Long> {
             @Param("memberNo") Long memberNo,
             @Param("fromDate") LocalDate fromDate,
             Pageable pageable);
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "JOIN kb.project p " +
+           "JOIN FETCH kc.projectMember pm " +
+           "JOIN FETCH pm.member m " +
+           "WHERE p.projectNo IN :projectNos " +
+           "AND (kc.kanbanCardStatus IS NULL OR kc.kanbanCardStatus <> 'D') " +
+           "AND kc.kanbanCardStartedAt <= :rangeEnd " +
+           "AND (kc.kanbanCardEndedAt IS NULL OR kc.kanbanCardEndedAt >= :rangeStart) " +
+           "ORDER BY kc.kanbanCardEndedAt ASC")
+    List<KanbanCard> findByProjectNoInAndDateRangeOverlap(
+            @Param("projectNos") List<Long> projectNos,
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd);
+
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "JOIN FETCH kc.kanbanBoard kb " +
+           "LEFT JOIN FETCH kc.projectMember pm " +
+           "LEFT JOIN FETCH pm.member m " +
+           "WHERE kb.project.projectNo = :projectNo")
+    List<KanbanCard> findByProjectNoWithBoardAndMember(@Param("projectNo") Long projectNo);
+
+    /** 응답 DTO 변환용: 카드 + 보드 + 담당자(멤버) 한 번에 로드 (lazy 연쇄 호출로 인한 JDBC 상태 오류 완화) */
+    @Query("SELECT kc FROM KanbanCard kc " +
+           "LEFT JOIN FETCH kc.kanbanBoard " +
+           "LEFT JOIN FETCH kc.projectMember pm " +
+           "LEFT JOIN FETCH pm.member " +
+           "WHERE kc.kanbanCardNo = :id")
+    Optional<KanbanCard> findByIdWithBoardAndMember(@Param("id") Long id);
 }
 
